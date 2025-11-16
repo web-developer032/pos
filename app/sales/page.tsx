@@ -29,34 +29,34 @@ export default function SalesPage() {
           <p className="mt-2 text-gray-600">View all sales transactions</p>
         </div>
 
-        <div className="bg-white shadow rounded-lg overflow-hidden">
+        <div className="overflow-hidden rounded-lg bg-white shadow">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                   Sale Number
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                   Customer
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                   Date
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                   Payment Method
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                   Total
                 </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">
                   Actions
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="divide-y divide-gray-200 bg-white">
               {data?.sales.map((sale) => (
                 <tr key={sale.id}>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                  <td className="whitespace-nowrap px-6 py-4 text-sm font-medium text-gray-900">
                     {sale.sale_number}
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-500">
@@ -65,13 +65,13 @@ export default function SalesPage() {
                   <td className="px-6 py-4 text-sm text-gray-500">
                     {format(new Date(sale.created_at), "MMM dd, yyyy HH:mm")}
                   </td>
-                  <td className="px-6 py-4 text-sm text-gray-500 capitalize">
+                  <td className="px-6 py-4 text-sm capitalize text-gray-500">
                     {sale.payment_method}
                   </td>
                   <td className="px-6 py-4 text-sm font-semibold text-gray-900">
                     {formatCurrency(sale.final_amount)}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                  <td className="whitespace-nowrap px-6 py-4 text-right text-sm font-medium">
                     <Link
                       href={`/sales/${sale.id}`}
                       className="text-indigo-600 hover:text-indigo-900"
@@ -84,8 +84,7 @@ export default function SalesPage() {
             </tbody>
           </table>
         </div>
-      </ProtectedRoute>
+      </DashboardLayout>
     </ProtectedRoute>
   );
 }
-

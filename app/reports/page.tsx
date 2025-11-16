@@ -83,7 +83,7 @@ export default function ReportsPage() {
         </div>
 
         <div className="rounded-lg bg-white p-6 shadow">
-          <h3 className="mb-4 text-lg font-semibold">
+          <h3 className="mb-4 text-lg font-semibold text-gray-900">
             Revenue Trend (Last 30 Days)
           </h3>
           <ResponsiveContainer width="100%" height={400}>

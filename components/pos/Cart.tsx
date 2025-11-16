@@ -17,7 +17,7 @@ export function Cart() {
 
   return (
     <div className="flex h-full flex-col rounded-lg bg-white p-6 shadow-lg">
-      <h2 className="mb-4 text-2xl font-bold">Cart</h2>
+      <h2 className="mb-4 text-2xl font-bold text-gray-900">Cart</h2>
       <div className="mb-4 flex-1 overflow-y-auto">
         {items.length === 0 ? (
           <p className="py-8 text-center text-gray-500">Cart is empty</p>
