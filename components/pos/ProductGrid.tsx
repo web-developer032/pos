@@ -68,18 +68,18 @@ export function ProductGrid() {
         {data?.products.map((product) => (
           <div
             key={product.id}
-            className="border rounded-lg p-4 hover:shadow-lg transition-shadow cursor-pointer"
+            className="border rounded-lg p-4 hover:shadow-lg transition-shadow cursor-pointer bg-white"
             onClick={() => handleAddToCart(product)}
           >
-            <h3 className="font-semibold mb-2">{product.name}</h3>
+            <h3 className="font-semibold mb-2 text-gray-900">{product.name}</h3>
             <p className="text-2xl font-bold text-indigo-600 mb-2">
               ${product.selling_price.toFixed(2)}
             </p>
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-gray-700">
               Stock: {product.stock_quantity}
             </p>
             {product.stock_quantity <= product.min_stock_level && (
-              <p className="text-xs text-red-600 mt-1">Low Stock!</p>
+              <p className="text-xs text-red-600 mt-1 font-semibold">Low Stock!</p>
             )}
           </div>
         ))}

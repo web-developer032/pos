@@ -31,8 +31,8 @@ export function Cart() {
                 className="border rounded p-3 flex justify-between items-center"
               >
                 <div className="flex-1">
-                  <p className="font-medium">{item.name}</p>
-                  <p className="text-sm text-gray-500">
+                  <p className="font-medium text-gray-900">{item.name}</p>
+                  <p className="text-sm text-gray-600">
                     ${item.price.toFixed(2)} x {item.quantity}
                   </p>
                 </div>
@@ -50,7 +50,7 @@ export function Cart() {
                         })
                       )
                     }
-                    className="w-16 px-2 py-1 border rounded text-center"
+                    className="w-16 px-2 py-1 border rounded text-center text-gray-900"
                   />
                   <button
                     onClick={() => dispatch(removeItem(item.product_id))}
@@ -65,19 +65,19 @@ export function Cart() {
         )}
       </div>
       <div className="border-t pt-4 space-y-2">
-        <div className="flex justify-between">
+        <div className="flex justify-between text-gray-900">
           <span>Subtotal:</span>
           <span>${subtotal.toFixed(2)}</span>
         </div>
-        <div className="flex justify-between">
+        <div className="flex justify-between text-gray-900">
           <span>Discount:</span>
           <span>-${discount.toFixed(2)}</span>
         </div>
-        <div className="flex justify-between">
+        <div className="flex justify-between text-gray-900">
           <span>Tax:</span>
           <span>${tax.toFixed(2)}</span>
         </div>
-        <div className="flex justify-between font-bold text-lg border-t pt-2">
+        <div className="flex justify-between font-bold text-lg border-t pt-2 text-gray-900">
           <span>Total:</span>
           <span>${finalTotal.toFixed(2)}</span>
         </div>

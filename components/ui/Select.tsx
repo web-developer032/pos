@@ -21,7 +21,7 @@ export function Select({
         </label>
       )}
       <select
-        className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 ${
+        className={`w-full px-3 py-2 border rounded-md shadow-sm text-gray-900 bg-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 ${
           error ? "border-red-300" : "border-gray-300"
         } ${className}`}
         {...props}

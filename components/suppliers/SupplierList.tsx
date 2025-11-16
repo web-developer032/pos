@@ -1,7 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { useGetSuppliersQuery, useDeleteSupplierMutation } from "@/lib/api/suppliersApi";
+import {
+  useGetSuppliersQuery,
+  useDeleteSupplierMutation,
+} from "@/lib/api/suppliersApi";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { SupplierForm } from "./SupplierForm";
@@ -41,36 +44,36 @@ export function SupplierList() {
 
   return (
     <div>
-      <div className="mb-4 flex justify-between items-center">
-        <h2 className="text-xl font-semibold">All Suppliers</h2>
+      <div className="mb-4 flex items-center justify-between">
+        <h2 className="text-xl font-semibold text-gray-900">All Suppliers</h2>
         <Button onClick={() => setIsModalOpen(true)}>Add Supplier</Button>
       </div>
 
-      <div className="bg-white shadow rounded-lg overflow-hidden">
+      <div className="overflow-hidden rounded-lg bg-white shadow">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                 Name
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                 Contact Person
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                 Email
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                 Phone
               </th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">
                 Actions
               </th>
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
+          <tbody className="divide-y divide-gray-200 bg-white">
             {data?.suppliers.map((supplier) => (
               <tr key={supplier.id}>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                <td className="whitespace-nowrap px-6 py-4 text-sm font-medium text-gray-900">
                   {supplier.name}
                 </td>
                 <td className="px-6 py-4 text-sm text-gray-500">
@@ -82,10 +85,10 @@ export function SupplierList() {
                 <td className="px-6 py-4 text-sm text-gray-500">
                   {supplier.phone || "-"}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                <td className="whitespace-nowrap px-6 py-4 text-right text-sm font-medium">
                   <button
                     onClick={() => handleEdit(supplier.id)}
-                    className="text-indigo-600 hover:text-indigo-900 mr-4"
+                    className="mr-4 text-indigo-600 hover:text-indigo-900"
                   >
                     Edit
                   </button>
@@ -118,4 +121,3 @@ export function SupplierList() {
     </div>
   );
 }
-
