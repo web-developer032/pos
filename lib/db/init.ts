@@ -5,7 +5,7 @@ let initialized = false;
 
 export async function ensureDatabaseInitialized() {
   if (initialized) return;
-  
+
   try {
     await initializeDatabase();
     await seedDatabase();
@@ -15,4 +15,3 @@ export async function ensureDatabaseInitialized() {
     throw error;
   }
 }
-

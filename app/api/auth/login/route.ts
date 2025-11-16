@@ -35,7 +35,10 @@ export async function POST(request: NextRequest) {
     };
 
     // Verify password
-    const isValid = await verifyPassword(validated.password, user.password_hash);
+    const isValid = await verifyPassword(
+      validated.password,
+      user.password_hash
+    );
     if (!isValid) {
       return NextResponse.json(
         { error: "Invalid credentials" },
@@ -73,4 +76,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-
