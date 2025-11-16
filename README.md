@@ -29,9 +29,11 @@ npm install
 2. Set up environment variables:
 Create a `.env.local` file in the root directory:
 ```env
-DATABASE_URL=file:./local.db
+DATABASE_URL=file:./data/db/local.db
 DATABASE_AUTH_TOKEN=your_auth_token_if_needed
 ```
+
+Note: The database will be automatically stored in the `data/db` folder. The directory will be created automatically if it doesn't exist.
 
 3. Run the development server:
 ```bash
@@ -68,7 +70,9 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ## Database Setup
 
-This project uses libSQL. For local development, it uses a file-based database. For production, configure your `DATABASE_URL` environment variable to point to your libSQL instance.
+This project uses libSQL. For local development, the database is stored in the `data/db` folder (default: `data/db/local.db`). The directory is created automatically when the application starts.
+
+For production, configure your `DATABASE_URL` environment variable to point to your libSQL instance.
 
 ## State Management
 
