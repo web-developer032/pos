@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useGetProductsQuery } from "@/lib/api/productsApi";
 import { useGetCategoriesQuery } from "@/lib/api/categoriesApi";
 import { useAppDispatch } from "@/lib/hooks";
+import { useCurrency } from "@/lib/hooks/useCurrency";
 import { addItem } from "@/lib/slices/cartSlice";
 import { Select } from "@/components/ui/Select";
 import { Input } from "@/components/ui/Input";
@@ -18,6 +19,7 @@ export function ProductGrid() {
   });
   const { data: categoriesData } = useGetCategoriesQuery();
   const dispatch = useAppDispatch();
+  const { format: formatCurrency } = useCurrency();
 
   const handleAddToCart = (product: any) => {
     if (product.stock_quantity <= 0) {
@@ -64,22 +66,24 @@ export function ProductGrid() {
           className="w-48"
         />
       </div>
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
         {data?.products.map((product) => (
           <div
             key={product.id}
-            className="border rounded-lg p-4 hover:shadow-lg transition-shadow cursor-pointer bg-white"
+            className="cursor-pointer rounded-lg border bg-white p-4 transition-shadow hover:shadow-lg"
             onClick={() => handleAddToCart(product)}
           >
-            <h3 className="font-semibold mb-2 text-gray-900">{product.name}</h3>
-            <p className="text-2xl font-bold text-indigo-600 mb-2">
-              ${product.selling_price.toFixed(2)}
+            <h3 className="mb-2 font-semibold text-gray-900">{product.name}</h3>
+            <p className="mb-2 text-2xl font-bold text-indigo-600">
+              {formatCurrency(product.selling_price)}
             </p>
             <p className="text-sm text-gray-700">
               Stock: {product.stock_quantity}
             </p>
             {product.stock_quantity <= product.min_stock_level && (
-              <p className="text-xs text-red-600 mt-1 font-semibold">Low Stock!</p>
+              <p className="mt-1 text-xs font-semibold text-red-600">
+                Low Stock!
+              </p>
             )}
           </div>
         ))}
@@ -87,4 +91,3 @@ export function ProductGrid() {
     </div>
   );
 }
-

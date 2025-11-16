@@ -2,14 +2,12 @@
 
 import { useAppSelector, useAppDispatch } from "@/lib/hooks";
 import { removeItem, updateQuantity } from "@/lib/slices/cartSlice";
-import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
+import { useCurrency } from "@/lib/hooks/useCurrency";
 
 export function Cart() {
   const dispatch = useAppDispatch();
-  const { items, customerId, discount, tax } = useAppSelector(
-    (state) => state.cart
-  );
+  const { items, discount, tax } = useAppSelector((state) => state.cart);
+  const { format: formatCurrency } = useCurrency();
 
   const subtotal = items.reduce(
     (sum, item) => sum + item.price * item.quantity,
@@ -18,22 +16,22 @@ export function Cart() {
   const finalTotal = subtotal - discount + tax;
 
   return (
-    <div className="bg-white rounded-lg shadow-lg p-6 h-full flex flex-col">
-      <h2 className="text-2xl font-bold mb-4">Cart</h2>
-      <div className="flex-1 overflow-y-auto mb-4">
+    <div className="flex h-full flex-col rounded-lg bg-white p-6 shadow-lg">
+      <h2 className="mb-4 text-2xl font-bold">Cart</h2>
+      <div className="mb-4 flex-1 overflow-y-auto">
         {items.length === 0 ? (
-          <p className="text-gray-500 text-center py-8">Cart is empty</p>
+          <p className="py-8 text-center text-gray-500">Cart is empty</p>
         ) : (
           <div className="space-y-2">
             {items.map((item) => (
               <div
                 key={item.product_id}
-                className="border rounded p-3 flex justify-between items-center"
+                className="flex items-center justify-between rounded border p-3"
               >
                 <div className="flex-1">
                   <p className="font-medium text-gray-900">{item.name}</p>
                   <p className="text-sm text-gray-600">
-                    ${item.price.toFixed(2)} x {item.quantity}
+                    {formatCurrency(item.price)} x {item.quantity}
                   </p>
                 </div>
                 <div className="flex items-center space-x-2">
@@ -50,7 +48,7 @@ export function Cart() {
                         })
                       )
                     }
-                    className="w-16 px-2 py-1 border rounded text-center text-gray-900"
+                    className="w-16 rounded border px-2 py-1 text-center text-gray-900"
                   />
                   <button
                     onClick={() => dispatch(removeItem(item.product_id))}
@@ -64,25 +62,24 @@ export function Cart() {
           </div>
         )}
       </div>
-      <div className="border-t pt-4 space-y-2">
+      <div className="space-y-2 border-t pt-4">
         <div className="flex justify-between text-gray-900">
           <span>Subtotal:</span>
-          <span>${subtotal.toFixed(2)}</span>
+          <span>{formatCurrency(subtotal)}</span>
         </div>
         <div className="flex justify-between text-gray-900">
           <span>Discount:</span>
-          <span>-${discount.toFixed(2)}</span>
+          <span>-{formatCurrency(discount)}</span>
         </div>
         <div className="flex justify-between text-gray-900">
           <span>Tax:</span>
-          <span>${tax.toFixed(2)}</span>
+          <span>{formatCurrency(tax)}</span>
         </div>
-        <div className="flex justify-between font-bold text-lg border-t pt-2 text-gray-900">
+        <div className="flex justify-between border-t pt-2 text-lg font-bold text-gray-900">
           <span>Total:</span>
-          <span>${finalTotal.toFixed(2)}</span>
+          <span>{formatCurrency(finalTotal)}</span>
         </div>
       </div>
     </div>
   );
 }
-

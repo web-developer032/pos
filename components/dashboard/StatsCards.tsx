@@ -1,7 +1,8 @@
 "use client";
 
 import { useGetSalesQuery } from "@/lib/api/salesApi";
-import { format, startOfDay, endOfDay } from "date-fns";
+import { useCurrency } from "@/lib/hooks/useCurrency";
+import { format } from "date-fns";
 
 export function StatsCards() {
   const today = format(new Date(), "yyyy-MM-dd");
@@ -9,6 +10,7 @@ export function StatsCards() {
     startDate: today,
     endDate: today,
   });
+  const { format: formatCurrency } = useCurrency();
 
   if (isLoading) {
     return <div>Loading stats...</div>;
@@ -22,24 +24,27 @@ export function StatsCards() {
   const todayOrders = todaySales.length;
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-      <div className="bg-white rounded-lg shadow p-6">
-        <h3 className="text-gray-500 text-sm font-medium">Today's Revenue</h3>
-        <p className="text-3xl font-bold text-gray-900 mt-2">
-          ${todayRevenue.toFixed(2)}
+    <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+      <div className="rounded-lg bg-white p-6 shadow">
+        <h3 className="text-sm font-medium text-gray-500">
+          Today&apos;s Revenue
+        </h3>
+        <p className="mt-2 text-3xl font-bold text-gray-900">
+          {formatCurrency(todayRevenue)}
         </p>
       </div>
-      <div className="bg-white rounded-lg shadow p-6">
-        <h3 className="text-gray-500 text-sm font-medium">Today's Orders</h3>
-        <p className="text-3xl font-bold text-gray-900 mt-2">{todayOrders}</p>
+      <div className="rounded-lg bg-white p-6 shadow">
+        <h3 className="text-sm font-medium text-gray-500">
+          Today&apos;s Orders
+        </h3>
+        <p className="mt-2 text-3xl font-bold text-gray-900">{todayOrders}</p>
       </div>
-      <div className="bg-white rounded-lg shadow p-6">
-        <h3 className="text-gray-500 text-sm font-medium">Average Order</h3>
-        <p className="text-3xl font-bold text-gray-900 mt-2">
-          ${todayOrders > 0 ? (todayRevenue / todayOrders).toFixed(2) : "0.00"}
+      <div className="rounded-lg bg-white p-6 shadow">
+        <h3 className="text-sm font-medium text-gray-500">Average Order</h3>
+        <p className="mt-2 text-3xl font-bold text-gray-900">
+          {formatCurrency(todayOrders > 0 ? todayRevenue / todayOrders : 0)}
         </p>
       </div>
     </div>
   );
 }
-

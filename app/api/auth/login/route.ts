@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const user = result.rows[0] as {
+    const user = result.rows[0] as unknown as {
       id: number;
       username: string;
       email: string;

@@ -3,11 +3,13 @@
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { useGetSalesQuery } from "@/lib/api/salesApi";
+import { useCurrency } from "@/lib/hooks/useCurrency";
 import { format } from "date-fns";
 import Link from "next/link";
 
 export default function SalesPage() {
   const { data, isLoading } = useGetSalesQuery();
+  const { format: formatCurrency } = useCurrency();
 
   if (isLoading) {
     return (
@@ -67,7 +69,7 @@ export default function SalesPage() {
                     {sale.payment_method}
                   </td>
                   <td className="px-6 py-4 text-sm font-semibold text-gray-900">
-                    ${sale.final_amount.toFixed(2)}
+                    {formatCurrency(sale.final_amount)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <Link

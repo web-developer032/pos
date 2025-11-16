@@ -3,12 +3,14 @@
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { useGetPurchaseOrdersQuery, useUpdatePurchaseOrderMutation } from "@/lib/api/purchaseOrdersApi";
+import { useCurrency } from "@/lib/hooks/useCurrency";
 import { format } from "date-fns";
 import toast from "react-hot-toast";
 
 export default function PurchaseOrdersPage() {
   const { data, isLoading, refetch } = useGetPurchaseOrdersQuery();
   const [updatePO] = useUpdatePurchaseOrderMutation();
+  const { format: formatCurrency } = useCurrency();
 
   const handleStatusChange = async (id: number, status: "pending" | "completed" | "cancelled") => {
     try {
@@ -55,7 +57,7 @@ export default function PurchaseOrdersPage() {
                   <td className="px-6 py-4 text-sm font-medium">{po.po_number}</td>
                   <td className="px-6 py-4 text-sm">{po.supplier_name}</td>
                   <td className="px-6 py-4 text-sm">{format(new Date(po.created_at), "MMM dd, yyyy")}</td>
-                  <td className="px-6 py-4 text-sm">${po.total_amount.toFixed(2)}</td>
+                  <td className="px-6 py-4 text-sm">{formatCurrency(po.total_amount)}</td>
                   <td className="px-6 py-4 text-sm">
                     <span className={`px-2 py-1 rounded text-xs ${
                       po.status === "completed" ? "bg-green-100 text-green-800" :

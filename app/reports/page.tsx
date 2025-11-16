@@ -3,8 +3,17 @@
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { useGetSalesQuery } from "@/lib/api/salesApi";
+import { useCurrency } from "@/lib/hooks/useCurrency";
 import { format, subDays } from "date-fns";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
 
 export default function ReportsPage() {
   const startDate = format(subDays(new Date(), 30), "yyyy-MM-dd");
@@ -12,6 +21,7 @@ export default function ReportsPage() {
     startDate,
     endDate: format(new Date(), "yyyy-MM-dd"),
   });
+  const { format: formatCurrency } = useCurrency();
 
   if (isLoading) {
     return (
@@ -34,7 +44,8 @@ export default function ReportsPage() {
     revenue: parseFloat(revenue.toFixed(2)),
   }));
 
-  const totalRevenue = data?.sales.reduce((sum, sale) => sum + sale.final_amount, 0) || 0;
+  const totalRevenue =
+    data?.sales.reduce((sum, sale) => sum + sale.final_amount, 0) || 0;
   const totalSales = data?.sales.length || 0;
 
   return (
@@ -44,25 +55,37 @@ export default function ReportsPage() {
           <h1 className="text-3xl font-bold text-gray-900">Reports</h1>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-          <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-gray-500 text-sm font-medium">Total Revenue (30 days)</h3>
-            <p className="text-3xl font-bold text-gray-900 mt-2">${totalRevenue.toFixed(2)}</p>
+        <div className="mb-6 grid grid-cols-1 gap-6 md:grid-cols-3">
+          <div className="rounded-lg bg-white p-6 shadow">
+            <h3 className="text-sm font-medium text-gray-500">
+              Total Revenue (30 days)
+            </h3>
+            <p className="mt-2 text-3xl font-bold text-gray-900">
+              {formatCurrency(totalRevenue)}
+            </p>
           </div>
-          <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-gray-500 text-sm font-medium">Total Sales (30 days)</h3>
-            <p className="text-3xl font-bold text-gray-900 mt-2">{totalSales}</p>
+          <div className="rounded-lg bg-white p-6 shadow">
+            <h3 className="text-sm font-medium text-gray-500">
+              Total Sales (30 days)
+            </h3>
+            <p className="mt-2 text-3xl font-bold text-gray-900">
+              {totalSales}
+            </p>
           </div>
-          <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-gray-500 text-sm font-medium">Average Order Value</h3>
-            <p className="text-3xl font-bold text-gray-900 mt-2">
-              ${totalSales > 0 ? (totalRevenue / totalSales).toFixed(2) : "0.00"}
+          <div className="rounded-lg bg-white p-6 shadow">
+            <h3 className="text-sm font-medium text-gray-500">
+              Average Order Value
+            </h3>
+            <p className="mt-2 text-3xl font-bold text-gray-900">
+              {formatCurrency(totalSales > 0 ? totalRevenue / totalSales : 0)}
             </p>
           </div>
         </div>
 
-        <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-semibold mb-4">Revenue Trend (Last 30 Days)</h3>
+        <div className="rounded-lg bg-white p-6 shadow">
+          <h3 className="mb-4 text-lg font-semibold">
+            Revenue Trend (Last 30 Days)
+          </h3>
           <ResponsiveContainer width="100%" height={400}>
             <BarChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" />
@@ -73,8 +96,7 @@ export default function ReportsPage() {
             </BarChart>
           </ResponsiveContainer>
         </div>
-      </ProtectedRoute>
+      </DashboardLayout>
     </ProtectedRoute>
   );
 }
-

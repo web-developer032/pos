@@ -2,12 +2,12 @@
 
 import { useState } from "react";
 import { useAppSelector, useAppDispatch } from "@/lib/hooks";
+import { useCurrency } from "@/lib/hooks/useCurrency";
 import { useCreateSaleMutation } from "@/lib/api/salesApi";
 import { clearCart } from "@/lib/slices/cartSlice";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { Select } from "@/components/ui/Select";
-import { Input } from "@/components/ui/Input";
 import toast from "react-hot-toast";
 
 interface PaymentModalProps {
@@ -26,7 +26,10 @@ export function PaymentModal({
     (state) => state.cart
   );
   const [createSale, { isLoading }] = useCreateSaleMutation();
-  const [paymentMethod, setPaymentMethod] = useState<"cash" | "card" | "digital">("cash");
+  const [paymentMethod, setPaymentMethod] = useState<
+    "cash" | "card" | "digital"
+  >("cash");
+  const { format: formatCurrency } = useCurrency();
 
   const subtotal = items.reduce(
     (sum, item) => sum + item.price * item.quantity,
@@ -65,22 +68,22 @@ export function PaymentModal({
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Complete Payment" size="md">
       <div className="space-y-4">
-        <div className="border rounded p-4">
-          <div className="flex justify-between mb-2">
+        <div className="rounded border p-4">
+          <div className="mb-2 flex justify-between">
             <span>Subtotal:</span>
-            <span>${subtotal.toFixed(2)}</span>
+            <span>{formatCurrency(subtotal)}</span>
           </div>
-          <div className="flex justify-between mb-2">
+          <div className="mb-2 flex justify-between">
             <span>Discount:</span>
-            <span>-${discount.toFixed(2)}</span>
+            <span>-{formatCurrency(discount)}</span>
           </div>
-          <div className="flex justify-between mb-2">
+          <div className="mb-2 flex justify-between">
             <span>Tax:</span>
-            <span>${tax.toFixed(2)}</span>
+            <span>{formatCurrency(tax)}</span>
           </div>
-          <div className="flex justify-between font-bold text-lg border-t pt-2">
+          <div className="flex justify-between border-t pt-2 text-lg font-bold">
             <span>Total:</span>
-            <span>${finalTotal.toFixed(2)}</span>
+            <span>{formatCurrency(finalTotal)}</span>
           </div>
         </div>
 
@@ -109,4 +112,3 @@ export function PaymentModal({
     </Modal>
   );
 }
-
