@@ -15,7 +15,12 @@ interface MenuItem {
 
 const menuItems: MenuItem[] = [
   { name: "Dashboard", href: "/dashboard", icon: "📊" },
-  { name: "POS", href: "/pos", icon: "🛒", roles: ["admin", "cashier", "manager"] },
+  {
+    name: "POS",
+    href: "/pos",
+    icon: "🛒",
+    roles: ["admin", "cashier", "manager"],
+  },
   { name: "Products", href: "/products", icon: "📦" },
   { name: "Categories", href: "/categories", icon: "📁" },
   { name: "Suppliers", href: "/suppliers", icon: "🚚" },
@@ -25,7 +30,12 @@ const menuItems: MenuItem[] = [
   { name: "Sales", href: "/sales", icon: "💰" },
   { name: "Reports", href: "/reports", icon: "📈" },
   { name: "Users", href: "/users", icon: "👤", roles: ["admin"] },
-  { name: "Settings", href: "/settings", icon: "⚙️", roles: ["admin", "manager"] },
+  {
+    name: "Settings",
+    href: "/settings",
+    icon: "⚙️",
+    roles: ["admin", "manager"],
+  },
 ];
 
 export function Sidebar() {
@@ -44,11 +54,12 @@ export function Sidebar() {
   );
 
   return (
-    <div className="w-64 bg-gray-900 text-white min-h-screen">
+    <aside className="min-h-screen w-64 bg-gray-900 text-white">
       <div className="p-6">
         <h1 className="text-2xl font-bold">POS System</h1>
       </div>
-      <nav className="mt-8">
+
+      <nav>
         {filteredMenuItems.map((item) => {
           const isActive = pathname === item.href;
           return (
@@ -56,7 +67,7 @@ export function Sidebar() {
               key={item.href}
               href={item.href}
               className={`flex items-center px-6 py-3 hover:bg-gray-800 ${
-                isActive ? "bg-gray-800 border-r-4 border-indigo-500" : ""
+                isActive ? "border-r-4 border-indigo-500 bg-gray-800" : ""
               }`}
             >
               <span className="mr-3">{item.icon}</span>
@@ -65,20 +76,15 @@ export function Sidebar() {
           );
         })}
       </nav>
-      <div className="absolute bottom-0 w-64 p-6 border-t border-gray-800">
-        <div className="mb-4">
-          <p className="text-sm text-gray-400">Logged in as</p>
-          <p className="font-medium">{user?.username}</p>
-          <p className="text-xs text-gray-500 capitalize">{user?.role}</p>
-        </div>
+
+      <div className="absolute bottom-0 w-64 border-t border-gray-800 p-6">
         <button
           onClick={handleLogout}
-          className="w-full px-4 py-2 bg-red-600 hover:bg-red-700 rounded-md text-sm font-medium"
+          className="w-full rounded-md bg-red-600 px-4 py-2 text-sm font-medium hover:bg-red-700"
         >
           Logout
         </button>
       </div>
-    </div>
+    </aside>
   );
 }
-

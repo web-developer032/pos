@@ -26,24 +26,33 @@ function UsersList() {
   }
 
   return (
-    <div className="bg-white shadow rounded-lg overflow-hidden">
+    <div className="overflow-hidden rounded-lg bg-white shadow">
       <table className="min-w-full divide-y divide-gray-200">
         <thead className="bg-gray-50">
           <tr>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Username</th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Role</th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Created</th>
+            <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">
+              Username
+            </th>
+            <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">
+              Email
+            </th>
+            <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">
+              Role
+            </th>
+            <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">
+              Created
+            </th>
           </tr>
         </thead>
-        <tbody className="bg-white divide-y divide-gray-200">
+        <tbody className="divide-y divide-gray-200 bg-white text-gray-900">
           {data?.users.map((user) => (
             <tr key={user.id}>
               <td className="px-6 py-4 text-sm font-medium">{user.username}</td>
               <td className="px-6 py-4 text-sm">{user.email}</td>
               <td className="px-6 py-4 text-sm capitalize">{user.role}</td>
               <td className="px-6 py-4 text-sm">
-                {user.created_at && format(new Date(user.created_at), "MMM dd, yyyy")}
+                {user.created_at &&
+                  format(new Date(user.created_at), "MMM dd, yyyy")}
               </td>
             </tr>
           ))}
@@ -52,4 +61,3 @@ function UsersList() {
     </div>
   );
 }
-
