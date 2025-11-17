@@ -10,7 +10,7 @@ export default function UsersPage() {
     <ProtectedRoute allowedRoles={["admin"]}>
       <DashboardLayout>
         <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-900">Users</h1>
+          <h1 className="text-3xl font-bold ">Users</h1>
         </div>
         <UsersList />
       </DashboardLayout>
@@ -44,7 +44,7 @@ function UsersList() {
             </th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-gray-200 bg-white text-gray-900">
+        <tbody className="divide-y divide-gray-200 bg-white ">
           {data?.users.map((user) => (
             <tr key={user.id}>
               <td className="px-6 py-4 text-sm font-medium">{user.username}</td>

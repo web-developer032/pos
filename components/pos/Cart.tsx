@@ -17,7 +17,7 @@ export function Cart() {
 
   return (
     <div className="flex h-full flex-col rounded-lg bg-white p-6 shadow-lg">
-      <h2 className="mb-4 text-2xl font-bold text-gray-900">Cart</h2>
+      <h2 className="mb-4 text-2xl font-bold ">Cart</h2>
       <div className="mb-4 flex-1 overflow-y-auto">
         {items.length === 0 ? (
           <p className="py-8 text-center text-gray-500">Cart is empty</p>
@@ -29,7 +29,7 @@ export function Cart() {
                 className="flex items-center justify-between rounded border p-3"
               >
                 <div className="flex-1">
-                  <p className="font-medium text-gray-900">{item.name}</p>
+                  <p className="font-medium ">{item.name}</p>
                   <p className="text-sm text-gray-600">
                     {formatCurrency(item.price)} x {item.quantity}
                   </p>
@@ -48,7 +48,7 @@ export function Cart() {
                         })
                       )
                     }
-                    className="w-16 rounded border px-2 py-1 text-center text-gray-900"
+                    className="w-16 rounded border px-2 py-1 text-center "
                   />
                   <button
                     onClick={() => dispatch(removeItem(item.product_id))}
@@ -63,19 +63,19 @@ export function Cart() {
         )}
       </div>
       <div className="space-y-2 border-t pt-4">
-        <div className="flex justify-between text-gray-900">
+        <div className="flex justify-between ">
           <span>Subtotal:</span>
           <span>{formatCurrency(subtotal)}</span>
         </div>
-        <div className="flex justify-between text-gray-900">
+        <div className="flex justify-between ">
           <span>Discount:</span>
           <span>-{formatCurrency(discount)}</span>
         </div>
-        <div className="flex justify-between text-gray-900">
+        <div className="flex justify-between ">
           <span>Tax:</span>
           <span>{formatCurrency(tax)}</span>
         </div>
-        <div className="flex justify-between border-t pt-2 text-lg font-bold text-gray-900">
+        <div className="flex justify-between border-t pt-2 text-lg font-bold ">
           <span>Total:</span>
           <span>{formatCurrency(finalTotal)}</span>
         </div>

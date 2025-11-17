@@ -2,7 +2,10 @@
 
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
-import { useGetSettingsQuery, useUpdateSettingsMutation } from "@/lib/api/settingsApi";
+import {
+  useGetSettingsQuery,
+  useUpdateSettingsMutation,
+} from "@/lib/api/settingsApi";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { useState, useEffect } from "react";
@@ -13,7 +16,7 @@ export default function SettingsPage() {
     <ProtectedRoute allowedRoles={["admin", "manager"]}>
       <DashboardLayout>
         <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-900">Settings</h1>
+          <h1 className="text-3xl font-bold">Settings</h1>
         </div>
         <SettingsForm />
       </DashboardLayout>
@@ -57,11 +60,16 @@ function SettingsForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="bg-white shadow rounded-lg p-6 space-y-4 max-w-2xl">
+    <form
+      onSubmit={handleSubmit}
+      className="max-w-2xl space-y-4 rounded-lg bg-white p-6 shadow"
+    >
       <Input
         label="Store Name"
         value={formData.store_name}
-        onChange={(e) => setFormData({ ...formData, store_name: e.target.value })}
+        onChange={(e) =>
+          setFormData({ ...formData, store_name: e.target.value })
+        }
       />
       <Input
         label="Tax Rate (%)"
@@ -78,10 +86,11 @@ function SettingsForm() {
       <Input
         label="Currency Symbol"
         value={formData.currency_symbol}
-        onChange={(e) => setFormData({ ...formData, currency_symbol: e.target.value })}
+        onChange={(e) =>
+          setFormData({ ...formData, currency_symbol: e.target.value })
+        }
       />
       <Button type="submit">Save Settings</Button>
     </form>
   );
 }
-

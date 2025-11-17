@@ -73,7 +73,7 @@ export function ProductGrid() {
             className="cursor-pointer rounded-lg border bg-white p-4 transition-shadow hover:shadow-lg"
             onClick={() => handleAddToCart(product)}
           >
-            <h3 className="mb-2 font-semibold text-gray-900">{product.name}</h3>
+            <h3 className="mb-2 font-semibold ">{product.name}</h3>
             <p className="mb-2 text-2xl font-bold text-indigo-600">
               {formatCurrency(product.selling_price)}
             </p>

@@ -13,16 +13,16 @@ export default function DashboardPage() {
     <ProtectedRoute>
       <DashboardLayout>
         <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
+          <h1 className="text-3xl font-bold">Dashboard</h1>
           <p className="mt-2 text-gray-600">Overview of your store</p>
         </div>
 
         <StatsCards />
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+        <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
           <SalesChart />
           <TopProducts />
         </div>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+        <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
           <RecentSales />
           <LowStockAlerts />
         </div>
@@ -30,4 +30,3 @@ export default function DashboardPage() {
     </ProtectedRoute>
   );
 }
-

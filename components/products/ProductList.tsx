@@ -4,6 +4,8 @@ import { useState } from "react";
 import {
   useGetProductsQuery,
   useDeleteProductMutation,
+  useImportProductsMutation,
+  CreateProductRequest,
 } from "@/lib/api/productsApi";
 import { useGetCategoriesQuery } from "@/lib/api/categoriesApi";
 import { useCurrency } from "@/lib/hooks/useCurrency";
@@ -12,6 +14,7 @@ import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Modal } from "@/components/ui/Modal";
 import { ProductForm } from "./ProductForm";
+import { ImportExport } from "@/components/common/ImportExport";
 import toast from "react-hot-toast";
 
 export function ProductList() {
@@ -23,6 +26,7 @@ export function ProductList() {
   });
   const { data: categoriesData } = useGetCategoriesQuery();
   const [deleteProduct] = useDeleteProductMutation();
+  const [importProducts] = useImportProductsMutation();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<number | null>(null);
   const { format: formatCurrency } = useCurrency();
@@ -49,15 +53,91 @@ export function ProductList() {
     setEditingProduct(null);
   };
 
+  const handleImport = async (
+    items: any[]
+  ): Promise<{ imported: number; errors: string[] }> => {
+    try {
+      // Map CSV data to product format
+      const products: CreateProductRequest[] = items.map((item) => ({
+        name: item.name || item.Name || "",
+        barcode: item.barcode || item.Barcode || undefined,
+        sku: item.sku || item.SKU || undefined,
+        description: item.description || item.Description || undefined,
+        category_id:
+          item.category_id || item["Category ID"]
+            ? parseInt(item.category_id || item["Category ID"])
+            : undefined,
+        supplier_id:
+          item.supplier_id || item["Supplier ID"]
+            ? parseInt(item.supplier_id || item["Supplier ID"])
+            : undefined,
+        cost_price: parseFloat(item.cost_price || item["Cost Price"] || "0"),
+        selling_price: parseFloat(
+          item.selling_price || item["Selling Price"] || "0"
+        ),
+        stock_quantity: parseInt(
+          item.stock_quantity || item["Stock Quantity"] || "0"
+        ),
+        min_stock_level: parseInt(
+          item.min_stock_level || item["Min Stock Level"] || "0"
+        ),
+        image_url: item.image_url || item["Image URL"] || undefined,
+      }));
+
+      const result = await importProducts({ products }).unwrap();
+      return result;
+    } catch (error: any) {
+      throw new Error(error.data?.error || "Failed to import products");
+    }
+  };
+
   if (isLoading) {
     return <div>Loading...</div>;
   }
+
+  // Prepare export data
+  const exportData = (data?.products || []).map((p) => ({
+    name: p.name,
+    barcode: p.barcode || "",
+    sku: p.sku || "",
+    description: p.description || "",
+    category_id: p.category_id || "",
+    supplier_id: p.supplier_id || "",
+    cost_price: p.cost_price,
+    selling_price: p.selling_price,
+    stock_quantity: p.stock_quantity,
+    min_stock_level: p.min_stock_level,
+    image_url: p.image_url || "",
+  }));
+
+  const exportHeaders = [
+    "name",
+    "barcode",
+    "sku",
+    "description",
+    "category_id",
+    "supplier_id",
+    "cost_price",
+    "selling_price",
+    "stock_quantity",
+    "min_stock_level",
+    "image_url",
+  ];
 
   return (
     <div>
       <div className="mb-4 flex items-center justify-between">
         <h2 className="text-xl font-semibold">All Products</h2>
-        <Button onClick={() => setIsModalOpen(true)}>Add Product</Button>
+        <div className="flex gap-2">
+          <ImportExport
+            data={exportData}
+            headers={exportHeaders}
+            filename="products"
+            onImport={handleImport}
+            onImportSuccess={refetch}
+          />
+          <Button onClick={() => setIsModalOpen(true)}>Add Product</Button>
+        </div>
       </div>
 
       <div className="mb-4 flex gap-4">
@@ -110,7 +190,7 @@ export function ProductList() {
           <tbody className="divide-y divide-gray-200 bg-white">
             {data?.products.map((product) => (
               <tr key={product.id}>
-                <td className="whitespace-nowrap px-6 py-4 text-sm font-medium text-gray-900">
+                <td className="whitespace-nowrap px-6 py-4 text-sm font-medium ">
                   {product.name}
                 </td>
                 <td className="px-6 py-4 text-sm text-gray-500">
@@ -119,7 +199,7 @@ export function ProductList() {
                 <td className="px-6 py-4 text-sm text-gray-500">
                   {product.category_name || "-"}
                 </td>
-                <td className="px-6 py-4 text-sm text-gray-900">
+                <td className="px-6 py-4 text-sm ">
                   {formatCurrency(product.selling_price)}
                 </td>
                 <td className="px-6 py-4 text-sm">
@@ -127,7 +207,7 @@ export function ProductList() {
                     className={
                       product.stock_quantity <= product.min_stock_level
                         ? "font-semibold text-red-600"
-                        : "text-gray-900"
+                        : ""
                     }
                   >
                     {product.stock_quantity}

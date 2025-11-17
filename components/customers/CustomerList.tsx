@@ -1,11 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { useGetCustomersQuery, useDeleteCustomerMutation } from "@/lib/api/customersApi";
+import {
+  useGetCustomersQuery,
+  useDeleteCustomerMutation,
+  useImportCustomersMutation,
+  CreateCustomerRequest,
+} from "@/lib/api/customersApi";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
 import { CustomerForm } from "./CustomerForm";
+import { ImportExport } from "@/components/common/ImportExport";
 import toast from "react-hot-toast";
 
 export function CustomerList() {
@@ -14,6 +20,7 @@ export function CustomerList() {
     search: search || undefined,
   });
   const [deleteCustomer] = useDeleteCustomerMutation();
+  const [importCustomers] = useImportCustomersMutation();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<number | null>(null);
 
@@ -39,15 +46,56 @@ export function CustomerList() {
     setEditingCustomer(null);
   };
 
+  const handleImport = async (
+    items: any[]
+  ): Promise<{ imported: number; errors: string[] }> => {
+    try {
+      const customers: CreateCustomerRequest[] = items.map((item) => ({
+        name: item.name || item.Name || "",
+        email: item.email || item.Email || undefined,
+        phone: item.phone || item.Phone || undefined,
+        address: item.address || item.Address || undefined,
+        loyalty_points:
+          item.loyalty_points || item["Loyalty Points"]
+            ? parseInt(item.loyalty_points || item["Loyalty Points"])
+            : undefined,
+      }));
+
+      const result = await importCustomers({ customers }).unwrap();
+      return result;
+    } catch (error: any) {
+      throw new Error(error.data?.error || "Failed to import customers");
+    }
+  };
+
   if (isLoading) {
     return <div>Loading...</div>;
   }
 
+  const exportData = (data?.customers || []).map((c) => ({
+    name: c.name,
+    email: c.email || "",
+    phone: c.phone || "",
+    address: c.address || "",
+    loyalty_points: c.loyalty_points,
+  }));
+
+  const exportHeaders = ["name", "email", "phone", "address", "loyalty_points"];
+
   return (
     <div>
-      <div className="mb-4 flex justify-between items-center">
+      <div className="mb-4 flex items-center justify-between">
         <h2 className="text-xl font-semibold">All Customers</h2>
-        <Button onClick={() => setIsModalOpen(true)}>Add Customer</Button>
+        <div className="flex gap-2">
+          <ImportExport
+            data={exportData}
+            headers={exportHeaders}
+            filename="customers"
+            onImport={handleImport}
+            onImportSuccess={refetch}
+          />
+          <Button onClick={() => setIsModalOpen(true)}>Add Customer</Button>
+        </div>
       </div>
 
       <div className="mb-4">
@@ -58,31 +106,31 @@ export function CustomerList() {
         />
       </div>
 
-      <div className="bg-white shadow rounded-lg overflow-hidden">
+      <div className="overflow-hidden rounded-lg bg-white shadow">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                 Name
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                 Email
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                 Phone
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                 Loyalty Points
               </th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">
                 Actions
               </th>
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
+          <tbody className="divide-y divide-gray-200 bg-white">
             {data?.customers.map((customer) => (
               <tr key={customer.id}>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                <td className="whitespace-nowrap px-6 py-4 text-sm font-medium ">
                   {customer.name}
                 </td>
                 <td className="px-6 py-4 text-sm text-gray-500">
@@ -91,13 +139,13 @@ export function CustomerList() {
                 <td className="px-6 py-4 text-sm text-gray-500">
                   {customer.phone || "-"}
                 </td>
-                <td className="px-6 py-4 text-sm text-gray-900">
+                <td className="px-6 py-4 text-sm ">
                   {customer.loyalty_points}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                <td className="whitespace-nowrap px-6 py-4 text-right text-sm font-medium">
                   <button
                     onClick={() => handleEdit(customer.id)}
-                    className="text-indigo-600 hover:text-indigo-900 mr-4"
+                    className="mr-4 text-indigo-600 hover:text-indigo-900"
                   >
                     Edit
                   </button>
@@ -130,4 +178,3 @@ export function CustomerList() {
     </div>
   );
 }
-

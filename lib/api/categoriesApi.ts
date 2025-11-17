@@ -53,6 +53,17 @@ export const categoriesApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ["Category"],
     }),
+    importCategories: builder.mutation<
+      { message: string; imported: number; errors: string[] },
+      { categories: CreateCategoryRequest[] }
+    >({
+      query: (body) => ({
+        url: "/categories/import",
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: ["Category"],
+    }),
   }),
 });
 
@@ -62,5 +73,6 @@ export const {
   useCreateCategoryMutation,
   useUpdateCategoryMutation,
   useDeleteCategoryMutation,
+  useImportCategoriesMutation,
 } = categoriesApi;
 

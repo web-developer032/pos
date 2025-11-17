@@ -29,7 +29,7 @@ export function StatsCards() {
         <h3 className="text-sm font-medium text-gray-500">
           Today&apos;s Revenue
         </h3>
-        <p className="mt-2 text-3xl font-bold text-gray-900">
+        <p className="mt-2 text-3xl font-bold ">
           {formatCurrency(todayRevenue)}
         </p>
       </div>
@@ -37,11 +37,11 @@ export function StatsCards() {
         <h3 className="text-sm font-medium text-gray-500">
           Today&apos;s Orders
         </h3>
-        <p className="mt-2 text-3xl font-bold text-gray-900">{todayOrders}</p>
+        <p className="mt-2 text-3xl font-bold ">{todayOrders}</p>
       </div>
       <div className="rounded-lg bg-white p-6 shadow">
         <h3 className="text-sm font-medium text-gray-500">Average Order</h3>
-        <p className="mt-2 text-3xl font-bold text-gray-900">
+        <p className="mt-2 text-3xl font-bold ">
           {formatCurrency(todayOrders > 0 ? todayRevenue / todayOrders : 0)}
         </p>
       </div>

@@ -73,6 +73,17 @@ export const customersApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ["Customer"],
     }),
+    importCustomers: builder.mutation<
+      { message: string; imported: number; errors: string[] },
+      { customers: CreateCustomerRequest[] }
+    >({
+      query: (body) => ({
+        url: "/customers/import",
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: ["Customer"],
+    }),
   }),
 });
 
@@ -82,5 +93,6 @@ export const {
   useCreateCustomerMutation,
   useUpdateCustomerMutation,
   useDeleteCustomerMutation,
+  useImportCustomersMutation,
 } = customersApi;
 

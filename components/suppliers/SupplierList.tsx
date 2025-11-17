@@ -4,15 +4,19 @@ import { useState } from "react";
 import {
   useGetSuppliersQuery,
   useDeleteSupplierMutation,
+  useImportSuppliersMutation,
+  CreateSupplierRequest,
 } from "@/lib/api/suppliersApi";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { SupplierForm } from "./SupplierForm";
+import { ImportExport } from "@/components/common/ImportExport";
 import toast from "react-hot-toast";
 
 export function SupplierList() {
   const { data, isLoading, refetch } = useGetSuppliersQuery();
   const [deleteSupplier] = useDeleteSupplierMutation();
+  const [importSuppliers] = useImportSuppliersMutation();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<number | null>(null);
 
@@ -38,15 +42,54 @@ export function SupplierList() {
     setEditingSupplier(null);
   };
 
+  const handleImport = async (
+    items: any[]
+  ): Promise<{ imported: number; errors: string[] }> => {
+    try {
+      const suppliers: CreateSupplierRequest[] = items.map((item) => ({
+        name: item.name || item.Name || "",
+        contact_person:
+          item.contact_person || item["Contact Person"] || undefined,
+        email: item.email || item.Email || undefined,
+        phone: item.phone || item.Phone || undefined,
+        address: item.address || item.Address || undefined,
+      }));
+
+      const result = await importSuppliers({ suppliers }).unwrap();
+      return result;
+    } catch (error: any) {
+      throw new Error(error.data?.error || "Failed to import suppliers");
+    }
+  };
+
   if (isLoading) {
     return <div>Loading...</div>;
   }
 
+  const exportData = (data?.suppliers || []).map((s) => ({
+    name: s.name,
+    contact_person: s.contact_person || "",
+    email: s.email || "",
+    phone: s.phone || "",
+    address: s.address || "",
+  }));
+
+  const exportHeaders = ["name", "contact_person", "email", "phone", "address"];
+
   return (
     <div>
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-xl font-semibold text-gray-900">All Suppliers</h2>
-        <Button onClick={() => setIsModalOpen(true)}>Add Supplier</Button>
+        <h2 className="text-xl font-semibold ">All Suppliers</h2>
+        <div className="flex gap-2">
+          <ImportExport
+            data={exportData}
+            headers={exportHeaders}
+            filename="suppliers"
+            onImport={handleImport}
+            onImportSuccess={refetch}
+          />
+          <Button onClick={() => setIsModalOpen(true)}>Add Supplier</Button>
+        </div>
       </div>
 
       <div className="overflow-hidden rounded-lg bg-white shadow">
@@ -73,7 +116,7 @@ export function SupplierList() {
           <tbody className="divide-y divide-gray-200 bg-white">
             {data?.suppliers.map((supplier) => (
               <tr key={supplier.id}>
-                <td className="whitespace-nowrap px-6 py-4 text-sm font-medium text-gray-900">
+                <td className="whitespace-nowrap px-6 py-4 text-sm font-medium ">
                   {supplier.name}
                 </td>
                 <td className="px-6 py-4 text-sm text-gray-500">

@@ -52,7 +52,7 @@ export default function ReportsPage() {
     <ProtectedRoute>
       <DashboardLayout>
         <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-900">Reports</h1>
+          <h1 className="text-3xl font-bold">Reports</h1>
         </div>
 
         <div className="mb-6 grid grid-cols-1 gap-6 md:grid-cols-3">
@@ -60,7 +60,7 @@ export default function ReportsPage() {
             <h3 className="text-sm font-medium text-gray-500">
               Total Revenue (30 days)
             </h3>
-            <p className="mt-2 text-3xl font-bold text-gray-900">
+            <p className="mt-2 text-3xl font-bold">
               {formatCurrency(totalRevenue)}
             </p>
           </div>
@@ -68,22 +68,20 @@ export default function ReportsPage() {
             <h3 className="text-sm font-medium text-gray-500">
               Total Sales (30 days)
             </h3>
-            <p className="mt-2 text-3xl font-bold text-gray-900">
-              {totalSales}
-            </p>
+            <p className="mt-2 text-3xl font-bold">{totalSales}</p>
           </div>
           <div className="rounded-lg bg-white p-6 shadow">
             <h3 className="text-sm font-medium text-gray-500">
               Average Order Value
             </h3>
-            <p className="mt-2 text-3xl font-bold text-gray-900">
+            <p className="mt-2 text-3xl font-bold">
               {formatCurrency(totalSales > 0 ? totalRevenue / totalSales : 0)}
             </p>
           </div>
         </div>
 
         <div className="rounded-lg bg-white p-6 shadow">
-          <h3 className="mb-4 text-lg font-semibold text-gray-900">
+          <h3 className="mb-4 text-lg font-semibold">
             Revenue Trend (Last 30 Days)
           </h3>
           <ResponsiveContainer width="100%" height={400}>

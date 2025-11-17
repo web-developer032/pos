@@ -2,7 +2,15 @@
 
 import { useGetSalesQuery } from "@/lib/api/salesApi";
 import { format, subDays } from "date-fns";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
 
 export function SalesChart() {
   const startDate = format(subDays(new Date(), 7), "yyyy-MM-dd");
@@ -13,8 +21,10 @@ export function SalesChart() {
 
   if (isLoading) {
     return (
-      <div className="bg-white rounded-lg shadow p-6">
-        <h3 className="text-lg font-semibold mb-4">Sales Trend (Last 7 Days)</h3>
+      <div className="rounded-lg bg-white p-6 shadow">
+        <h3 className="mb-4 text-lg font-semibold ">
+          Sales Trend (Last 7 Days)
+        </h3>
         <div>Loading...</div>
       </div>
     );
@@ -32,8 +42,8 @@ export function SalesChart() {
   }));
 
   return (
-    <div className="bg-white rounded-lg shadow p-6">
-      <h3 className="text-lg font-semibold mb-4">Sales Trend (Last 7 Days)</h3>
+    <div className="rounded-lg bg-white p-6 shadow">
+      <h3 className="mb-4 text-lg font-semibold ">Sales Trend (Last 7 Days)</h3>
       <ResponsiveContainer width="100%" height={300}>
         <LineChart data={chartData}>
           <CartesianGrid strokeDasharray="3 3" />
@@ -46,4 +56,3 @@ export function SalesChart() {
     </div>
   );
 }
-

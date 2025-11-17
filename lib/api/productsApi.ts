@@ -103,6 +103,17 @@ export const productsApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ["Product", "Inventory"],
     }),
+    importProducts: builder.mutation<
+      { message: string; imported: number; errors: string[] },
+      { products: CreateProductRequest[] }
+    >({
+      query: (body) => ({
+        url: "/products/import",
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: ["Product", "Inventory"],
+    }),
   }),
 });
 
@@ -113,5 +124,6 @@ export const {
   useCreateProductMutation,
   useUpdateProductMutation,
   useDeleteProductMutation,
+  useImportProductsMutation,
 } = productsApi;
 

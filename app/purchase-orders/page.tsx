@@ -42,7 +42,7 @@ export default function PurchaseOrdersPage() {
     <ProtectedRoute>
       <DashboardLayout>
         <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-900">Purchase Orders</h1>
+          <h1 className="text-3xl font-bold">Purchase Orders</h1>
         </div>
 
         <div className="overflow-hidden rounded-lg bg-white shadow">

@@ -25,7 +25,7 @@ export default function SalesPage() {
     <ProtectedRoute>
       <DashboardLayout>
         <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-900">Sales History</h1>
+          <h1 className="text-3xl font-bold ">Sales History</h1>
           <p className="mt-2 text-gray-600">View all sales transactions</p>
         </div>
 
@@ -56,7 +56,7 @@ export default function SalesPage() {
             <tbody className="divide-y divide-gray-200 bg-white">
               {data?.sales.map((sale) => (
                 <tr key={sale.id}>
-                  <td className="whitespace-nowrap px-6 py-4 text-sm font-medium text-gray-900">
+                  <td className="whitespace-nowrap px-6 py-4 text-sm font-medium ">
                     {sale.sale_number}
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-500">
@@ -68,7 +68,7 @@ export default function SalesPage() {
                   <td className="px-6 py-4 text-sm capitalize text-gray-500">
                     {sale.payment_method}
                   </td>
-                  <td className="px-6 py-4 text-sm font-semibold text-gray-900">
+                  <td className="px-6 py-4 text-sm font-semibold ">
                     {formatCurrency(sale.final_amount)}
                   </td>
                   <td className="whitespace-nowrap px-6 py-4 text-right text-sm font-medium">

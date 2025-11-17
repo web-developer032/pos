@@ -9,7 +9,7 @@ export default function InventoryPage() {
     <ProtectedRoute>
       <DashboardLayout>
         <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-900">Inventory</h1>
+          <h1 className="text-3xl font-bold">Inventory</h1>
           <p className="mt-2 text-gray-600">Manage stock levels</p>
         </div>
         <InventoryList />
@@ -17,4 +17,3 @@ export default function InventoryPage() {
     </ProtectedRoute>
   );
 }
-

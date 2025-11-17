@@ -62,6 +62,17 @@ export const suppliersApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ["Supplier"],
     }),
+    importSuppliers: builder.mutation<
+      { message: string; imported: number; errors: string[] },
+      { suppliers: CreateSupplierRequest[] }
+    >({
+      query: (body) => ({
+        url: "/suppliers/import",
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: ["Supplier"],
+    }),
   }),
 });
 
@@ -71,5 +82,6 @@ export const {
   useCreateSupplierMutation,
   useUpdateSupplierMutation,
   useDeleteSupplierMutation,
+  useImportSuppliersMutation,
 } = suppliersApi;
 

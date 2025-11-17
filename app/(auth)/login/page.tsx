@@ -35,9 +35,7 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-gray-50">
       <div className="w-full max-w-md space-y-8 rounded-lg bg-white p-8 shadow-md">
         <div>
-          <h2 className="text-center text-3xl font-extrabold text-gray-900">
-            POS System
-          </h2>
+          <h2 className="text-center text-3xl font-extrabold ">POS System</h2>
           <p className="mt-2 text-center text-sm text-gray-600">
             Sign in to your account
           </p>
@@ -53,7 +51,7 @@ export default function LoginPage() {
                 name="username"
                 type="text"
                 required
-                className="relative block w-full appearance-none rounded-none rounded-t-md border border-gray-300 px-3 py-2 text-gray-900 placeholder-gray-500 focus:z-10 focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+                className="relative block w-full appearance-none rounded-none rounded-t-md border border-gray-300 px-3 py-2  placeholder-gray-500 focus:z-10 focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
                 placeholder="Username"
                 value={formData.username}
                 onChange={(e) =>
@@ -70,7 +68,7 @@ export default function LoginPage() {
                 name="password"
                 type="password"
                 required
-                className="relative block w-full appearance-none rounded-none rounded-b-md border border-gray-300 px-3 py-2 text-gray-900 placeholder-gray-500 focus:z-10 focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+                className="relative block w-full appearance-none rounded-none rounded-b-md border border-gray-300 px-3 py-2  placeholder-gray-500 focus:z-10 focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
                 placeholder="Password"
                 value={formData.password}
                 onChange={(e) =>

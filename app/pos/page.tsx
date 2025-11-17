@@ -23,7 +23,7 @@ export default function POSPage() {
     <ProtectedRoute allowedRoles={["admin", "cashier", "manager"]}>
       <DashboardLayout>
         <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-900">Point of Sale</h1>
+          <h1 className="text-3xl font-bold">Point of Sale</h1>
         </div>
 
         <div className="mb-4 flex gap-4">
@@ -38,7 +38,11 @@ export default function POSPage() {
             ]}
             value={customerId?.toString() || ""}
             onChange={(e) =>
-              dispatch(setCustomer(e.target.value ? parseInt(e.target.value) : undefined))
+              dispatch(
+                setCustomer(
+                  e.target.value ? parseInt(e.target.value) : undefined
+                )
+              )
             }
             className="w-64"
           />
@@ -47,7 +51,9 @@ export default function POSPage() {
             type="number"
             step="0.01"
             value={discount}
-            onChange={(e) => dispatch(setDiscount(parseFloat(e.target.value) || 0))}
+            onChange={(e) =>
+              dispatch(setDiscount(parseFloat(e.target.value) || 0))
+            }
             className="w-32"
           />
           <Input
@@ -60,14 +66,14 @@ export default function POSPage() {
           />
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           <div className="lg:col-span-2">
             <ProductGrid />
           </div>
           <div className="lg:col-span-1">
             <Cart />
             <Button
-              className="w-full mt-4"
+              className="mt-4 w-full"
               onClick={() => setIsPaymentModalOpen(true)}
             >
               Checkout
@@ -84,4 +90,3 @@ export default function POSPage() {
     </ProtectedRoute>
   );
 }
-

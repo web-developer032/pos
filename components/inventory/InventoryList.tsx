@@ -16,38 +16,36 @@ export function InventoryList() {
 
   return (
     <div>
-      <div className="bg-white shadow rounded-lg overflow-hidden">
+      <div className="overflow-hidden rounded-lg bg-white shadow">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                 Product
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                 Category
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                 Current Stock
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                 Min Stock Level
               </th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">
                 Actions
               </th>
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
+          <tbody className="divide-y divide-gray-200 bg-white">
             {data?.inventory.map((item) => (
               <tr
                 key={item.id}
                 className={
-                  item.stock_quantity <= item.min_stock_level
-                    ? "bg-red-50"
-                    : ""
+                  item.stock_quantity <= item.min_stock_level ? "bg-red-50" : ""
                 }
               >
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                <td className="whitespace-nowrap px-6 py-4 text-sm font-medium ">
                   {item.name}
                 </td>
                 <td className="px-6 py-4 text-sm text-gray-500">
@@ -57,8 +55,8 @@ export function InventoryList() {
                   <span
                     className={
                       item.stock_quantity <= item.min_stock_level
-                        ? "text-red-600 font-semibold"
-                        : "text-gray-900"
+                        ? "font-semibold text-red-600"
+                        : ""
                     }
                   >
                     {item.stock_quantity}
@@ -67,7 +65,7 @@ export function InventoryList() {
                 <td className="px-6 py-4 text-sm text-gray-500">
                   {item.min_stock_level}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                <td className="whitespace-nowrap px-6 py-4 text-right text-sm font-medium">
                   <button
                     onClick={() => {
                       setSelectedProduct(item.id);
@@ -104,4 +102,3 @@ export function InventoryList() {
     </div>
   );
 }
-

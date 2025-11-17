@@ -9,7 +9,7 @@ export default function CustomersPage() {
     <ProtectedRoute>
       <DashboardLayout>
         <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-900">Customers</h1>
+          <h1 className="text-3xl font-bold">Customers</h1>
           <p className="mt-2 text-gray-600">Manage your customers</p>
         </div>
         <CustomerList />
@@ -17,4 +17,3 @@ export default function CustomersPage() {
     </ProtectedRoute>
   );
 }
-
