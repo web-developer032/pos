@@ -10,10 +10,10 @@ export interface AuthRequest extends NextRequest {
 }
 
 export function requireAuth(
-  handler: (req: AuthRequest) => Promise<NextResponse>,
+  handler: (req: AuthRequest, context?: any) => Promise<NextResponse>,
   allowedRoles?: string[]
 ) {
-  return async (req: NextRequest): Promise<NextResponse> => {
+  return async (req: NextRequest, context?: any): Promise<NextResponse> => {
     const authHeader = req.headers.get("authorization");
     const token = extractTokenFromHeader(authHeader);
 
@@ -40,6 +40,6 @@ export function requireAuth(
     }
 
     (req as AuthRequest).user = payload;
-    return handler(req as AuthRequest);
+    return handler(req as AuthRequest, context);
   };
 }

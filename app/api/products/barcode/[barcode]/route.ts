@@ -2,8 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/middleware/auth";
 import client from "@/lib/db";
 
-async function getHandler(req: NextRequest, { params }: { params: { barcode: string } }) {
+async function getHandler(
+  req: NextRequest,
+  context: { params: Promise<{ barcode: string }> }
+) {
   try {
+    const params = await context.params;
     const result = await client.execute({
       sql: `SELECT p.*, c.name as category_name, s.name as supplier_name
             FROM products p

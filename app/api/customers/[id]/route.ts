@@ -11,8 +11,12 @@ const customerSchema = z.object({
   loyalty_points: z.number().int().min(0).optional(),
 });
 
-async function getHandler(req: NextRequest, { params }: { params: { id: string } }) {
+async function getHandler(
+  req: NextRequest,
+  context: { params: Promise<{ id: string }> }
+) {
   try {
+    const params = await context.params;
     const result = await client.execute({
       sql: "SELECT * FROM customers WHERE id = ?",
       args: [params.id],
@@ -32,8 +36,12 @@ async function getHandler(req: NextRequest, { params }: { params: { id: string }
   }
 }
 
-async function putHandler(req: NextRequest, { params }: { params: { id: string } }) {
+async function putHandler(
+  req: NextRequest,
+  context: { params: Promise<{ id: string }> }
+) {
   try {
+    const params = await context.params;
     const body = await req.json();
     const validated = customerSchema.parse(body);
 
@@ -89,8 +97,12 @@ async function putHandler(req: NextRequest, { params }: { params: { id: string }
   }
 }
 
-async function deleteHandler(req: NextRequest, { params }: { params: { id: string } }) {
+async function deleteHandler(
+  req: NextRequest,
+  context: { params: Promise<{ id: string }> }
+) {
   try {
+    const params = await context.params;
     await client.execute({
       sql: "DELETE FROM customers WHERE id = ?",
       args: [params.id],

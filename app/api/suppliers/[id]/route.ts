@@ -11,8 +11,12 @@ const supplierSchema = z.object({
   address: z.string().optional(),
 });
 
-async function getHandler(req: NextRequest, { params }: { params: { id: string } }) {
+async function getHandler(
+  req: NextRequest,
+  context: { params: Promise<{ id: string }> }
+) {
   try {
+    const params = await context.params;
     const result = await client.execute({
       sql: "SELECT * FROM suppliers WHERE id = ?",
       args: [params.id],
@@ -32,8 +36,12 @@ async function getHandler(req: NextRequest, { params }: { params: { id: string }
   }
 }
 
-async function putHandler(req: NextRequest, { params }: { params: { id: string } }) {
+async function putHandler(
+  req: NextRequest,
+  context: { params: Promise<{ id: string }> }
+) {
   try {
+    const params = await context.params;
     const body = await req.json();
     const validated = supplierSchema.parse(body);
 
@@ -88,8 +96,12 @@ async function putHandler(req: NextRequest, { params }: { params: { id: string }
   }
 }
 
-async function deleteHandler(req: NextRequest, { params }: { params: { id: string } }) {
+async function deleteHandler(
+  req: NextRequest,
+  context: { params: Promise<{ id: string }> }
+) {
   try {
+    const params = await context.params;
     await client.execute({
       sql: "DELETE FROM suppliers WHERE id = ?",
       args: [params.id],

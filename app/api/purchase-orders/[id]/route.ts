@@ -3,8 +3,12 @@ import { requireAuth } from "@/lib/middleware/auth";
 import client from "@/lib/db";
 import { z } from "zod";
 
-async function getHandler(req: NextRequest, { params }: { params: { id: string } }) {
+async function getHandler(
+  req: NextRequest,
+  context: { params: Promise<{ id: string }> }
+) {
   try {
+    const params = await context.params;
     const poResult = await client.execute({
       sql: `SELECT po.*, s.name as supplier_name, u.username as user_name
             FROM purchase_orders po
@@ -42,8 +46,12 @@ async function getHandler(req: NextRequest, { params }: { params: { id: string }
   }
 }
 
-async function putHandler(req: NextRequest, { params }: { params: { id: string } }) {
+async function putHandler(
+  req: NextRequest,
+  context: { params: Promise<{ id: string }> }
+) {
   try {
+    const params = await context.params;
     const body = await req.json();
     const status = body.status;
 

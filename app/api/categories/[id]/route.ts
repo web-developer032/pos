@@ -8,15 +8,22 @@ const categorySchema = z.object({
   description: z.string().optional(),
 });
 
-async function getHandler(req: NextRequest, { params }: { params: { id: string } }) {
+async function getHandler(
+  req: NextRequest,
+  context: { params: Promise<{ id: string }> }
+) {
   try {
+    const params = await context.params;
     const result = await client.execute({
       sql: "SELECT * FROM categories WHERE id = ?",
       args: [params.id],
     });
 
     if (result.rows.length === 0) {
-      return NextResponse.json({ error: "Category not found" }, { status: 404 });
+      return NextResponse.json(
+        { error: "Category not found" },
+        { status: 404 }
+      );
     }
 
     return NextResponse.json({ category: result.rows[0] });
@@ -29,8 +36,12 @@ async function getHandler(req: NextRequest, { params }: { params: { id: string }
   }
 }
 
-async function putHandler(req: NextRequest, { params }: { params: { id: string } }) {
+async function putHandler(
+  req: NextRequest,
+  context: { params: Promise<{ id: string }> }
+) {
   try {
+    const params = await context.params;
     const body = await req.json();
     const validated = categorySchema.parse(body);
 
@@ -47,7 +58,10 @@ async function putHandler(req: NextRequest, { params }: { params: { id: string }
     }
 
     if (updates.length === 0) {
-      return NextResponse.json({ error: "No fields to update" }, { status: 400 });
+      return NextResponse.json(
+        { error: "No fields to update" },
+        { status: 400 }
+      );
     }
 
     values.push(params.id);
@@ -73,8 +87,12 @@ async function putHandler(req: NextRequest, { params }: { params: { id: string }
   }
 }
 
-async function deleteHandler(req: NextRequest, { params }: { params: { id: string } }) {
+async function deleteHandler(
+  req: NextRequest,
+  context: { params: Promise<{ id: string }> }
+) {
   try {
+    const params = await context.params;
     await client.execute({
       sql: "DELETE FROM categories WHERE id = ?",
       args: [params.id],
@@ -93,4 +111,3 @@ async function deleteHandler(req: NextRequest, { params }: { params: { id: strin
 export const GET = requireAuth(getHandler);
 export const PUT = requireAuth(putHandler);
 export const DELETE = requireAuth(deleteHandler);
-

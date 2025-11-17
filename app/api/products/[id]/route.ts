@@ -17,8 +17,12 @@ const productSchema = z.object({
   image_url: z.string().optional(),
 });
 
-async function getHandler(req: NextRequest, { params }: { params: { id: string } }) {
+async function getHandler(
+  req: NextRequest,
+  context: { params: Promise<{ id: string }> }
+) {
   try {
+    const params = await context.params;
     const result = await client.execute({
       sql: `SELECT p.*, c.name as category_name, s.name as supplier_name
             FROM products p
@@ -42,8 +46,12 @@ async function getHandler(req: NextRequest, { params }: { params: { id: string }
   }
 }
 
-async function putHandler(req: NextRequest, { params }: { params: { id: string } }) {
+async function putHandler(
+  req: NextRequest,
+  context: { params: Promise<{ id: string }> }
+) {
   try {
+    const params = await context.params;
     const body = await req.json();
     const validated = productSchema.parse(body);
 
@@ -85,8 +93,12 @@ async function putHandler(req: NextRequest, { params }: { params: { id: string }
   }
 }
 
-async function deleteHandler(req: NextRequest, { params }: { params: { id: string } }) {
+async function deleteHandler(
+  req: NextRequest,
+  context: { params: Promise<{ id: string }> }
+) {
   try {
+    const params = await context.params;
     await client.execute({
       sql: "DELETE FROM products WHERE id = ?",
       args: [params.id],
