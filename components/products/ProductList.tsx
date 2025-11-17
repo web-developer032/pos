@@ -124,6 +124,23 @@ export function ProductList() {
     "image_url",
   ];
 
+  // Template data with example values
+  const templateData = [
+    {
+      name: "Example Product",
+      barcode: "1234567890123",
+      sku: "SKU-001",
+      description: "Product description",
+      category_id: "1",
+      supplier_id: "1",
+      cost_price: "10.00",
+      selling_price: "15.00",
+      stock_quantity: "100",
+      min_stock_level: "10",
+      image_url: "https://example.com/image.jpg",
+    },
+  ];
+
   return (
     <div>
       <div className="mb-4 flex items-center justify-between">
@@ -135,6 +152,7 @@ export function ProductList() {
             filename="products"
             onImport={handleImport}
             onImportSuccess={refetch}
+            templateData={templateData}
           />
           <Button onClick={() => setIsModalOpen(true)}>Add Product</Button>
         </div>

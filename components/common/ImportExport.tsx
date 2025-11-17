@@ -2,7 +2,12 @@
 
 import { useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
-import { arrayToCSV, downloadCSV, parseCSV, readFileAsText } from "@/lib/utils/csv";
+import {
+  arrayToCSV,
+  downloadCSV,
+  parseCSV,
+  readFileAsText,
+} from "@/lib/utils/csv";
 import toast from "react-hot-toast";
 
 interface ImportExportProps<T> {
@@ -13,6 +18,7 @@ interface ImportExportProps<T> {
   onImportSuccess?: () => void;
   exportLabel?: string;
   importLabel?: string;
+  templateData?: T[];
 }
 
 export function ImportExport<T extends Record<string, any>>({
@@ -23,6 +29,7 @@ export function ImportExport<T extends Record<string, any>>({
   onImportSuccess,
   exportLabel = "Export CSV",
   importLabel = "Import CSV",
+  templateData,
 }: ImportExportProps<T>) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isImporting, setIsImporting] = useState(false);
@@ -30,11 +37,28 @@ export function ImportExport<T extends Record<string, any>>({
   const handleExport = () => {
     try {
       const csv = arrayToCSV(data, headers);
-      downloadCSV(csv, `${filename}_${new Date().toISOString().split("T")[0]}.csv`);
+      downloadCSV(
+        csv,
+        `${filename}_${new Date().toISOString().split("T")[0]}.csv`
+      );
       toast.success("Data exported successfully");
     } catch (error) {
       toast.error("Failed to export data");
       console.error("Export error:", error);
+    }
+  };
+
+  const handleDownloadTemplate = () => {
+    try {
+      const template =
+        templateData && templateData.length > 0
+          ? arrayToCSV(templateData, headers)
+          : arrayToCSV([], headers); // Just headers if no template data
+      downloadCSV(template, `${filename}_template.csv`);
+      toast.success("Template downloaded successfully");
+    } catch (error) {
+      toast.error("Failed to download template");
+      console.error("Template download error:", error);
     }
   };
 
@@ -64,7 +88,7 @@ export function ImportExport<T extends Record<string, any>>({
       }
 
       const result = await onImport(parsed as T[]);
-      
+
       if (result.errors.length > 0) {
         toast.error(
           `Imported ${result.imported} items. ${result.errors.length} errors occurred.`,
@@ -93,6 +117,9 @@ export function ImportExport<T extends Record<string, any>>({
 
   return (
     <div className="flex gap-2">
+      <Button onClick={handleDownloadTemplate} variant="outline" type="button">
+        Download Template
+      </Button>
       <Button onClick={handleExport} variant="outline" type="button">
         {exportLabel}
       </Button>
@@ -117,4 +144,3 @@ export function ImportExport<T extends Record<string, any>>({
     </div>
   );
 }
-

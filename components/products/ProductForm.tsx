@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useForm } from "react-hook-form";
+import { useEffect } from "react";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import {
@@ -21,16 +21,30 @@ const productSchema = z.object({
   barcode: z.string().optional(),
   sku: z.string().optional(),
   description: z.string().optional(),
-  category_id: z.number().optional(),
-  supplier_id: z.number().optional(),
-  cost_price: z.number().min(0, "Cost price must be >= 0"),
-  selling_price: z.number().min(0, "Selling price must be >= 0"),
-  stock_quantity: z.number().int().min(0, "Stock quantity must be >= 0"),
-  min_stock_level: z.number().int().min(0, "Min stock level must be >= 0"),
+  category_id: z.union([z.number(), z.string(), z.undefined()]).optional(),
+  supplier_id: z.union([z.number(), z.string(), z.undefined()]).optional(),
+  cost_price: z.union([z.number(), z.string()]),
+  selling_price: z.union([z.number(), z.string()]),
+  stock_quantity: z.union([z.number(), z.string()]),
+  min_stock_level: z.union([z.number(), z.string()]),
   image_url: z.string().optional(),
 });
 
-type ProductFormData = z.infer<typeof productSchema>;
+type ProductFormDataRaw = z.infer<typeof productSchema>;
+
+interface ProductFormData {
+  name: string;
+  barcode?: string;
+  sku?: string;
+  description?: string;
+  category_id?: number;
+  supplier_id?: number;
+  cost_price: number;
+  selling_price: number;
+  stock_quantity: number;
+  min_stock_level: number;
+  image_url?: string;
+}
 
 interface ProductFormProps {
   productId?: number | null;
@@ -49,10 +63,24 @@ export function ProductForm({ productId, onSuccess }: ProductFormProps) {
   const {
     register,
     handleSubmit,
+    control,
     formState: { errors },
     reset,
-  } = useForm<ProductFormData>({
+  } = useForm<ProductFormDataRaw>({
     resolver: zodResolver(productSchema),
+    defaultValues: {
+      name: "",
+      barcode: "",
+      sku: "",
+      description: "",
+      category_id: undefined,
+      supplier_id: undefined,
+      cost_price: "",
+      selling_price: "",
+      stock_quantity: "",
+      min_stock_level: "",
+      image_url: "",
+    },
   });
 
   useEffect(() => {
@@ -64,22 +92,65 @@ export function ProductForm({ productId, onSuccess }: ProductFormProps) {
         description: productData.product.description || "",
         category_id: productData.product.category_id || undefined,
         supplier_id: productData.product.supplier_id || undefined,
-        cost_price: productData.product.cost_price,
-        selling_price: productData.product.selling_price,
-        stock_quantity: productData.product.stock_quantity,
-        min_stock_level: productData.product.min_stock_level,
+        cost_price: productData.product.cost_price.toString(),
+        selling_price: productData.product.selling_price.toString(),
+        stock_quantity: productData.product.stock_quantity.toString(),
+        min_stock_level: productData.product.min_stock_level.toString(),
         image_url: productData.product.image_url || "",
       });
     }
   }, [productData, reset]);
 
-  const onSubmit = async (data: ProductFormData) => {
+  const onSubmit = async (data: ProductFormDataRaw) => {
     try {
-      const submitData = {
-        ...data,
-        category_id: data.category_id || undefined,
-        supplier_id: data.supplier_id || undefined,
+      // Convert string numbers to actual numbers
+      const costPrice = Number(data.cost_price);
+      const sellingPrice = Number(data.selling_price);
+      const stockQuantity = Number(data.stock_quantity);
+      const minStockLevel = Number(data.min_stock_level);
+
+      // Validate required number fields
+      if (isNaN(costPrice) || costPrice < 0) {
+        toast.error("Cost price is required and must be >= 0");
+        return;
+      }
+      if (isNaN(sellingPrice) || sellingPrice < 0) {
+        toast.error("Selling price is required and must be >= 0");
+        return;
+      }
+      if (isNaN(stockQuantity) || stockQuantity < 0) {
+        toast.error("Stock quantity is required and must be >= 0");
+        return;
+      }
+      if (isNaN(minStockLevel) || minStockLevel < 0) {
+        toast.error("Min stock level is required and must be >= 0");
+        return;
+      }
+
+      // Convert category_id and supplier_id
+      const categoryId =
+        data.category_id === "" || data.category_id === undefined
+          ? undefined
+          : Number(data.category_id);
+      const supplierId =
+        data.supplier_id === "" || data.supplier_id === undefined
+          ? undefined
+          : Number(data.supplier_id);
+
+      const submitData: ProductFormData = {
+        name: data.name,
+        barcode: data.barcode || undefined,
+        sku: data.sku || undefined,
+        description: data.description || undefined,
+        category_id: isNaN(Number(categoryId)) ? undefined : Number(categoryId),
+        supplier_id: isNaN(Number(supplierId)) ? undefined : Number(supplierId),
+        cost_price: costPrice,
+        selling_price: sellingPrice,
+        stock_quantity: Math.floor(stockQuantity),
+        min_stock_level: Math.floor(minStockLevel),
+        image_url: data.image_url || undefined,
       };
+
       if (productId) {
         await updateProduct({ id: productId, data: submitData }).unwrap();
         toast.success("Product updated successfully");
@@ -88,8 +159,9 @@ export function ProductForm({ productId, onSuccess }: ProductFormProps) {
         toast.success("Product created successfully");
       }
       onSuccess?.();
-    } catch (error: any) {
-      toast.error(error.data?.error || "Failed to save product");
+    } catch (error: unknown) {
+      const err = error as { data?: { error?: string } };
+      toast.error(err.data?.error || "Failed to save product");
     }
   };
 
@@ -101,11 +173,7 @@ export function ProductForm({ productId, onSuccess }: ProductFormProps) {
           {...register("name")}
           error={errors.name?.message}
         />
-        <Input
-          label="SKU"
-          {...register("sku")}
-          error={errors.sku?.message}
-        />
+        <Input label="SKU" {...register("sku")} error={errors.sku?.message} />
       </div>
       <div className="grid grid-cols-2 gap-4">
         <Input
@@ -120,27 +188,51 @@ export function ProductForm({ productId, onSuccess }: ProductFormProps) {
         />
       </div>
       <div className="grid grid-cols-2 gap-4">
-        <Select
-          label="Category"
-          options={[
-            { value: "", label: "Select Category" },
-            ...(categoriesData?.categories.map((c) => ({
-              value: c.id.toString(),
-              label: c.name,
-            })) || []),
-          ]}
-          {...register("category_id", { valueAsNumber: true })}
+        <Controller
+          name="category_id"
+          control={control}
+          render={({ field }) => (
+            <Select
+              label="Category"
+              options={[
+                { value: "", label: "Select Category" },
+                ...(categoriesData?.categories.map((c) => ({
+                  value: c.id.toString(),
+                  label: c.name,
+                })) || []),
+              ]}
+              value={field.value?.toString() || ""}
+              onChange={(e) => {
+                field.onChange(
+                  e.target.value === "" ? undefined : Number(e.target.value)
+                );
+              }}
+              error={errors.category_id?.message}
+            />
+          )}
         />
-        <Select
-          label="Supplier"
-          options={[
-            { value: "", label: "Select Supplier" },
-            ...(suppliersData?.suppliers.map((s) => ({
-              value: s.id.toString(),
-              label: s.name,
-            })) || []),
-          ]}
-          {...register("supplier_id", { valueAsNumber: true })}
+        <Controller
+          name="supplier_id"
+          control={control}
+          render={({ field }) => (
+            <Select
+              label="Supplier"
+              options={[
+                { value: "", label: "Select Supplier" },
+                ...(suppliersData?.suppliers.map((s) => ({
+                  value: s.id.toString(),
+                  label: s.name,
+                })) || []),
+              ]}
+              value={field.value?.toString() || ""}
+              onChange={(e) => {
+                field.onChange(
+                  e.target.value === "" ? undefined : Number(e.target.value)
+                );
+              }}
+              error={errors.supplier_id?.message}
+            />
+          )}
         />
       </div>
       <Input
@@ -153,14 +245,14 @@ export function ProductForm({ productId, onSuccess }: ProductFormProps) {
           label="Cost Price *"
           type="number"
           step="0.01"
-          {...register("cost_price", { valueAsNumber: true })}
+          {...register("cost_price")}
           error={errors.cost_price?.message}
         />
         <Input
           label="Selling Price *"
           type="number"
           step="0.01"
-          {...register("selling_price", { valueAsNumber: true })}
+          {...register("selling_price")}
           error={errors.selling_price?.message}
         />
       </div>
@@ -168,13 +260,13 @@ export function ProductForm({ productId, onSuccess }: ProductFormProps) {
         <Input
           label="Stock Quantity *"
           type="number"
-          {...register("stock_quantity", { valueAsNumber: true })}
+          {...register("stock_quantity")}
           error={errors.stock_quantity?.message}
         />
         <Input
           label="Min Stock Level *"
           type="number"
-          {...register("min_stock_level", { valueAsNumber: true })}
+          {...register("min_stock_level")}
           error={errors.min_stock_level?.message}
         />
       </div>
@@ -184,4 +276,3 @@ export function ProductForm({ productId, onSuccess }: ProductFormProps) {
     </form>
   );
 }
-

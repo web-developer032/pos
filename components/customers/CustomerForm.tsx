@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -15,10 +15,10 @@ import toast from "react-hot-toast";
 
 const customerSchema = z.object({
   name: z.string().min(1, "Name is required"),
-  email: z.string().email().optional().or(z.literal("")),
+  email: z.string().email("Invalid email format").optional().or(z.literal("")),
   phone: z.string().optional(),
   address: z.string().optional(),
-  loyalty_points: z.number().int().min(0).optional(),
+  loyalty_points: z.coerce.number().int().min(0).optional(),
 });
 
 type CustomerFormData = z.infer<typeof customerSchema>;
@@ -42,6 +42,13 @@ export function CustomerForm({ customerId, onSuccess }: CustomerFormProps) {
     reset,
   } = useForm<CustomerFormData>({
     resolver: zodResolver(customerSchema),
+    defaultValues: {
+      name: "",
+      email: "",
+      phone: "",
+      address: "",
+      loyalty_points: 0,
+    },
   });
 
   useEffect(() => {
@@ -58,11 +65,19 @@ export function CustomerForm({ customerId, onSuccess }: CustomerFormProps) {
 
   const onSubmit = async (data: CustomerFormData) => {
     try {
+      const submitData = {
+        name: data.name,
+        email: data.email || undefined,
+        phone: data.phone || undefined,
+        address: data.address || undefined,
+        loyalty_points: data.loyalty_points || undefined,
+      };
+
       if (customerId) {
-        await updateCustomer({ id: customerId, data }).unwrap();
+        await updateCustomer({ id: customerId, data: submitData }).unwrap();
         toast.success("Customer updated successfully");
       } else {
-        await createCustomer(data).unwrap();
+        await createCustomer(submitData).unwrap();
         toast.success("Customer created successfully");
       }
       onSuccess?.();
@@ -108,4 +123,3 @@ export function CustomerForm({ customerId, onSuccess }: CustomerFormProps) {
     </form>
   );
 }
-

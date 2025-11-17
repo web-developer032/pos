@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -39,6 +39,10 @@ export function CategoryForm({ categoryId, onSuccess }: CategoryFormProps) {
     reset,
   } = useForm<CategoryFormData>({
     resolver: zodResolver(categorySchema),
+    defaultValues: {
+      name: "",
+      description: "",
+    },
   });
 
   useEffect(() => {
@@ -52,11 +56,16 @@ export function CategoryForm({ categoryId, onSuccess }: CategoryFormProps) {
 
   const onSubmit = async (data: CategoryFormData) => {
     try {
+      const submitData = {
+        name: data.name,
+        description: data.description || undefined,
+      };
+
       if (categoryId) {
-        await updateCategory({ id: categoryId, data }).unwrap();
+        await updateCategory({ id: categoryId, data: submitData }).unwrap();
         toast.success("Category updated successfully");
       } else {
-        await createCategory(data).unwrap();
+        await createCategory(submitData).unwrap();
         toast.success("Category created successfully");
       }
       onSuccess?.();
@@ -68,7 +77,7 @@ export function CategoryForm({ categoryId, onSuccess }: CategoryFormProps) {
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
       <Input
-        label="Name"
+        label="Name *"
         {...register("name")}
         error={errors.name?.message}
       />
@@ -83,4 +92,3 @@ export function CategoryForm({ categoryId, onSuccess }: CategoryFormProps) {
     </form>
   );
 }
-

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -16,7 +16,7 @@ import toast from "react-hot-toast";
 const supplierSchema = z.object({
   name: z.string().min(1, "Name is required"),
   contact_person: z.string().optional(),
-  email: z.string().email().optional().or(z.literal("")),
+  email: z.string().email("Invalid email format").optional().or(z.literal("")),
   phone: z.string().optional(),
   address: z.string().optional(),
 });
@@ -42,6 +42,13 @@ export function SupplierForm({ supplierId, onSuccess }: SupplierFormProps) {
     reset,
   } = useForm<SupplierFormData>({
     resolver: zodResolver(supplierSchema),
+    defaultValues: {
+      name: "",
+      contact_person: "",
+      email: "",
+      phone: "",
+      address: "",
+    },
   });
 
   useEffect(() => {
@@ -58,11 +65,19 @@ export function SupplierForm({ supplierId, onSuccess }: SupplierFormProps) {
 
   const onSubmit = async (data: SupplierFormData) => {
     try {
+      const submitData = {
+        name: data.name,
+        contact_person: data.contact_person || undefined,
+        email: data.email || undefined,
+        phone: data.phone || undefined,
+        address: data.address || undefined,
+      };
+
       if (supplierId) {
-        await updateSupplier({ id: supplierId, data }).unwrap();
+        await updateSupplier({ id: supplierId, data: submitData }).unwrap();
         toast.success("Supplier updated successfully");
       } else {
-        await createSupplier(data).unwrap();
+        await createSupplier(submitData).unwrap();
         toast.success("Supplier created successfully");
       }
       onSuccess?.();
@@ -105,4 +120,3 @@ export function SupplierForm({ supplierId, onSuccess }: SupplierFormProps) {
     </form>
   );
 }
-

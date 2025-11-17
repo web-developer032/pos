@@ -69,6 +69,14 @@ export function CategoryList() {
 
   const exportHeaders = ["name", "description"];
 
+  // Template data with example values
+  const templateData = [
+    {
+      name: "Electronics",
+      description: "Electronic products and accessories",
+    },
+  ];
+
   return (
     <div>
       <div className="mb-4 flex items-center justify-between">
@@ -80,6 +88,7 @@ export function CategoryList() {
             filename="categories"
             onImport={handleImport}
             onImportSuccess={refetch}
+            templateData={templateData}
           />
           <Button onClick={() => setIsModalOpen(true)}>Add Category</Button>
         </div>

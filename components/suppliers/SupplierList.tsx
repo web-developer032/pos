@@ -76,6 +76,17 @@ export function SupplierList() {
 
   const exportHeaders = ["name", "contact_person", "email", "phone", "address"];
 
+  // Template data with example values
+  const templateData = [
+    {
+      name: "ABC Suppliers Inc",
+      contact_person: "Jane Smith",
+      email: "jane.smith@abcsuppliers.com",
+      phone: "+1234567890",
+      address: "456 Business Ave, City, State 12345",
+    },
+  ];
+
   return (
     <div>
       <div className="mb-4 flex items-center justify-between">
@@ -87,6 +98,7 @@ export function SupplierList() {
             filename="suppliers"
             onImport={handleImport}
             onImportSuccess={refetch}
+            templateData={templateData}
           />
           <Button onClick={() => setIsModalOpen(true)}>Add Supplier</Button>
         </div>

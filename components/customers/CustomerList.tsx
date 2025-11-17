@@ -82,6 +82,17 @@ export function CustomerList() {
 
   const exportHeaders = ["name", "email", "phone", "address", "loyalty_points"];
 
+  // Template data with example values
+  const templateData = [
+    {
+      name: "John Doe",
+      email: "john.doe@example.com",
+      phone: "+1234567890",
+      address: "123 Main St, City, State 12345",
+      loyalty_points: "0",
+    },
+  ];
+
   return (
     <div>
       <div className="mb-4 flex items-center justify-between">
@@ -93,6 +104,7 @@ export function CustomerList() {
             filename="customers"
             onImport={handleImport}
             onImportSuccess={refetch}
+            templateData={templateData}
           />
           <Button onClick={() => setIsModalOpen(true)}>Add Customer</Button>
         </div>
