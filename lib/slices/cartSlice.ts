@@ -52,6 +52,17 @@ const cartSlice = createSlice({
         item.quantity = action.payload.quantity;
       }
     },
+    updatePrice: (
+      state,
+      action: PayloadAction<{ product_id: number; price: number }>
+    ) => {
+      const item = state.items.find(
+        (item) => item.product_id === action.payload.product_id
+      );
+      if (item) {
+        item.price = action.payload.price;
+      }
+    },
     setCustomer: (state, action: PayloadAction<number | undefined>) => {
       state.customerId = action.payload;
     },
@@ -74,6 +85,7 @@ export const {
   addItem,
   removeItem,
   updateQuantity,
+  updatePrice,
   setCustomer,
   setDiscount,
   setTax,

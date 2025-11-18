@@ -72,3 +72,4 @@ async function postHandler(req: NextRequest) {
 
 export const GET = requireAuth(getHandler);
 export const POST = requireAuth(postHandler);
+
