@@ -184,7 +184,6 @@ export function ProductGrid() {
             <Input
               label="New Selling Price"
               type="number"
-              step="0.01"
               min="0"
               value={newPrice}
               onChange={(e) => setNewPrice(e.target.value)}

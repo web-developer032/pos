@@ -38,13 +38,13 @@ export function Cart({ onCheckout }: CartProps) {
       if (!isNaN(newPrice) && newPrice >= 0) {
         dispatch(updatePrice({ product_id: productId, price: newPrice }));
       }
-      setEditingPriceId(null);
       setPriceInputs((prev) => {
         const updated = { ...prev };
         delete updated[productId];
         return updated;
       });
     }
+    setEditingPriceId(null);
   };
 
   const handlePriceKeyDown = (e: React.KeyboardEvent, productId: number) => {
@@ -81,7 +81,6 @@ export function Cart({ onCheckout }: CartProps) {
                       {editingPriceId === item.product_id ? (
                         <input
                           type="number"
-                          step="0.01"
                           min="0"
                           value={
                             priceInputs[item.product_id] ??

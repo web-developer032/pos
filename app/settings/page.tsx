@@ -74,7 +74,7 @@ function SettingsForm() {
       <Input
         label="Tax Rate (%)"
         type="number"
-        step="0.01"
+        step="0.1"
         value={formData.tax_rate}
         onChange={(e) => setFormData({ ...formData, tax_rate: e.target.value })}
       />

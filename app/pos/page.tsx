@@ -50,7 +50,6 @@ export default function POSPage() {
             <Input
               label="Discount"
               type="number"
-              step="0.01"
               value={discount}
               onChange={(e) =>
                 dispatch(setDiscount(parseFloat(e.target.value) || 0))
@@ -61,7 +60,7 @@ export default function POSPage() {
             <Input
               label="Tax"
               type="number"
-              step="0.01"
+              step="0.1"
               value={tax}
               onChange={(e) =>
                 dispatch(setTax(parseFloat(e.target.value) || 0))

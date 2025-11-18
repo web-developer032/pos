@@ -440,14 +440,12 @@ export function ProductForm({ productId, onSuccess }: ProductFormProps) {
           <Input
             label="Cost Price *"
             type="number"
-            step="0.01"
             {...register("cost_price")}
             error={errors.cost_price?.message}
           />
           <Input
             label="Selling Price *"
             type="number"
-            step="0.01"
             required
             {...register("selling_price")}
             error={errors.selling_price?.message}
