@@ -84,7 +84,7 @@ async function postHandler(req: NextRequest) {
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { error: "Invalid input", details: error.errors },
+        { error: "Invalid input", details: error.issues },
         { status: 400 }
       );
     }
@@ -98,4 +98,3 @@ async function postHandler(req: NextRequest) {
 
 export const GET = requireAuth(getHandler);
 export const POST = requireAuth(postHandler);
-

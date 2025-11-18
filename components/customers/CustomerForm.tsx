@@ -15,10 +15,10 @@ import toast from "react-hot-toast";
 
 const customerSchema = z.object({
   name: z.string().min(1, "Name is required"),
-  email: z.string().email("Invalid email format").optional().or(z.literal("")),
+  email: z.email("Invalid email format").optional().or(z.literal("")),
   phone: z.string().optional(),
   address: z.string().optional(),
-  loyalty_points: z.coerce.number().int().min(0).optional(),
+  loyalty_points: z.number().int().min(0).optional(),
 });
 
 type CustomerFormData = z.infer<typeof customerSchema>;
