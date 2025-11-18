@@ -24,10 +24,6 @@ export function ProductGrid() {
   const { format: formatCurrency } = useCurrency();
 
   const handleAddToCart = (product: any) => {
-    if (product.stock_quantity <= 0) {
-      toast.error("Product out of stock");
-      return;
-    }
     dispatch(
       addItem({
         product_id: product.id,
@@ -46,7 +42,7 @@ export function ProductGrid() {
 
   return (
     <div>
-      <div className="mb-4 flex gap-4">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:gap-4">
         <Input
           placeholder="Search products..."
           value={search}
@@ -65,21 +61,21 @@ export function ProductGrid() {
           onChange={(e) =>
             setCategoryId(e.target.value ? parseInt(e.target.value) : undefined)
           }
-          className="w-48"
+          className="w-full sm:w-48"
         />
       </div>
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
         {data?.products.map((product) => (
           <div
             key={product.id}
-            className="cursor-pointer rounded-lg border bg-white p-4 transition-shadow hover:shadow-lg"
+            className="cursor-pointer rounded-lg border bg-white p-3 transition-shadow hover:shadow-lg sm:p-4"
             onClick={() => handleAddToCart(product)}
           >
-            <h3 className="mb-2 font-semibold ">{product.name}</h3>
-            <p className="mb-2 text-2xl font-bold text-indigo-600">
+            <h3 className="mb-2 truncate font-semibold">{product.name}</h3>
+            <p className="mb-2 text-xl font-bold text-indigo-600 sm:text-2xl">
               {formatCurrency(product.selling_price)}
             </p>
-            <p className="text-sm text-gray-700">
+            <p className="text-xs text-gray-700 sm:text-sm">
               Stock: {product.stock_quantity}
             </p>
             {product.stock_quantity <= product.min_stock_level && (

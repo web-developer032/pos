@@ -16,23 +16,23 @@ export function InventoryList() {
 
   return (
     <div>
-      <div className="overflow-hidden rounded-lg bg-white shadow">
+      <div className="overflow-x-auto rounded-lg bg-white shadow">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+              <th className="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 sm:px-6">
                 Product
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+              <th className="hidden px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 sm:table-cell sm:px-6">
                 Category
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+              <th className="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 sm:px-6">
                 Current Stock
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+              <th className="hidden px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 sm:table-cell sm:px-6">
                 Min Stock Level
               </th>
-              <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">
+              <th className="px-3 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 sm:px-6">
                 Actions
               </th>
             </tr>
@@ -45,13 +45,13 @@ export function InventoryList() {
                   item.stock_quantity <= item.min_stock_level ? "bg-red-50" : ""
                 }
               >
-                <td className="whitespace-nowrap px-6 py-4 text-sm font-medium ">
+                <td className="whitespace-nowrap px-3 py-4 text-sm font-medium sm:px-6">
                   {item.name}
                 </td>
-                <td className="px-6 py-4 text-sm text-gray-500">
+                <td className="hidden px-3 py-4 text-sm text-gray-500 sm:table-cell sm:px-6">
                   {item.category_name || "-"}
                 </td>
-                <td className="px-6 py-4 text-sm">
+                <td className="px-3 py-4 text-sm sm:px-6">
                   <span
                     className={
                       item.stock_quantity <= item.min_stock_level
@@ -62,10 +62,10 @@ export function InventoryList() {
                     {item.stock_quantity}
                   </span>
                 </td>
-                <td className="px-6 py-4 text-sm text-gray-500">
+                <td className="hidden px-3 py-4 text-sm text-gray-500 sm:table-cell sm:px-6">
                   {item.min_stock_level}
                 </td>
-                <td className="whitespace-nowrap px-6 py-4 text-right text-sm font-medium">
+                <td className="whitespace-nowrap px-3 py-4 text-right text-sm font-medium sm:px-6">
                   <button
                     onClick={() => {
                       setSelectedProduct(item.id);

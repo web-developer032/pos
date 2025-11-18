@@ -94,9 +94,9 @@ export function SupplierList() {
 
   return (
     <div>
-      <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-xl font-semibold ">All Suppliers</h2>
-        <div className="flex gap-2">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <h2 className="text-xl font-semibold">All Suppliers</h2>
+        <div className="flex flex-col gap-2 sm:flex-row">
           <ImportExport
             data={exportData}
             headers={exportHeaders}
@@ -109,23 +109,23 @@ export function SupplierList() {
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-lg bg-white shadow">
+      <div className="overflow-x-auto rounded-lg bg-white shadow">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+              <th className="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 sm:px-6">
                 Name
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+              <th className="hidden px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 sm:table-cell sm:px-6">
                 Contact Person
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+              <th className="hidden px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 sm:table-cell sm:px-6">
                 Email
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+              <th className="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 sm:px-6">
                 Phone
               </th>
-              <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">
+              <th className="px-3 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 sm:px-6">
                 Actions
               </th>
             </tr>
@@ -133,32 +133,34 @@ export function SupplierList() {
           <tbody className="divide-y divide-gray-200 bg-white">
             {data?.suppliers.map((supplier) => (
               <tr key={supplier.id}>
-                <td className="whitespace-nowrap px-6 py-4 text-sm font-medium ">
+                <td className="whitespace-nowrap px-3 py-4 text-sm font-medium sm:px-6">
                   {supplier.name}
                 </td>
-                <td className="px-6 py-4 text-sm text-gray-500">
+                <td className="hidden px-3 py-4 text-sm text-gray-500 sm:table-cell sm:px-6">
                   {supplier.contact_person || "-"}
                 </td>
-                <td className="px-6 py-4 text-sm text-gray-500">
+                <td className="hidden px-3 py-4 text-sm text-gray-500 sm:table-cell sm:px-6">
                   {supplier.email || "-"}
                 </td>
-                <td className="px-6 py-4 text-sm text-gray-500">
+                <td className="px-3 py-4 text-sm text-gray-500 sm:px-6">
                   {supplier.phone || "-"}
                 </td>
-                <td className="whitespace-nowrap px-6 py-4 text-right text-sm font-medium">
-                  <button
-                    onClick={() => handleEdit(supplier.id)}
-                    className="mr-4 text-indigo-600 hover:text-indigo-900"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => handleDelete(supplier.id)}
-                    disabled={deletingId === supplier.id}
-                    className="text-red-600 hover:text-red-900 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {deletingId === supplier.id ? "Deleting..." : "Delete"}
-                  </button>
+                <td className="whitespace-nowrap px-3 py-4 text-right text-sm font-medium sm:px-6">
+                  <div className="flex flex-col gap-1 sm:flex-row sm:justify-end">
+                    <button
+                      onClick={() => handleEdit(supplier.id)}
+                      className="text-indigo-600 hover:text-indigo-900"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => handleDelete(supplier.id)}
+                      disabled={deletingId === supplier.id}
+                      className="text-red-600 hover:text-red-900 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {deletingId === supplier.id ? "Deleting..." : "Delete"}
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}

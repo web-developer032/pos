@@ -150,9 +150,9 @@ export function ProductList() {
 
   return (
     <div>
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="text-xl font-semibold">All Products</h2>
-        <div className="flex gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row">
           <ImportExport
             data={exportData}
             headers={exportHeaders}
@@ -165,7 +165,7 @@ export function ProductList() {
         </div>
       </div>
 
-      <div className="mb-4 flex gap-4">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:gap-4">
         <Input
           placeholder="Search products..."
           value={search}
@@ -184,30 +184,30 @@ export function ProductList() {
           onChange={(e) =>
             setCategoryId(e.target.value ? parseInt(e.target.value) : undefined)
           }
-          className="w-48"
+          className="w-full sm:w-48"
         />
       </div>
 
-      <div className="overflow-hidden rounded-lg bg-white shadow">
+      <div className="overflow-x-auto rounded-lg bg-white shadow">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+              <th className="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 sm:px-6">
                 Name
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+              <th className="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 sm:px-6">
                 SKU/Barcode
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+              <th className="hidden px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 sm:table-cell sm:px-6">
                 Category
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+              <th className="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 sm:px-6">
                 Price
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+              <th className="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 sm:px-6">
                 Stock
               </th>
-              <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">
+              <th className="px-3 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 sm:px-6">
                 Actions
               </th>
             </tr>
@@ -215,19 +215,19 @@ export function ProductList() {
           <tbody className="divide-y divide-gray-200 bg-white">
             {data?.products.map((product) => (
               <tr key={product.id}>
-                <td className="whitespace-nowrap px-6 py-4 text-sm font-medium ">
+                <td className="whitespace-nowrap px-3 py-4 text-sm font-medium sm:px-6">
                   {product.name}
                 </td>
-                <td className="px-6 py-4 text-sm text-gray-500">
+                <td className="px-3 py-4 text-sm text-gray-500 sm:px-6">
                   {product.sku || product.barcode || "-"}
                 </td>
-                <td className="px-6 py-4 text-sm text-gray-500">
+                <td className="hidden px-3 py-4 text-sm text-gray-500 sm:table-cell sm:px-6">
                   {product.category_name || "-"}
                 </td>
-                <td className="px-6 py-4 text-sm ">
+                <td className="px-3 py-4 text-sm sm:px-6">
                   {formatCurrency(product.selling_price)}
                 </td>
-                <td className="px-6 py-4 text-sm">
+                <td className="px-3 py-4 text-sm sm:px-6">
                   <span
                     className={
                       product.stock_quantity <= product.min_stock_level
@@ -238,20 +238,22 @@ export function ProductList() {
                     {product.stock_quantity}
                   </span>
                 </td>
-                <td className="whitespace-nowrap px-6 py-4 text-right text-sm font-medium">
-                  <button
-                    onClick={() => handleEdit(product.id)}
-                    className="mr-4 text-indigo-600 hover:text-indigo-900"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => handleDelete(product.id)}
-                    disabled={deletingId === product.id}
-                    className="text-red-600 hover:text-red-900 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {deletingId === product.id ? "Deleting..." : "Delete"}
-                  </button>
+                <td className="whitespace-nowrap px-3 py-4 text-right text-sm font-medium sm:px-6">
+                  <div className="flex flex-col gap-1 sm:flex-row sm:justify-end">
+                    <button
+                      onClick={() => handleEdit(product.id)}
+                      className="text-indigo-600 hover:text-indigo-900"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => handleDelete(product.id)}
+                      disabled={deletingId === product.id}
+                      className="text-red-600 hover:text-red-900 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {deletingId === product.id ? "Deleting..." : "Delete"}
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}

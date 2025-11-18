@@ -65,33 +65,33 @@ export function Sidebar() {
   );
 
   return (
-    <aside className="min-h-screen w-64 bg-gray-900 text-white">
-      <div className="p-6">
-        <h1 className="text-2xl font-bold">POS System</h1>
+    <aside className="flex flex-col w-48 sm:w-64 bg-gray-900 text-white">
+      <div className="p-3 sm:p-4 lg:p-6">
+        <h1 className="text-lg font-bold sm:text-xl lg:text-2xl">POS System</h1>
       </div>
 
-      <nav>
+      <nav className="flex-1 overflow-y-auto pb-20">
         {filteredMenuItems.map((item) => {
           const isActive = pathname === item.href;
           return (
             <Link
               key={item.href}
               href={item.href}
-              className={`flex items-center px-6 py-3 hover:bg-gray-800 ${
+              className={`flex items-center px-3 py-2 text-xs hover:bg-gray-800 sm:px-4 sm:py-3 sm:text-sm lg:px-6 lg:text-base ${
                 isActive ? "border-r-4 border-indigo-500 bg-gray-800" : ""
               }`}
             >
-              <span className="mr-3">{item.icon}</span>
-              <span>{item.name}</span>
+              <span className="mr-2 sm:mr-3">{item.icon}</span>
+              <span className="truncate">{item.name}</span>
             </Link>
           );
         })}
       </nav>
 
-      <div className="absolute bottom-0 w-64 border-t border-gray-800 p-6">
+      <div className="border-t border-gray-800 bg-gray-900 p-3 sm:p-4 lg:p-6">
         <button
           onClick={handleLogout}
-          className="w-full rounded-md bg-red-600 px-4 py-2 text-sm font-medium hover:bg-red-700"
+          className="w-full rounded-md bg-red-600 px-3 py-2 text-xs font-medium hover:bg-red-700 sm:px-4 sm:text-sm"
         >
           Logout
         </button>
