@@ -47,7 +47,10 @@ export const customersApi = apiSlice.injectEndpoints({
       query: (id) => `/customers/${id}`,
       providesTags: (result, error, id) => [{ type: "Customer", id }],
     }),
-    createCustomer: builder.mutation<{ customer: Customer }, CreateCustomerRequest>({
+    createCustomer: builder.mutation<
+      { customer: Customer },
+      CreateCustomerRequest
+    >({
       query: (body) => ({
         url: "/customers",
         method: "POST",
@@ -95,4 +98,3 @@ export const {
   useDeleteCustomerMutation,
   useImportCustomersMutation,
 } = customersApi;
-

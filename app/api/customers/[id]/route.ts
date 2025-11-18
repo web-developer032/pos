@@ -23,7 +23,10 @@ async function getHandler(
     });
 
     if (result.rows.length === 0) {
-      return NextResponse.json({ error: "Customer not found" }, { status: 404 });
+      return NextResponse.json(
+        { error: "Customer not found" },
+        { status: 404 }
+      );
     }
 
     return NextResponse.json({ customer: result.rows[0] });
@@ -70,7 +73,10 @@ async function putHandler(
     }
 
     if (updates.length === 0) {
-      return NextResponse.json({ error: "No fields to update" }, { status: 400 });
+      return NextResponse.json(
+        { error: "No fields to update" },
+        { status: 400 }
+      );
     }
 
     updates.push("updated_at = CURRENT_TIMESTAMP");
@@ -121,4 +127,3 @@ async function deleteHandler(
 export const GET = requireAuth(getHandler);
 export const PUT = requireAuth(putHandler);
 export const DELETE = requireAuth(deleteHandler);
-

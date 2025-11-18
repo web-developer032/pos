@@ -190,11 +190,22 @@ export async function initializeDatabase() {
   `);
 
   // Create indexes for better performance
-  await client.execute(`CREATE INDEX IF NOT EXISTS idx_products_barcode ON products(barcode)`);
-  await client.execute(`CREATE INDEX IF NOT EXISTS idx_products_category ON products(category_id)`);
-  await client.execute(`CREATE INDEX IF NOT EXISTS idx_sales_user ON sales(user_id)`);
-  await client.execute(`CREATE INDEX IF NOT EXISTS idx_sales_date ON sales(created_at)`);
-  await client.execute(`CREATE INDEX IF NOT EXISTS idx_sale_items_sale ON sale_items(sale_id)`);
-  await client.execute(`CREATE INDEX IF NOT EXISTS idx_inventory_product ON inventory_transactions(product_id)`);
+  await client.execute(
+    `CREATE INDEX IF NOT EXISTS idx_products_barcode ON products(barcode)`
+  );
+  await client.execute(
+    `CREATE INDEX IF NOT EXISTS idx_products_category ON products(category_id)`
+  );
+  await client.execute(
+    `CREATE INDEX IF NOT EXISTS idx_sales_user ON sales(user_id)`
+  );
+  await client.execute(
+    `CREATE INDEX IF NOT EXISTS idx_sales_date ON sales(created_at)`
+  );
+  await client.execute(
+    `CREATE INDEX IF NOT EXISTS idx_sale_items_sale ON sale_items(sale_id)`
+  );
+  await client.execute(
+    `CREATE INDEX IF NOT EXISTS idx_inventory_product ON inventory_transactions(product_id)`
+  );
 }
-
