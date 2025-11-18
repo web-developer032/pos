@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import {
   useGetProductsQuery,
   useUpdateProductMutation,
@@ -9,6 +9,7 @@ import { useGetCategoriesQuery } from "@/lib/api/categoriesApi";
 import { useAppDispatch } from "@/lib/hooks";
 import { useCurrency } from "@/lib/hooks/useCurrency";
 import { useDebounce } from "@/lib/hooks/useDebounce";
+import { useThrottledCallback } from "@/lib/hooks/useThrottledCallback";
 import { addItem } from "@/lib/slices/cartSlice";
 import { Select } from "@/components/ui/Select";
 import { Input } from "@/components/ui/Input";
@@ -27,7 +28,8 @@ export function ProductGrid() {
     categoryId,
   });
   const { data: categoriesData } = useGetCategoriesQuery();
-  const [updateProduct] = useUpdateProductMutation();
+  const [updateProduct, { isLoading: isUpdatingPrice }] =
+    useUpdateProductMutation();
   const dispatch = useAppDispatch();
   const { format: formatCurrency } = useCurrency();
 
@@ -50,12 +52,12 @@ export function ProductGrid() {
     setNewPrice(product.selling_price.toString());
   };
 
-  const handleCloseEditModal = () => {
+  const handleCloseEditModal = useCallback(() => {
     setEditingProduct(null);
     setNewPrice("");
-  };
+  }, []);
 
-  const handleSavePrice = async () => {
+  const handleSavePriceInternal = useCallback(async () => {
     if (!editingProduct || !newPrice) return;
 
     const price = parseFloat(newPrice);
@@ -71,11 +73,14 @@ export function ProductGrid() {
       }).unwrap();
       toast.success("Price updated successfully");
       refetch();
-      handleCloseEditModal();
+      setEditingProduct(null);
+      setNewPrice("");
     } catch (error: any) {
       toast.error(error.data?.error || "Failed to update price");
     }
-  };
+  }, [editingProduct, newPrice, updateProduct, refetch]);
+
+  const handleSavePrice = useThrottledCallback(handleSavePriceInternal, 1000);
 
   if (isLoading) {
     return <div>Loading products...</div>;
@@ -155,10 +160,20 @@ export function ProductGrid() {
         size="sm"
       >
         {editingProduct && (
-          <div className="space-y-4">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleSavePrice();
+            }}
+            className="space-y-4"
+          >
             <div>
-              <p className="text-sm text-gray-600">Product:</p>
-              <p className="text-lg font-semibold">{editingProduct.name}</p>
+              <p className="text-sm text-gray-600">
+                Product:{" "}
+                <span className="text-lg font-semibold">
+                  {editingProduct.name}
+                </span>
+              </p>
             </div>
             <div>
               <p className="mb-1 text-sm text-gray-600">Current Price:</p>
@@ -174,14 +189,22 @@ export function ProductGrid() {
               value={newPrice}
               onChange={(e) => setNewPrice(e.target.value)}
               placeholder="Enter new price"
+              autoFocus
             />
             <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={handleCloseEditModal}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleCloseEditModal}
+                disabled={isUpdatingPrice}
+              >
                 Cancel
               </Button>
-              <Button onClick={handleSavePrice}>Update Price</Button>
+              <Button type="submit" disabled={isUpdatingPrice}>
+                {isUpdatingPrice ? "Updating..." : "Update Price"}
+              </Button>
             </div>
-          </div>
+          </form>
         )}
       </Modal>
     </div>
