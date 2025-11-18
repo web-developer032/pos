@@ -7,6 +7,7 @@ import {
   useImportCustomersMutation,
   CreateCustomerRequest,
 } from "@/lib/api/customersApi";
+import { useDebounce } from "@/lib/hooks/useDebounce";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
@@ -16,22 +17,28 @@ import toast from "react-hot-toast";
 
 export function CustomerList() {
   const [search, setSearch] = useState("");
+  const debouncedSearch = useDebounce(search, 500);
   const { data, isLoading, refetch } = useGetCustomersQuery({
-    search: search || undefined,
+    search: debouncedSearch || undefined,
   });
   const [deleteCustomer] = useDeleteCustomerMutation();
   const [importCustomers] = useImportCustomersMutation();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<number | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
 
   const handleDelete = async (id: number) => {
+    if (deletingId === id) return; // Prevent double click
     if (confirm("Are you sure you want to delete this customer?")) {
+      setDeletingId(id);
       try {
         await deleteCustomer(id).unwrap();
         toast.success("Customer deleted successfully");
         refetch();
       } catch (error: any) {
         toast.error(error.data?.error || "Failed to delete customer");
+      } finally {
+        setDeletingId(null);
       }
     }
   };
@@ -163,9 +170,10 @@ export function CustomerList() {
                   </button>
                   <button
                     onClick={() => handleDelete(customer.id)}
-                    className="text-red-600 hover:text-red-900"
+                    disabled={deletingId === customer.id}
+                    className="text-red-600 hover:text-red-900 disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    Delete
+                    {deletingId === customer.id ? "Deleting..." : "Delete"}
                   </button>
                 </td>
               </tr>

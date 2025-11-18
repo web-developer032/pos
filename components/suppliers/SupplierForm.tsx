@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -29,6 +29,7 @@ interface SupplierFormProps {
 }
 
 export function SupplierForm({ supplierId, onSuccess }: SupplierFormProps) {
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { data: supplierData } = useGetSupplierQuery(supplierId!, {
     skip: !supplierId,
   });
@@ -64,6 +65,9 @@ export function SupplierForm({ supplierId, onSuccess }: SupplierFormProps) {
   }, [supplierData, reset]);
 
   const onSubmit = async (data: SupplierFormData) => {
+    if (isSubmitting) return; // Prevent double submission
+    setIsSubmitting(true);
+
     try {
       const submitData = {
         name: data.name,
@@ -83,6 +87,8 @@ export function SupplierForm({ supplierId, onSuccess }: SupplierFormProps) {
       onSuccess?.();
     } catch (error: any) {
       toast.error(error.data?.error || "Failed to save supplier");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -115,7 +121,9 @@ export function SupplierForm({ supplierId, onSuccess }: SupplierFormProps) {
         error={errors.address?.message}
       />
       <div className="flex justify-end space-x-2">
-        <Button type="submit">{supplierId ? "Update" : "Create"}</Button>
+        <Button type="submit" disabled={isSubmitting}>
+          {isSubmitting ? "Saving..." : supplierId ? "Update" : "Create"}
+        </Button>
       </div>
     </form>
   );

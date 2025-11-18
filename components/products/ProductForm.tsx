@@ -29,6 +29,7 @@ function InlineCategoryForm({
 }: {
   onSuccess: (categoryId: number) => void;
 }) {
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const {
     register,
     handleSubmit,
@@ -39,6 +40,8 @@ function InlineCategoryForm({
   const [createCategory] = useCreateCategoryMutation();
 
   const onSubmit = async (data: { name: string; description?: string }) => {
+    if (isSubmitting) return; // Prevent double submission
+    setIsSubmitting(true);
     try {
       const result = await createCategory({
         name: data.name,
@@ -48,6 +51,8 @@ function InlineCategoryForm({
     } catch (error: unknown) {
       const err = error as { data?: { error?: string } };
       toast.error(err.data?.error || "Failed to create category");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -64,7 +69,9 @@ function InlineCategoryForm({
         error={errors.description?.message as string}
       />
       <div className="flex justify-end space-x-2">
-        <Button type="submit">Create</Button>
+        <Button type="submit" disabled={isSubmitting}>
+          {isSubmitting ? "Creating..." : "Create"}
+        </Button>
       </div>
     </form>
   );
@@ -76,6 +83,7 @@ function InlineSupplierForm({
 }: {
   onSuccess: (supplierId: number) => void;
 }) {
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const {
     register,
     handleSubmit,
@@ -98,6 +106,8 @@ function InlineSupplierForm({
     phone?: string;
     address?: string;
   }) => {
+    if (isSubmitting) return; // Prevent double submission
+    setIsSubmitting(true);
     try {
       const result = await createSupplier({
         name: data.name,
@@ -110,6 +120,8 @@ function InlineSupplierForm({
     } catch (error: unknown) {
       const err = error as { data?: { error?: string } };
       toast.error(err.data?.error || "Failed to create supplier");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -195,6 +207,7 @@ interface ProductFormProps {
 export function ProductForm({ productId, onSuccess }: ProductFormProps) {
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [showSupplierModal, setShowSupplierModal] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const { data: productData } = useGetProductQuery(productId!, {
     skip: !productId,
@@ -249,6 +262,9 @@ export function ProductForm({ productId, onSuccess }: ProductFormProps) {
   }, [productData, reset]);
 
   const onSubmit = async (data: ProductFormDataRaw) => {
+    if (isSubmitting) return; // Prevent double submission
+    setIsSubmitting(true);
+
     try {
       // Convert string numbers to actual numbers
       const costPrice = Number(data.cost_price);
@@ -259,18 +275,22 @@ export function ProductForm({ productId, onSuccess }: ProductFormProps) {
       // Validate required number fields
       if (isNaN(costPrice) || costPrice < 0) {
         toast.error("Cost price is required and must be >= 0");
+        setIsSubmitting(false);
         return;
       }
       if (isNaN(sellingPrice) || sellingPrice < 0) {
         toast.error("Selling price is required and must be >= 0");
+        setIsSubmitting(false);
         return;
       }
       if (isNaN(stockQuantity) || stockQuantity < 0) {
         toast.error("Stock quantity is required and must be >= 0");
+        setIsSubmitting(false);
         return;
       }
       if (isNaN(minStockLevel) || minStockLevel < 0) {
         toast.error("Min stock level is required and must be >= 0");
+        setIsSubmitting(false);
         return;
       }
 
@@ -309,6 +329,8 @@ export function ProductForm({ productId, onSuccess }: ProductFormProps) {
     } catch (error: unknown) {
       const err = error as { data?: { error?: string } };
       toast.error(err.data?.error || "Failed to save product");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -446,7 +468,9 @@ export function ProductForm({ productId, onSuccess }: ProductFormProps) {
           />
         </div>
         <div className="flex justify-end space-x-2">
-          <Button type="submit">{productId ? "Update" : "Create"}</Button>
+          <Button type="submit" disabled={isSubmitting}>
+            {isSubmitting ? "Saving..." : productId ? "Update" : "Create"}
+          </Button>
         </div>
       </form>
 

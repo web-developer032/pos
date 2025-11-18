@@ -19,15 +19,20 @@ export function CategoryList() {
   const [importCategories] = useImportCategoriesMutation();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<number | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
 
   const handleDelete = async (id: number) => {
+    if (deletingId === id) return; // Prevent double click
     if (confirm("Are you sure you want to delete this category?")) {
+      setDeletingId(id);
       try {
         await deleteCategory(id).unwrap();
         toast.success("Category deleted successfully");
         refetch();
       } catch (error: any) {
         toast.error(error.data?.error || "Failed to delete category");
+      } finally {
+        setDeletingId(null);
       }
     }
   };
@@ -127,9 +132,10 @@ export function CategoryList() {
                   </button>
                   <button
                     onClick={() => handleDelete(category.id)}
-                    className="text-red-600 hover:text-red-900"
+                    disabled={deletingId === category.id}
+                    className="text-red-600 hover:text-red-900 disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    Delete
+                    {deletingId === category.id ? "Deleting..." : "Delete"}
                   </button>
                 </td>
               </tr>

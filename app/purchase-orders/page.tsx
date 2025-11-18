@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import {
@@ -13,18 +14,24 @@ import toast from "react-hot-toast";
 export default function PurchaseOrdersPage() {
   const { data, isLoading, refetch } = useGetPurchaseOrdersQuery();
   const [updatePO] = useUpdatePurchaseOrderMutation();
+  const [updatingId, setUpdatingId] = useState<number | null>(null);
   const { format: formatCurrency } = useCurrency();
 
   const handleStatusChange = async (
     id: number,
     status: "pending" | "completed" | "cancelled"
   ) => {
+    if (updatingId === id) return; // Prevent double click
+    setUpdatingId(id);
     try {
       await updatePO({ id, status }).unwrap();
       toast.success("Purchase order updated");
       refetch();
-    } catch (error: any) {
-      toast.error(error.data?.error || "Failed to update");
+    } catch (error: unknown) {
+      const err = error as { data?: { error?: string } };
+      toast.error(err.data?.error || "Failed to update");
+    } finally {
+      setUpdatingId(null);
     }
   };
 
@@ -100,15 +107,17 @@ export default function PurchaseOrdersPage() {
                       <>
                         <button
                           onClick={() => handleStatusChange(po.id, "completed")}
-                          className="mr-4 text-green-600 hover:text-green-900"
+                          disabled={updatingId === po.id}
+                          className="mr-4 text-green-600 hover:text-green-900 disabled:cursor-not-allowed disabled:opacity-50"
                         >
-                          Complete
+                          {updatingId === po.id ? "Updating..." : "Complete"}
                         </button>
                         <button
                           onClick={() => handleStatusChange(po.id, "cancelled")}
-                          className="text-red-600 hover:text-red-900"
+                          disabled={updatingId === po.id}
+                          className="text-red-600 hover:text-red-900 disabled:cursor-not-allowed disabled:opacity-50"
                         >
-                          Cancel
+                          {updatingId === po.id ? "Updating..." : "Cancel"}
                         </button>
                       </>
                     )}

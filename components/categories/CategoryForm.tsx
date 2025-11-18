@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -26,6 +26,7 @@ interface CategoryFormProps {
 }
 
 export function CategoryForm({ categoryId, onSuccess }: CategoryFormProps) {
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { data: categoryData } = useGetCategoryQuery(categoryId!, {
     skip: !categoryId,
   });
@@ -55,6 +56,9 @@ export function CategoryForm({ categoryId, onSuccess }: CategoryFormProps) {
   }, [categoryData, reset]);
 
   const onSubmit = async (data: CategoryFormData) => {
+    if (isSubmitting) return; // Prevent double submission
+    setIsSubmitting(true);
+
     try {
       const submitData = {
         name: data.name,
@@ -71,6 +75,8 @@ export function CategoryForm({ categoryId, onSuccess }: CategoryFormProps) {
       onSuccess?.();
     } catch (error: any) {
       toast.error(error.data?.error || "Failed to save category");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -87,7 +93,9 @@ export function CategoryForm({ categoryId, onSuccess }: CategoryFormProps) {
         error={errors.description?.message}
       />
       <div className="flex justify-end space-x-2">
-        <Button type="submit">{categoryId ? "Update" : "Create"}</Button>
+        <Button type="submit" disabled={isSubmitting}>
+          {isSubmitting ? "Saving..." : categoryId ? "Update" : "Create"}
+        </Button>
       </div>
     </form>
   );

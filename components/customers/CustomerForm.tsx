@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -29,6 +29,7 @@ interface CustomerFormProps {
 }
 
 export function CustomerForm({ customerId, onSuccess }: CustomerFormProps) {
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { data: customerData } = useGetCustomerQuery(customerId!, {
     skip: !customerId,
   });
@@ -64,6 +65,9 @@ export function CustomerForm({ customerId, onSuccess }: CustomerFormProps) {
   }, [customerData, reset]);
 
   const onSubmit = async (data: CustomerFormData) => {
+    if (isSubmitting) return; // Prevent double submission
+    setIsSubmitting(true);
+
     try {
       const submitData = {
         name: data.name,
@@ -83,6 +87,8 @@ export function CustomerForm({ customerId, onSuccess }: CustomerFormProps) {
       onSuccess?.();
     } catch (error: any) {
       toast.error(error.data?.error || "Failed to save customer");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -118,7 +124,9 @@ export function CustomerForm({ customerId, onSuccess }: CustomerFormProps) {
         />
       )}
       <div className="flex justify-end space-x-2">
-        <Button type="submit">{customerId ? "Update" : "Create"}</Button>
+        <Button type="submit" disabled={isSubmitting}>
+          {isSubmitting ? "Saving..." : customerId ? "Update" : "Create"}
+        </Button>
       </div>
     </form>
   );

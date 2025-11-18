@@ -19,15 +19,20 @@ export function SupplierList() {
   const [importSuppliers] = useImportSuppliersMutation();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<number | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
 
   const handleDelete = async (id: number) => {
+    if (deletingId === id) return; // Prevent double click
     if (confirm("Are you sure you want to delete this supplier?")) {
+      setDeletingId(id);
       try {
         await deleteSupplier(id).unwrap();
         toast.success("Supplier deleted successfully");
         refetch();
       } catch (error: any) {
         toast.error(error.data?.error || "Failed to delete supplier");
+      } finally {
+        setDeletingId(null);
       }
     }
   };
@@ -149,9 +154,10 @@ export function SupplierList() {
                   </button>
                   <button
                     onClick={() => handleDelete(supplier.id)}
-                    className="text-red-600 hover:text-red-900"
+                    disabled={deletingId === supplier.id}
+                    className="text-red-600 hover:text-red-900 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    Delete
+                    {deletingId === supplier.id ? "Deleting..." : "Delete"}
                   </button>
                 </td>
               </tr>

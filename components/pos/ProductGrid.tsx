@@ -5,6 +5,7 @@ import { useGetProductsQuery } from "@/lib/api/productsApi";
 import { useGetCategoriesQuery } from "@/lib/api/categoriesApi";
 import { useAppDispatch } from "@/lib/hooks";
 import { useCurrency } from "@/lib/hooks/useCurrency";
+import { useDebounce } from "@/lib/hooks/useDebounce";
 import { addItem } from "@/lib/slices/cartSlice";
 import { Select } from "@/components/ui/Select";
 import { Input } from "@/components/ui/Input";
@@ -13,8 +14,9 @@ import toast from "react-hot-toast";
 export function ProductGrid() {
   const [search, setSearch] = useState("");
   const [categoryId, setCategoryId] = useState<number | undefined>();
+  const debouncedSearch = useDebounce(search, 500);
   const { data, isLoading } = useGetProductsQuery({
-    search: search || undefined,
+    search: debouncedSearch || undefined,
     categoryId,
   });
   const { data: categoriesData } = useGetCategoriesQuery();

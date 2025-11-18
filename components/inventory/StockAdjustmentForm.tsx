@@ -16,7 +16,7 @@ export function StockAdjustmentForm({
   productId,
   onSuccess,
 }: StockAdjustmentFormProps) {
-  const [adjustInventory] = useAdjustInventoryMutation();
+  const [adjustInventory, { isLoading: isAdjusting }] = useAdjustInventoryMutation();
   const [quantity, setQuantity] = useState("");
   const [transactionType, setTransactionType] = useState<
     "sale" | "purchase" | "adjustment"
@@ -25,6 +25,7 @@ export function StockAdjustmentForm({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isAdjusting) return; // Prevent double submission
     try {
       await adjustInventory({
         product_id: productId,
@@ -68,7 +69,9 @@ export function StockAdjustmentForm({
         onChange={(e) => setNotes(e.target.value)}
       />
       <div className="flex justify-end space-x-2">
-        <Button type="submit">Adjust Stock</Button>
+        <Button type="submit" disabled={isAdjusting}>
+          {isAdjusting ? "Adjusting..." : "Adjust Stock"}
+        </Button>
       </div>
     </form>
   );

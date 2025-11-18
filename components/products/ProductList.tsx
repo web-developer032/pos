@@ -9,6 +9,7 @@ import {
 } from "@/lib/api/productsApi";
 import { useGetCategoriesQuery } from "@/lib/api/categoriesApi";
 import { useCurrency } from "@/lib/hooks/useCurrency";
+import { useDebounce } from "@/lib/hooks/useDebounce";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
@@ -20,8 +21,9 @@ import toast from "react-hot-toast";
 export function ProductList() {
   const [search, setSearch] = useState("");
   const [categoryId, setCategoryId] = useState<number | undefined>();
+  const debouncedSearch = useDebounce(search, 500);
   const { data, isLoading, refetch } = useGetProductsQuery({
-    search: search || undefined,
+    search: debouncedSearch || undefined,
     categoryId,
   });
   const { data: categoriesData } = useGetCategoriesQuery();
@@ -29,16 +31,21 @@ export function ProductList() {
   const [importProducts] = useImportProductsMutation();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<number | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
   const { format: formatCurrency } = useCurrency();
 
   const handleDelete = async (id: number) => {
+    if (deletingId === id) return; // Prevent double click
     if (confirm("Are you sure you want to delete this product?")) {
+      setDeletingId(id);
       try {
         await deleteProduct(id).unwrap();
         toast.success("Product deleted successfully");
         refetch();
       } catch (error: any) {
         toast.error(error.data?.error || "Failed to delete product");
+      } finally {
+        setDeletingId(null);
       }
     }
   };
@@ -240,9 +247,10 @@ export function ProductList() {
                   </button>
                   <button
                     onClick={() => handleDelete(product.id)}
-                    className="text-red-600 hover:text-red-900"
+                    disabled={deletingId === product.id}
+                    className="text-red-600 hover:text-red-900 disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    Delete
+                    {deletingId === product.id ? "Deleting..." : "Delete"}
                   </button>
                 </td>
               </tr>
