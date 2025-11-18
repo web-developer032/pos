@@ -44,9 +44,20 @@ export function Sidebar() {
   const router = useRouter();
   const { user } = useAppSelector((state) => state.auth);
 
-  const handleLogout = () => {
-    dispatch(logout());
-    router.push("/login");
+  const handleLogout = async () => {
+    try {
+      // Call logout API to clear the httpOnly cookie
+      await fetch("/api/auth/logout", {
+        method: "POST",
+        credentials: "include",
+      });
+    } catch (error) {
+      console.error("Logout error:", error);
+    } finally {
+      // Clear Redux state and localStorage
+      dispatch(logout());
+      router.push("/login");
+    }
   };
 
   const filteredMenuItems = menuItems.filter(

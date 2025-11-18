@@ -18,35 +18,40 @@ export function ProtectedRoute({
 }: ProtectedRouteProps) {
   const router = useRouter();
   const dispatch = useAppDispatch();
-  const { isAuthenticated, token, user } = useAppSelector((state) => state.auth);
-  const { data, isLoading } = useGetMeQuery(undefined, {
-    skip: !token,
-  });
+  const { isAuthenticated, user } = useAppSelector((state) => state.auth);
+  
+  // Always try to get user info from /auth/me (uses cookie)
+  // This will work even after page refresh since token is in httpOnly cookie
+  const { data, isLoading, error } = useGetMeQuery();
 
+  // Update auth state when we get user data from /auth/me
   useEffect(() => {
-    if (token && data) {
+    if (data?.user) {
       dispatch(
         setCredentials({
           user: data.user,
-          token: token,
+          token: "", // Token is in httpOnly cookie, not needed in Redux
         })
       );
     }
-  }, [data, token, dispatch]);
+  }, [data, dispatch]);
 
+  // Handle authentication check
   useEffect(() => {
-    if (!isLoading && !isAuthenticated && !token) {
-      router.push("/login");
-    } else if (
-      !isLoading &&
-      isAuthenticated &&
-      allowedRoles &&
-      user &&
-      !allowedRoles.includes(user.role)
-    ) {
-      router.push("/dashboard");
+    if (!isLoading) {
+      // If /auth/me fails (401/403), user is not authenticated
+      if (error && "status" in error && (error.status === 401 || error.status === 403)) {
+        router.push("/login");
+      } else if (
+        data?.user &&
+        allowedRoles &&
+        !allowedRoles.includes(data.user.role)
+      ) {
+        // User is authenticated but doesn't have required role
+        router.push("/dashboard");
+      }
     }
-  }, [isAuthenticated, isLoading, token, allowedRoles, router, user]);
+  }, [isLoading, error, data, allowedRoles, router]);
 
   if (isLoading) {
     return (
@@ -56,18 +61,32 @@ export function ProtectedRoute({
     );
   }
 
-  if (!isAuthenticated || !token) {
+  // If error and not authenticated, show nothing (redirecting to login)
+  if (error && "status" in error && (error.status === 401 || error.status === 403)) {
     return null;
   }
 
-  if (allowedRoles && user && !allowedRoles.includes(user.role)) {
+  // If we have user data, check role permissions
+  if (data?.user) {
+    if (allowedRoles && !allowedRoles.includes(data.user.role)) {
+      return (
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="text-lg text-red-600">Access Denied</div>
+        </div>
+      );
+    }
+    return <>{children}</>;
+  }
+
+  // If no user data and no error yet, still loading
+  if (!data && !error) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-lg text-red-600">Access Denied</div>
+        <div className="text-lg">Loading...</div>
       </div>
     );
   }
 
-  return <>{children}</>;
+  return null;
 }
 

@@ -53,7 +53,8 @@ export async function POST(request: NextRequest) {
       role: user.role,
     });
 
-    return NextResponse.json({
+    // Create response with JSON data
+    const response = NextResponse.json({
       token,
       user: {
         id: user.id,
@@ -62,10 +63,21 @@ export async function POST(request: NextRequest) {
         role: user.role,
       },
     });
+
+    // Set httpOnly cookie for token (7 days expiration, same as JWT)
+    response.cookies.set("auth_token", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 60 * 60 * 24 * 7, // 7 days in seconds
+      path: "/",
+    });
+
+    return response;
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { error: "Invalid input", details: error.errors },
+        { error: "Invalid input", details: error.issues },
         { status: 400 }
       );
     }

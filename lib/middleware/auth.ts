@@ -14,8 +14,11 @@ export function requireAuth(
   allowedRoles?: string[]
 ) {
   return async (req: NextRequest, context?: any): Promise<NextResponse> => {
+    // Try to get token from cookie first, then from Authorization header
+    const cookieToken = req.cookies.get("auth_token")?.value;
     const authHeader = req.headers.get("authorization");
-    const token = extractTokenFromHeader(authHeader);
+    const headerToken = extractTokenFromHeader(authHeader);
+    const token = cookieToken || headerToken;
 
     if (!token) {
       return NextResponse.json(
