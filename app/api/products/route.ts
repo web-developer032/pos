@@ -122,7 +122,15 @@ async function deleteHandler(req: NextRequest) {
     const deleteAll = searchParams.get("delete_all") === "true";
 
     if (deleteAll) {
+      // Delete related records first (due to foreign key constraints)
+      // Order matters: delete child records before parent records
+      await client.execute("DELETE FROM sale_items");
+      await client.execute("DELETE FROM purchase_order_items");
+      await client.execute("DELETE FROM inventory_transactions");
+
+      // Now delete products
       await client.execute("DELETE FROM products");
+
       return NextResponse.json({
         message: "All products deleted successfully",
       });
