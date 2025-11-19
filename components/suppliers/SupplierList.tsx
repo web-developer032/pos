@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useState, useEffect } from "react";
 import {
   useGetSuppliersQuery,
   useDeleteSupplierMutation,
@@ -191,7 +190,7 @@ export function SupplierList() {
                     <button
                       onClick={() => handleDelete(supplier.id)}
                       disabled={deletingId === supplier.id}
-                      className="text-red-600 hover:text-red-900 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="text-red-600 hover:text-red-900 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {deletingId === supplier.id ? "Deleting..." : "Delete"}
                     </button>

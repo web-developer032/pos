@@ -98,7 +98,27 @@ export function ProductList() {
     items: any[]
   ): Promise<{ imported: number; errors: string[] }> => {
     try {
-      // Helper function to safely parse numbers
+      // Helper to get field value from CSV (handles multiple case variations)
+      const getField = (item: any, ...fieldNames: string[]): any => {
+        for (const fieldName of fieldNames) {
+          const value = item[fieldName];
+          if (value !== undefined && value !== null && value !== "") {
+            return value;
+          }
+        }
+        return undefined;
+      };
+
+      // Helper to normalize string fields (empty strings become undefined)
+      const normalizeString = (value: any): string | undefined => {
+        if (value === null || value === undefined || value === "") {
+          return undefined;
+        }
+        const str = String(value).trim();
+        return str.length > 0 ? str : undefined;
+      };
+
+      // Helper to parse numbers safely
       const parseNumber = (value: any, defaultValue: number = 0): number => {
         if (value === null || value === undefined || value === "") {
           return defaultValue;
@@ -117,59 +137,91 @@ export function ProductList() {
         return isNaN(parsed) ? defaultValue : parsed;
       };
 
-      // Map CSV data to product format
+      // Map CSV data to product format - clean and simple
       const products: CreateProductRequest[] = items
-        .map((item) => {
-          const costPrice =
-            item.cost_price || item["Cost Price"] || item["cost_price"];
-          const sellingPrice =
-            item.selling_price ||
-            item["Selling Price"] ||
-            item["selling_price"];
-          const stockQuantity =
-            item.stock_quantity ||
-            item["Stock Quantity"] ||
-            item["stock_quantity"];
-          const minStockLevel =
-            item.min_stock_level ||
-            item["Min Stock Level"] ||
-            item["min_stock_level"];
-          const categoryId =
-            item.category_id || item["Category ID"] || item["category_id"];
-          const supplierId =
-            item.supplier_id || item["Supplier ID"] || item["supplier_id"];
-          const name = item.name || item.Name || item["name"] || "";
+        .map((item): CreateProductRequest | null => {
+          const name = getField(item, "name", "Name", "NAME") || "";
+
+          // Skip rows with empty names
+          if (!name || name.trim().length === 0) {
+            return null;
+          }
 
           return {
-            name: name.trim(),
-            barcode:
-              item.barcode || item.Barcode || item["barcode"] || undefined,
-            sku: item.sku || item.SKU || item["sku"] || undefined,
-            description:
-              item.description ||
-              item.Description ||
-              item["description"] ||
-              undefined,
-            category_id: categoryId ? parseIntSafe(categoryId) : undefined,
-            supplier_id: supplierId ? parseIntSafe(supplierId) : undefined,
-            cost_price: parseNumber(costPrice, 0),
-            selling_price: parseNumber(sellingPrice, 0),
-            stock_quantity: parseIntSafe(stockQuantity, 0),
-            min_stock_level: parseIntSafe(minStockLevel, 0),
-            image_url:
-              item.image_url ||
-              item["Image URL"] ||
-              item["image_url"] ||
-              undefined,
+            name: String(name).trim(),
+            barcode: normalizeString(
+              getField(item, "barcode", "Barcode", "BARCODE")
+            ),
+            sku: normalizeString(getField(item, "sku", "SKU")),
+            description: normalizeString(
+              getField(item, "description", "Description", "DESCRIPTION")
+            ),
+            category_id: (() => {
+              const val = getField(
+                item,
+                "category_id",
+                "Category ID",
+                "category_id"
+              );
+              return val ? parseIntSafe(val) : undefined;
+            })(),
+            supplier_id: (() => {
+              const val = getField(
+                item,
+                "supplier_id",
+                "Supplier ID",
+                "supplier_id"
+              );
+              return val ? parseIntSafe(val) : undefined;
+            })(),
+            cost_price: parseNumber(
+              getField(item, "cost_price", "Cost Price", "cost_price"),
+              0
+            ),
+            selling_price: parseNumber(
+              getField(item, "selling_price", "Selling Price", "selling_price"),
+              0
+            ),
+            stock_quantity: parseIntSafe(
+              getField(
+                item,
+                "stock_quantity",
+                "Stock Quantity",
+                "stock_quantity"
+              ),
+              0
+            ),
+            min_stock_level: parseIntSafe(
+              getField(
+                item,
+                "min_stock_level",
+                "Min Stock Level",
+                "min_stock_level"
+              ),
+              0
+            ),
+            image_url: normalizeString(
+              getField(item, "image_url", "Image URL", "image_url")
+            ),
           };
         })
-        .filter((product) => product.name.length > 0); // Filter out products with empty names
+        .filter((product): product is CreateProductRequest => product !== null);
+
+      if (products.length === 0) {
+        throw new Error("No valid products found in CSV file");
+      }
 
       const result = await importProducts({ products }).unwrap();
       return result;
-    } catch (error: any) {
-      console.log(error);
-      throw new Error(error.data?.error || "Failed to import products");
+    } catch (error: unknown) {
+      const errorMessage =
+        error && typeof error === "object" && "data" in error
+          ? (error as { data?: { error?: string } }).data?.error ||
+            "Failed to import products"
+          : error instanceof Error
+            ? error.message
+            : "Failed to import products";
+      throw new Error(errorMessage);
     }
   };
 
