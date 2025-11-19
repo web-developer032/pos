@@ -13,10 +13,30 @@ const userSchema = z.object({
 
 async function getHandler(req: NextRequest) {
   try {
-    const result = await client.execute(
-      "SELECT id, username, email, role, created_at FROM users ORDER BY username"
+    const { searchParams } = new URL(req.url);
+    const page = parseInt(searchParams.get("page") || "1");
+    const limit = parseInt(searchParams.get("limit") || "25");
+    const offset = (page - 1) * limit;
+
+    // Get total count
+    const countResult = await client.execute(
+      "SELECT COUNT(*) as total FROM users"
     );
-    return NextResponse.json({ users: result.rows });
+    const total = (countResult.rows[0] as any).total as number;
+
+    const result = await client.execute({
+      sql: "SELECT id, username, email, role, created_at FROM users ORDER BY username LIMIT ? OFFSET ?",
+      args: [limit, offset],
+    });
+    return NextResponse.json({
+      users: result.rows,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    });
   } catch (error) {
     console.error("Error fetching users:", error);
     return NextResponse.json(
@@ -59,6 +79,35 @@ async function postHandler(req: NextRequest) {
   }
 }
 
+async function deleteHandler(req: NextRequest) {
+  try {
+    const user = (req as any).user;
+    if (user.role !== "admin") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    const { searchParams } = new URL(req.url);
+    const deleteAll = searchParams.get("delete_all") === "true";
+
+    if (deleteAll) {
+      await client.execute("DELETE FROM users WHERE role != 'admin'");
+      return NextResponse.json({ message: "All non-admin users deleted successfully" });
+    }
+
+    return NextResponse.json(
+      { error: "Invalid request" },
+      { status: 400 }
+    );
+  } catch (error) {
+    console.error("Error deleting users:", error);
+    return NextResponse.json(
+      { error: "Failed to delete users" },
+      { status: 500 }
+    );
+  }
+}
+
 export const GET = requireAuth(getHandler, ["admin"]);
 export const POST = requireAuth(postHandler, ["admin"]);
+export const DELETE = requireAuth(deleteHandler, ["admin"]);
 

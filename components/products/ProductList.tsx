@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   useGetProductsQuery,
   useDeleteProductMutation,
+  useDeleteAllProductsMutation,
   useImportProductsMutation,
   CreateProductRequest,
 } from "@/lib/api/productsApi";
@@ -14,6 +15,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Modal } from "@/components/ui/Modal";
+import { Pagination } from "@/components/ui/Pagination";
 import { ProductForm } from "./ProductForm";
 import { ImportExport } from "@/components/common/ImportExport";
 import toast from "react-hot-toast";
@@ -21,17 +23,29 @@ import toast from "react-hot-toast";
 export function ProductList() {
   const [search, setSearch] = useState("");
   const [categoryId, setCategoryId] = useState<number | undefined>();
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(25);
   const debouncedSearch = useDebounce(search, 500);
+
+  // Reset to page 1 when search or category changes
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, categoryId]);
+
   const { data, isLoading, refetch } = useGetProductsQuery({
     search: debouncedSearch || undefined,
     categoryId,
+    page,
+    limit,
   });
   const { data: categoriesData } = useGetCategoriesQuery();
   const [deleteProduct] = useDeleteProductMutation();
+  const [deleteAllProducts] = useDeleteAllProductsMutation();
   const [importProducts] = useImportProductsMutation();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<number | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [isDeletingAll, setIsDeletingAll] = useState(false);
   const { format: formatCurrency } = useCurrency();
 
   const handleDelete = async (id: number) => {
@@ -50,6 +64,26 @@ export function ProductList() {
     }
   };
 
+  const handleDeleteAll = async () => {
+    if (
+      !confirm(
+        "Are you sure you want to delete ALL products? This action cannot be undone!"
+      )
+    ) {
+      return;
+    }
+    setIsDeletingAll(true);
+    try {
+      await deleteAllProducts().unwrap();
+      toast.success("All products deleted successfully");
+      refetch();
+    } catch (error: any) {
+      toast.error(error.data?.error || "Failed to delete all products");
+    } finally {
+      setIsDeletingAll(false);
+    }
+  };
+
   const handleEdit = (id: number) => {
     setEditingProduct(id);
     setIsModalOpen(true);
@@ -64,36 +98,77 @@ export function ProductList() {
     items: any[]
   ): Promise<{ imported: number; errors: string[] }> => {
     try {
+      // Helper function to safely parse numbers
+      const parseNumber = (value: any, defaultValue: number = 0): number => {
+        if (value === null || value === undefined || value === "") {
+          return defaultValue;
+        }
+        const parsed =
+          typeof value === "string" ? parseFloat(value) : Number(value);
+        return isNaN(parsed) ? defaultValue : parsed;
+      };
+
+      const parseIntSafe = (value: any, defaultValue: number = 0): number => {
+        if (value === null || value === undefined || value === "") {
+          return defaultValue;
+        }
+        const parsed =
+          typeof value === "string" ? parseInt(value, 10) : Number(value);
+        return isNaN(parsed) ? defaultValue : parsed;
+      };
+
       // Map CSV data to product format
-      const products: CreateProductRequest[] = items.map((item) => ({
-        name: item.name || item.Name || "",
-        barcode: item.barcode || item.Barcode || undefined,
-        sku: item.sku || item.SKU || undefined,
-        description: item.description || item.Description || undefined,
-        category_id:
-          item.category_id || item["Category ID"]
-            ? parseInt(item.category_id || item["Category ID"])
-            : undefined,
-        supplier_id:
-          item.supplier_id || item["Supplier ID"]
-            ? parseInt(item.supplier_id || item["Supplier ID"])
-            : undefined,
-        cost_price: parseFloat(item.cost_price || item["Cost Price"] || "0"),
-        selling_price: parseFloat(
-          item.selling_price || item["Selling Price"] || "0"
-        ),
-        stock_quantity: parseInt(
-          item.stock_quantity || item["Stock Quantity"] || "0"
-        ),
-        min_stock_level: parseInt(
-          item.min_stock_level || item["Min Stock Level"] || "0"
-        ),
-        image_url: item.image_url || item["Image URL"] || undefined,
-      }));
+      const products: CreateProductRequest[] = items
+        .map((item) => {
+          const costPrice =
+            item.cost_price || item["Cost Price"] || item["cost_price"];
+          const sellingPrice =
+            item.selling_price ||
+            item["Selling Price"] ||
+            item["selling_price"];
+          const stockQuantity =
+            item.stock_quantity ||
+            item["Stock Quantity"] ||
+            item["stock_quantity"];
+          const minStockLevel =
+            item.min_stock_level ||
+            item["Min Stock Level"] ||
+            item["min_stock_level"];
+          const categoryId =
+            item.category_id || item["Category ID"] || item["category_id"];
+          const supplierId =
+            item.supplier_id || item["Supplier ID"] || item["supplier_id"];
+          const name = item.name || item.Name || item["name"] || "";
+
+          return {
+            name: name.trim(),
+            barcode:
+              item.barcode || item.Barcode || item["barcode"] || undefined,
+            sku: item.sku || item.SKU || item["sku"] || undefined,
+            description:
+              item.description ||
+              item.Description ||
+              item["description"] ||
+              undefined,
+            category_id: categoryId ? parseIntSafe(categoryId) : undefined,
+            supplier_id: supplierId ? parseIntSafe(supplierId) : undefined,
+            cost_price: parseNumber(costPrice, 0),
+            selling_price: parseNumber(sellingPrice, 0),
+            stock_quantity: parseIntSafe(stockQuantity, 0),
+            min_stock_level: parseIntSafe(minStockLevel, 0),
+            image_url:
+              item.image_url ||
+              item["Image URL"] ||
+              item["image_url"] ||
+              undefined,
+          };
+        })
+        .filter((product) => product.name.length > 0); // Filter out products with empty names
 
       const result = await importProducts({ products }).unwrap();
       return result;
     } catch (error: any) {
+      console.log(error);
       throw new Error(error.data?.error || "Failed to import products");
     }
   };
@@ -161,6 +236,14 @@ export function ProductList() {
             onImportSuccess={refetch}
             templateData={templateData}
           />
+          <Button
+            variant="outline"
+            onClick={handleDeleteAll}
+            disabled={isDeletingAll || (data?.products.length || 0) === 0}
+            className="text-red-600 hover:text-red-700"
+          >
+            {isDeletingAll ? "Deleting..." : "Delete All"}
+          </Button>
           <Button onClick={() => setIsModalOpen(true)}>Add Product</Button>
         </div>
       </div>
@@ -260,6 +343,25 @@ export function ProductList() {
           </tbody>
         </table>
       </div>
+
+      {data?.pagination && (
+        <div className="mt-4">
+          <Pagination
+            currentPage={data.pagination.page}
+            totalPages={data.pagination.totalPages}
+            totalItems={data.pagination.total}
+            itemsPerPage={data.pagination.limit}
+            onPageChange={(newPage) => {
+              setPage(newPage);
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            }}
+            onItemsPerPageChange={(newLimit) => {
+              setLimit(newLimit);
+              setPage(1);
+            }}
+          />
+        </div>
+      )}
 
       <Modal
         isOpen={isModalOpen}

@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   useGetCustomersQuery,
   useDeleteCustomerMutation,
+  useDeleteAllCustomersMutation,
   useImportCustomersMutation,
   CreateCustomerRequest,
 } from "@/lib/api/customersApi";
@@ -11,21 +12,33 @@ import { useDebounce } from "@/lib/hooks/useDebounce";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
+import { Pagination } from "@/components/ui/Pagination";
 import { CustomerForm } from "./CustomerForm";
 import { ImportExport } from "@/components/common/ImportExport";
 import toast from "react-hot-toast";
 
 export function CustomerList() {
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(25);
   const debouncedSearch = useDebounce(search, 500);
+  
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch]);
+  
   const { data, isLoading, refetch } = useGetCustomersQuery({
     search: debouncedSearch || undefined,
+    page,
+    limit,
   });
   const [deleteCustomer] = useDeleteCustomerMutation();
+  const [deleteAllCustomers] = useDeleteAllCustomersMutation();
   const [importCustomers] = useImportCustomersMutation();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<number | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [isDeletingAll, setIsDeletingAll] = useState(false);
 
   const handleDelete = async (id: number) => {
     if (deletingId === id) return; // Prevent double click
@@ -51,6 +64,26 @@ export function CustomerList() {
   const handleClose = () => {
     setIsModalOpen(false);
     setEditingCustomer(null);
+  };
+
+  const handleDeleteAll = async () => {
+    if (
+      !confirm(
+        "Are you sure you want to delete ALL customers? This action cannot be undone!"
+      )
+    ) {
+      return;
+    }
+    setIsDeletingAll(true);
+    try {
+      await deleteAllCustomers().unwrap();
+      toast.success("All customers deleted successfully");
+      refetch();
+    } catch (error: any) {
+      toast.error(error.data?.error || "Failed to delete all customers");
+    } finally {
+      setIsDeletingAll(false);
+    }
   };
 
   const handleImport = async (
@@ -113,6 +146,14 @@ export function CustomerList() {
             onImportSuccess={refetch}
             templateData={templateData}
           />
+          <Button
+            variant="outline"
+            onClick={handleDeleteAll}
+            disabled={isDeletingAll || (data?.customers.length || 0) === 0}
+            className="text-red-600 hover:text-red-700"
+          >
+            {isDeletingAll ? "Deleting..." : "Delete All"}
+          </Button>
           <Button onClick={() => setIsModalOpen(true)}>Add Customer</Button>
         </div>
       </div>
@@ -183,6 +224,25 @@ export function CustomerList() {
           </tbody>
         </table>
       </div>
+
+      {data?.pagination && (
+        <div className="mt-4">
+          <Pagination
+            currentPage={data.pagination.page}
+            totalPages={data.pagination.totalPages}
+            totalItems={data.pagination.total}
+            itemsPerPage={data.pagination.limit}
+            onPageChange={(newPage) => {
+              setPage(newPage);
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            }}
+            onItemsPerPageChange={(newLimit) => {
+              setLimit(newLimit);
+              setPage(1);
+            }}
+          />
+        </div>
+      )}
 
       <Modal
         isOpen={isModalOpen}

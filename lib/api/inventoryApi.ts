@@ -1,4 +1,5 @@
 import { apiSlice } from "./apiSlice";
+import { PaginationInfo } from "./productsApi";
 
 export interface InventoryItem {
   id: number;
@@ -30,8 +31,21 @@ export interface AdjustInventoryRequest {
 
 export const inventoryApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
-    getInventory: builder.query<{ inventory: InventoryItem[] }, void>({
-      query: () => "/inventory",
+    getInventory: builder.query<
+      { inventory: InventoryItem[]; pagination: PaginationInfo },
+      { page?: number; limit?: number } | void
+    >({
+      query: (params) => {
+        const searchParams = new URLSearchParams();
+        if (params?.page) {
+          searchParams.append("page", params.page.toString());
+        }
+        if (params?.limit) {
+          searchParams.append("limit", params.limit.toString());
+        }
+        const query = searchParams.toString();
+        return `/inventory${query ? `?${query}` : ""}`;
+      },
       providesTags: ["Inventory"],
     }),
     getTransactions: builder.query<

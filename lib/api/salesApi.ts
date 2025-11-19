@@ -1,4 +1,5 @@
 import { apiSlice } from "./apiSlice";
+import { PaginationInfo } from "./productsApi";
 
 export interface Sale {
   id: number;
@@ -44,8 +45,8 @@ export interface CreateSaleRequest {
 export const salesApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
     getSales: builder.query<
-      { sales: Sale[] },
-      { startDate?: string; endDate?: string } | void
+      { sales: Sale[]; pagination: PaginationInfo },
+      { startDate?: string; endDate?: string; page?: number; limit?: number } | void
     >({
       query: (params) => {
         const searchParams = new URLSearchParams();
@@ -54,6 +55,12 @@ export const salesApi = apiSlice.injectEndpoints({
         }
         if (params?.endDate) {
           searchParams.append("end_date", params.endDate);
+        }
+        if (params?.page) {
+          searchParams.append("page", params.page.toString());
+        }
+        if (params?.limit) {
+          searchParams.append("limit", params.limit.toString());
         }
         const query = searchParams.toString();
         return `/sales${query ? `?${query}` : ""}`;
@@ -75,6 +82,13 @@ export const salesApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ["Sale", "Inventory", "Product", "Report"],
     }),
+    deleteAllSales: builder.mutation<{ message: string }, void>({
+      query: () => ({
+        url: "/sales?delete_all=true",
+        method: "DELETE",
+      }),
+      invalidatesTags: ["Sale"],
+    }),
   }),
 });
 
@@ -82,5 +96,6 @@ export const {
   useGetSalesQuery,
   useGetSaleQuery,
   useCreateSaleMutation,
+  useDeleteAllSalesMutation,
 } = salesApi;
 

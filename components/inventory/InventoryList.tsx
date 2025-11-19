@@ -3,10 +3,13 @@
 import { useState } from "react";
 import { useGetInventoryQuery } from "@/lib/api/inventoryApi";
 import { Modal } from "@/components/ui/Modal";
+import { Pagination } from "@/components/ui/Pagination";
 import { StockAdjustmentForm } from "./StockAdjustmentForm";
 
 export function InventoryList() {
-  const { data, isLoading, refetch } = useGetInventoryQuery();
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(25);
+  const { data, isLoading, refetch } = useGetInventoryQuery({ page, limit });
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<number | null>(null);
 
@@ -81,6 +84,25 @@ export function InventoryList() {
           </tbody>
         </table>
       </div>
+
+      {data?.pagination && (
+        <div className="mt-4">
+          <Pagination
+            currentPage={data.pagination.page}
+            totalPages={data.pagination.totalPages}
+            totalItems={data.pagination.total}
+            itemsPerPage={data.pagination.limit}
+            onPageChange={(newPage) => {
+              setPage(newPage);
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            }}
+            onItemsPerPageChange={(newLimit) => {
+              setLimit(newLimit);
+              setPage(1);
+            }}
+          />
+        </div>
+      )}
 
       <Modal
         isOpen={isModalOpen}

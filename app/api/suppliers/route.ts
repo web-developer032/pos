@@ -13,8 +13,30 @@ const supplierSchema = z.object({
 
 async function getHandler(req: NextRequest) {
   try {
-    const result = await client.execute("SELECT * FROM suppliers ORDER BY name");
-    return NextResponse.json({ suppliers: result.rows });
+    const { searchParams } = new URL(req.url);
+    const page = parseInt(searchParams.get("page") || "1");
+    const limit = parseInt(searchParams.get("limit") || "25");
+    const offset = (page - 1) * limit;
+
+    // Get total count
+    const countResult = await client.execute(
+      "SELECT COUNT(*) as total FROM suppliers"
+    );
+    const total = (countResult.rows[0] as any).total as number;
+
+    const result = await client.execute({
+      sql: "SELECT * FROM suppliers ORDER BY name LIMIT ? OFFSET ?",
+      args: [limit, offset],
+    });
+    return NextResponse.json({
+      suppliers: result.rows,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    });
   } catch (error) {
     console.error("Error fetching suppliers:", error);
     return NextResponse.json(
@@ -56,6 +78,30 @@ async function postHandler(req: NextRequest) {
   }
 }
 
+async function deleteHandler(req: NextRequest) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const deleteAll = searchParams.get("delete_all") === "true";
+
+    if (deleteAll) {
+      await client.execute("DELETE FROM suppliers");
+      return NextResponse.json({ message: "All suppliers deleted successfully" });
+    }
+
+    return NextResponse.json(
+      { error: "Invalid request" },
+      { status: 400 }
+    );
+  } catch (error) {
+    console.error("Error deleting suppliers:", error);
+    return NextResponse.json(
+      { error: "Failed to delete suppliers" },
+      { status: 500 }
+    );
+  }
+}
+
 export const GET = requireAuth(getHandler);
 export const POST = requireAuth(postHandler);
+export const DELETE = requireAuth(deleteHandler);
 

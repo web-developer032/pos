@@ -47,11 +47,18 @@ export interface UpdateProductRequest {
   image_url?: string;
 }
 
+export interface PaginationInfo {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}
+
 export const productsApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
     getProducts: builder.query<
-      { products: Product[] },
-      { categoryId?: number; search?: string } | void
+      { products: Product[]; pagination: PaginationInfo },
+      { categoryId?: number; search?: string; page?: number; limit?: number } | void
     >({
       query: (params) => {
         const searchParams = new URLSearchParams();
@@ -60,6 +67,12 @@ export const productsApi = apiSlice.injectEndpoints({
         }
         if (params?.search) {
           searchParams.append("search", params.search);
+        }
+        if (params?.page) {
+          searchParams.append("page", params.page.toString());
+        }
+        if (params?.limit) {
+          searchParams.append("limit", params.limit.toString());
         }
         const query = searchParams.toString();
         return `/products${query ? `?${query}` : ""}`;
@@ -114,6 +127,13 @@ export const productsApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ["Product", "Inventory"],
     }),
+    deleteAllProducts: builder.mutation<{ message: string }, void>({
+      query: () => ({
+        url: "/products?delete_all=true",
+        method: "DELETE",
+      }),
+      invalidatesTags: ["Product", "Inventory"],
+    }),
   }),
 });
 
@@ -125,5 +145,6 @@ export const {
   useUpdateProductMutation,
   useDeleteProductMutation,
   useImportProductsMutation,
+  useDeleteAllProductsMutation,
 } = productsApi;
 

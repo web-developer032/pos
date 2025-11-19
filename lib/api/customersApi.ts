@@ -1,4 +1,5 @@
 import { apiSlice } from "./apiSlice";
+import { PaginationInfo } from "./productsApi";
 
 export interface Customer {
   id: number;
@@ -30,13 +31,19 @@ export interface UpdateCustomerRequest {
 export const customersApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
     getCustomers: builder.query<
-      { customers: Customer[] },
-      { search?: string } | void
+      { customers: Customer[]; pagination: PaginationInfo },
+      { search?: string; page?: number; limit?: number } | void
     >({
       query: (params) => {
         const searchParams = new URLSearchParams();
         if (params?.search) {
           searchParams.append("search", params.search);
+        }
+        if (params?.page) {
+          searchParams.append("page", params.page.toString());
+        }
+        if (params?.limit) {
+          searchParams.append("limit", params.limit.toString());
         }
         const query = searchParams.toString();
         return `/customers${query ? `?${query}` : ""}`;
@@ -84,6 +91,13 @@ export const customersApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ["Customer"],
     }),
+    deleteAllCustomers: builder.mutation<{ message: string }, void>({
+      query: () => ({
+        url: "/customers?delete_all=true",
+        method: "DELETE",
+      }),
+      invalidatesTags: ["Customer"],
+    }),
   }),
 });
 
@@ -94,5 +108,6 @@ export const {
   useUpdateCustomerMutation,
   useDeleteCustomerMutation,
   useImportCustomersMutation,
+  useDeleteAllCustomersMutation,
 } = customersApi;
 

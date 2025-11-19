@@ -1,4 +1,5 @@
 import { apiSlice } from "./apiSlice";
+import { PaginationInfo } from "./productsApi";
 
 export interface User {
   id: number;
@@ -17,8 +18,21 @@ export interface CreateUserRequest {
 
 export const usersApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
-    getUsers: builder.query<{ users: User[] }, void>({
-      query: () => "/users",
+    getUsers: builder.query<
+      { users: User[]; pagination: PaginationInfo },
+      { page?: number; limit?: number } | void
+    >({
+      query: (params) => {
+        const searchParams = new URLSearchParams();
+        if (params?.page) {
+          searchParams.append("page", params.page.toString());
+        }
+        if (params?.limit) {
+          searchParams.append("limit", params.limit.toString());
+        }
+        const query = searchParams.toString();
+        return `/users${query ? `?${query}` : ""}`;
+      },
       providesTags: ["User"],
     }),
     createUser: builder.mutation<{ user: User }, CreateUserRequest>({
@@ -29,8 +43,19 @@ export const usersApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ["User"],
     }),
+    deleteAllUsers: builder.mutation<{ message: string }, void>({
+      query: () => ({
+        url: "/users?delete_all=true",
+        method: "DELETE",
+      }),
+      invalidatesTags: ["User"],
+    }),
   }),
 });
 
-export const { useGetUsersQuery, useCreateUserMutation } = usersApi;
+export const {
+  useGetUsersQuery,
+  useCreateUserMutation,
+  useDeleteAllUsersMutation,
+} = usersApi;
 

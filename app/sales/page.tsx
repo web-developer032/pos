@@ -1,15 +1,43 @@
 "use client";
 
+import { useState } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
-import { useGetSalesQuery } from "@/lib/api/salesApi";
+import { useGetSalesQuery, useDeleteAllSalesMutation } from "@/lib/api/salesApi";
 import { useCurrency } from "@/lib/hooks/useCurrency";
+import { Pagination } from "@/components/ui/Pagination";
+import { Button } from "@/components/ui/Button";
 import { format } from "date-fns";
 import Link from "next/link";
+import toast from "react-hot-toast";
 
 export default function SalesPage() {
-  const { data, isLoading } = useGetSalesQuery();
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(25);
+  const { data, isLoading, refetch } = useGetSalesQuery({ page, limit });
+  const [deleteAllSales] = useDeleteAllSalesMutation();
+  const [isDeletingAll, setIsDeletingAll] = useState(false);
   const { format: formatCurrency } = useCurrency();
+
+  const handleDeleteAll = async () => {
+    if (
+      !confirm(
+        "Are you sure you want to delete ALL sales? This action cannot be undone!"
+      )
+    ) {
+      return;
+    }
+    setIsDeletingAll(true);
+    try {
+      await deleteAllSales().unwrap();
+      toast.success("All sales deleted successfully");
+      refetch();
+    } catch (error: any) {
+      toast.error(error.data?.error || "Failed to delete all sales");
+    } finally {
+      setIsDeletingAll(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -24,11 +52,21 @@ export default function SalesPage() {
   return (
     <ProtectedRoute>
       <DashboardLayout>
-        <div className="mb-4 sm:mb-6">
-          <h1 className="text-2xl font-bold sm:text-3xl">Sales History</h1>
-          <p className="mt-2 text-sm text-gray-600 sm:text-base">
-            View all sales transactions
-          </p>
+        <div className="mb-4 flex flex-col gap-3 sm:mb-6 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold sm:text-3xl">Sales History</h1>
+            <p className="mt-2 text-sm text-gray-600 sm:text-base">
+              View all sales transactions
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            onClick={handleDeleteAll}
+            disabled={isDeletingAll || (data?.sales.length || 0) === 0}
+            className="text-red-600 hover:text-red-700"
+          >
+            {isDeletingAll ? "Deleting..." : "Delete All"}
+          </Button>
         </div>
 
         <div className="overflow-x-auto rounded-lg bg-white shadow">
@@ -86,6 +124,25 @@ export default function SalesPage() {
             </tbody>
           </table>
         </div>
+
+        {data?.pagination && (
+          <div className="mt-4">
+            <Pagination
+              currentPage={data.pagination.page}
+              totalPages={data.pagination.totalPages}
+              totalItems={data.pagination.total}
+              itemsPerPage={data.pagination.limit}
+              onPageChange={(newPage) => {
+                setPage(newPage);
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              }}
+              onItemsPerPageChange={(newLimit) => {
+                setLimit(newLimit);
+                setPage(1);
+              }}
+            />
+          </div>
+        )}
       </DashboardLayout>
     </ProtectedRoute>
   );

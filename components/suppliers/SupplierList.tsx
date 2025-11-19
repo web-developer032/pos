@@ -1,25 +1,32 @@
 "use client";
 
 import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   useGetSuppliersQuery,
   useDeleteSupplierMutation,
+  useDeleteAllSuppliersMutation,
   useImportSuppliersMutation,
   CreateSupplierRequest,
 } from "@/lib/api/suppliersApi";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
+import { Pagination } from "@/components/ui/Pagination";
 import { SupplierForm } from "./SupplierForm";
 import { ImportExport } from "@/components/common/ImportExport";
 import toast from "react-hot-toast";
 
 export function SupplierList() {
-  const { data, isLoading, refetch } = useGetSuppliersQuery();
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(25);
+  const { data, isLoading, refetch } = useGetSuppliersQuery({ page, limit });
   const [deleteSupplier] = useDeleteSupplierMutation();
+  const [deleteAllSuppliers] = useDeleteAllSuppliersMutation();
   const [importSuppliers] = useImportSuppliersMutation();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<number | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [isDeletingAll, setIsDeletingAll] = useState(false);
 
   const handleDelete = async (id: number) => {
     if (deletingId === id) return; // Prevent double click
@@ -45,6 +52,26 @@ export function SupplierList() {
   const handleClose = () => {
     setIsModalOpen(false);
     setEditingSupplier(null);
+  };
+
+  const handleDeleteAll = async () => {
+    if (
+      !confirm(
+        "Are you sure you want to delete ALL suppliers? This action cannot be undone!"
+      )
+    ) {
+      return;
+    }
+    setIsDeletingAll(true);
+    try {
+      await deleteAllSuppliers().unwrap();
+      toast.success("All suppliers deleted successfully");
+      refetch();
+    } catch (error: any) {
+      toast.error(error.data?.error || "Failed to delete all suppliers");
+    } finally {
+      setIsDeletingAll(false);
+    }
   };
 
   const handleImport = async (
@@ -105,6 +132,14 @@ export function SupplierList() {
             onImportSuccess={refetch}
             templateData={templateData}
           />
+          <Button
+            variant="outline"
+            onClick={handleDeleteAll}
+            disabled={isDeletingAll || (data?.suppliers.length || 0) === 0}
+            className="text-red-600 hover:text-red-700"
+          >
+            {isDeletingAll ? "Deleting..." : "Delete All"}
+          </Button>
           <Button onClick={() => setIsModalOpen(true)}>Add Supplier</Button>
         </div>
       </div>
@@ -167,6 +202,25 @@ export function SupplierList() {
           </tbody>
         </table>
       </div>
+
+      {data?.pagination && (
+        <div className="mt-4">
+          <Pagination
+            currentPage={data.pagination.page}
+            totalPages={data.pagination.totalPages}
+            totalItems={data.pagination.total}
+            itemsPerPage={data.pagination.limit}
+            onPageChange={(newPage) => {
+              setPage(newPage);
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            }}
+            onItemsPerPageChange={(newLimit) => {
+              setLimit(newLimit);
+              setPage(1);
+            }}
+          />
+        </div>
+      )}
 
       <Modal
         isOpen={isModalOpen}

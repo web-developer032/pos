@@ -1,4 +1,5 @@
 import { apiSlice } from "./apiSlice";
+import { PaginationInfo } from "./productsApi";
 
 export interface PurchaseOrder {
   id: number;
@@ -34,8 +35,21 @@ export interface CreatePurchaseOrderRequest {
 
 export const purchaseOrdersApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
-    getPurchaseOrders: builder.query<{ purchase_orders: PurchaseOrder[] }, void>({
-      query: () => "/purchase-orders",
+    getPurchaseOrders: builder.query<
+      { purchase_orders: PurchaseOrder[]; pagination: PaginationInfo },
+      { page?: number; limit?: number } | void
+    >({
+      query: (params) => {
+        const searchParams = new URLSearchParams();
+        if (params?.page) {
+          searchParams.append("page", params.page.toString());
+        }
+        if (params?.limit) {
+          searchParams.append("limit", params.limit.toString());
+        }
+        const query = searchParams.toString();
+        return `/purchase-orders${query ? `?${query}` : ""}`;
+      },
       providesTags: ["PurchaseOrder"],
     }),
     getPurchaseOrder: builder.query<
@@ -71,6 +85,13 @@ export const purchaseOrdersApi = apiSlice.injectEndpoints({
         "Product",
       ],
     }),
+    deleteAllPurchaseOrders: builder.mutation<{ message: string }, void>({
+      query: () => ({
+        url: "/purchase-orders?delete_all=true",
+        method: "DELETE",
+      }),
+      invalidatesTags: ["PurchaseOrder"],
+    }),
   }),
 });
 
@@ -79,5 +100,6 @@ export const {
   useGetPurchaseOrderQuery,
   useCreatePurchaseOrderMutation,
   useUpdatePurchaseOrderMutation,
+  useDeleteAllPurchaseOrdersMutation,
 } = purchaseOrdersApi;
 

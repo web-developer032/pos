@@ -16,14 +16,40 @@ const poSchema = z.object({
 
 async function getHandler(req: NextRequest) {
   try {
-    const result = await client.execute(`
-      SELECT po.*, s.name as supplier_name, u.username as user_name
+    const { searchParams } = new URL(req.url);
+    const page = parseInt(searchParams.get("page") || "1");
+    const limit = parseInt(searchParams.get("limit") || "25");
+    const offset = (page - 1) * limit;
+
+    // Get total count
+    const countResult = await client.execute(`
+      SELECT COUNT(*) as total
       FROM purchase_orders po
       JOIN suppliers s ON po.supplier_id = s.id
       JOIN users u ON po.user_id = u.id
-      ORDER BY po.created_at DESC
     `);
-    return NextResponse.json({ purchase_orders: result.rows });
+    const total = (countResult.rows[0] as any).total as number;
+
+    const result = await client.execute({
+      sql: `
+        SELECT po.*, s.name as supplier_name, u.username as user_name
+        FROM purchase_orders po
+        JOIN suppliers s ON po.supplier_id = s.id
+        JOIN users u ON po.user_id = u.id
+        ORDER BY po.created_at DESC
+        LIMIT ? OFFSET ?
+      `,
+      args: [limit, offset],
+    });
+    return NextResponse.json({
+      purchase_orders: result.rows,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    });
   } catch (error) {
     console.error("Error fetching purchase orders:", error);
     return NextResponse.json(
@@ -86,6 +112,30 @@ async function postHandler(req: NextRequest) {
   }
 }
 
+async function deleteHandler(req: NextRequest) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const deleteAll = searchParams.get("delete_all") === "true";
+
+    if (deleteAll) {
+      await client.execute("DELETE FROM purchase_orders");
+      return NextResponse.json({ message: "All purchase orders deleted successfully" });
+    }
+
+    return NextResponse.json(
+      { error: "Invalid request" },
+      { status: 400 }
+    );
+  } catch (error) {
+    console.error("Error deleting purchase orders:", error);
+    return NextResponse.json(
+      { error: "Failed to delete purchase orders" },
+      { status: 500 }
+    );
+  }
+}
+
 export const GET = requireAuth(getHandler);
 export const POST = requireAuth(postHandler);
+export const DELETE = requireAuth(deleteHandler);
 

@@ -6,15 +6,22 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import {
   useGetPurchaseOrdersQuery,
   useUpdatePurchaseOrderMutation,
+  useDeleteAllPurchaseOrdersMutation,
 } from "@/lib/api/purchaseOrdersApi";
 import { useCurrency } from "@/lib/hooks/useCurrency";
+import { Pagination } from "@/components/ui/Pagination";
+import { Button } from "@/components/ui/Button";
 import { format } from "date-fns";
 import toast from "react-hot-toast";
 
 export default function PurchaseOrdersPage() {
-  const { data, isLoading, refetch } = useGetPurchaseOrdersQuery();
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(25);
+  const { data, isLoading, refetch } = useGetPurchaseOrdersQuery({ page, limit });
   const [updatePO] = useUpdatePurchaseOrderMutation();
+  const [deleteAllPOs] = useDeleteAllPurchaseOrdersMutation();
   const [updatingId, setUpdatingId] = useState<number | null>(null);
+  const [isDeletingAll, setIsDeletingAll] = useState(false);
   const { format: formatCurrency } = useCurrency();
 
   const handleStatusChange = async (
@@ -35,6 +42,26 @@ export default function PurchaseOrdersPage() {
     }
   };
 
+  const handleDeleteAll = async () => {
+    if (
+      !confirm(
+        "Are you sure you want to delete ALL purchase orders? This action cannot be undone!"
+      )
+    ) {
+      return;
+    }
+    setIsDeletingAll(true);
+    try {
+      await deleteAllPOs().unwrap();
+      toast.success("All purchase orders deleted successfully");
+      refetch();
+    } catch (error: any) {
+      toast.error(error.data?.error || "Failed to delete all purchase orders");
+    } finally {
+      setIsDeletingAll(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <ProtectedRoute>
@@ -48,8 +75,16 @@ export default function PurchaseOrdersPage() {
   return (
     <ProtectedRoute>
       <DashboardLayout>
-        <div className="mb-6">
+        <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="text-3xl font-bold">Purchase Orders</h1>
+          <Button
+            variant="outline"
+            onClick={handleDeleteAll}
+            disabled={isDeletingAll || (data?.purchase_orders.length || 0) === 0}
+            className="text-red-600 hover:text-red-700"
+          >
+            {isDeletingAll ? "Deleting..." : "Delete All"}
+          </Button>
         </div>
 
         <div className="overflow-hidden rounded-lg bg-white shadow">
@@ -127,6 +162,25 @@ export default function PurchaseOrdersPage() {
             </tbody>
           </table>
         </div>
+
+        {data?.pagination && (
+          <div className="mt-4">
+            <Pagination
+              currentPage={data.pagination.page}
+              totalPages={data.pagination.totalPages}
+              totalItems={data.pagination.total}
+              itemsPerPage={data.pagination.limit}
+              onPageChange={(newPage) => {
+                setPage(newPage);
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              }}
+              onItemsPerPageChange={(newLimit) => {
+                setLimit(newLimit);
+                setPage(1);
+              }}
+            />
+          </div>
+        )}
       </DashboardLayout>
     </ProtectedRoute>
   );

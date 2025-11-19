@@ -4,22 +4,28 @@ import { useState } from "react";
 import {
   useGetCategoriesQuery,
   useDeleteCategoryMutation,
+  useDeleteAllCategoriesMutation,
   useImportCategoriesMutation,
   CreateCategoryRequest,
 } from "@/lib/api/categoriesApi";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
+import { Pagination } from "@/components/ui/Pagination";
 import { CategoryForm } from "./CategoryForm";
 import { ImportExport } from "@/components/common/ImportExport";
 import toast from "react-hot-toast";
 
 export function CategoryList() {
-  const { data, isLoading, refetch } = useGetCategoriesQuery();
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(25);
+  const { data, isLoading, refetch } = useGetCategoriesQuery({ page, limit });
   const [deleteCategory] = useDeleteCategoryMutation();
+  const [deleteAllCategories] = useDeleteAllCategoriesMutation();
   const [importCategories] = useImportCategoriesMutation();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<number | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [isDeletingAll, setIsDeletingAll] = useState(false);
 
   const handleDelete = async (id: number) => {
     if (deletingId === id) return; // Prevent double click
@@ -45,6 +51,26 @@ export function CategoryList() {
   const handleClose = () => {
     setIsModalOpen(false);
     setEditingCategory(null);
+  };
+
+  const handleDeleteAll = async () => {
+    if (
+      !confirm(
+        "Are you sure you want to delete ALL categories? This action cannot be undone!"
+      )
+    ) {
+      return;
+    }
+    setIsDeletingAll(true);
+    try {
+      await deleteAllCategories().unwrap();
+      toast.success("All categories deleted successfully");
+      refetch();
+    } catch (error: any) {
+      toast.error(error.data?.error || "Failed to delete all categories");
+    } finally {
+      setIsDeletingAll(false);
+    }
   };
 
   const handleImport = async (
@@ -95,6 +121,14 @@ export function CategoryList() {
             onImportSuccess={refetch}
             templateData={templateData}
           />
+          <Button
+            variant="outline"
+            onClick={handleDeleteAll}
+            disabled={isDeletingAll || (data?.categories.length || 0) === 0}
+            className="text-red-600 hover:text-red-700"
+          >
+            {isDeletingAll ? "Deleting..." : "Delete All"}
+          </Button>
           <Button onClick={() => setIsModalOpen(true)}>Add Category</Button>
         </div>
       </div>
@@ -145,6 +179,25 @@ export function CategoryList() {
           </tbody>
         </table>
       </div>
+
+      {data?.pagination && (
+        <div className="mt-4">
+          <Pagination
+            currentPage={data.pagination.page}
+            totalPages={data.pagination.totalPages}
+            totalItems={data.pagination.total}
+            itemsPerPage={data.pagination.limit}
+            onPageChange={(newPage) => {
+              setPage(newPage);
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            }}
+            onItemsPerPageChange={(newLimit) => {
+              setLimit(newLimit);
+              setPage(1);
+            }}
+          />
+        </div>
+      )}
 
       <Modal
         isOpen={isModalOpen}

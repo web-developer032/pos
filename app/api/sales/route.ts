@@ -42,10 +42,31 @@ async function getHandler(req: NextRequest) {
       args.push(endDate);
     }
 
-    sql += " ORDER BY s.created_at DESC LIMIT 100";
+    // Get total count
+    const countSql = sql.replace(
+      /SELECT s\.\*, u\.username as user_name, c\.name as customer_name/,
+      "SELECT COUNT(*) as total"
+    );
+    const countResult = await client.execute({ sql: countSql, args });
+    const total = (countResult.rows[0] as any).total as number;
+
+    const page = parseInt(searchParams.get("page") || "1");
+    const limit = parseInt(searchParams.get("limit") || "25");
+    const offset = (page - 1) * limit;
+
+    sql += " ORDER BY s.created_at DESC LIMIT ? OFFSET ?";
+    args.push(limit, offset);
 
     const result = await client.execute({ sql, args });
-    return NextResponse.json({ sales: result.rows });
+    return NextResponse.json({
+      sales: result.rows,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    });
   } catch (error) {
     console.error("Error fetching sales:", error);
     return NextResponse.json(
@@ -158,6 +179,30 @@ async function postHandler(req: NextRequest) {
   }
 }
 
+async function deleteHandler(req: NextRequest) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const deleteAll = searchParams.get("delete_all") === "true";
+
+    if (deleteAll) {
+      await client.execute("DELETE FROM sales");
+      return NextResponse.json({ message: "All sales deleted successfully" });
+    }
+
+    return NextResponse.json(
+      { error: "Invalid request" },
+      { status: 400 }
+    );
+  } catch (error) {
+    console.error("Error deleting sales:", error);
+    return NextResponse.json(
+      { error: "Failed to delete sales" },
+      { status: 500 }
+    );
+  }
+}
+
 export const GET = requireAuth(getHandler);
 export const POST = requireAuth(postHandler);
+export const DELETE = requireAuth(deleteHandler);
 

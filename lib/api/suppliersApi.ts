@@ -1,4 +1,5 @@
 import { apiSlice } from "./apiSlice";
+import { PaginationInfo } from "./productsApi";
 
 export interface Supplier {
   id: number;
@@ -28,8 +29,21 @@ export interface UpdateSupplierRequest {
 
 export const suppliersApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
-    getSuppliers: builder.query<{ suppliers: Supplier[] }, void>({
-      query: () => "/suppliers",
+    getSuppliers: builder.query<
+      { suppliers: Supplier[]; pagination: PaginationInfo },
+      { page?: number; limit?: number } | void
+    >({
+      query: (params) => {
+        const searchParams = new URLSearchParams();
+        if (params?.page) {
+          searchParams.append("page", params.page.toString());
+        }
+        if (params?.limit) {
+          searchParams.append("limit", params.limit.toString());
+        }
+        const query = searchParams.toString();
+        return `/suppliers${query ? `?${query}` : ""}`;
+      },
       providesTags: ["Supplier"],
     }),
     getSupplier: builder.query<{ supplier: Supplier }, number>({
@@ -73,6 +87,13 @@ export const suppliersApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ["Supplier"],
     }),
+    deleteAllSuppliers: builder.mutation<{ message: string }, void>({
+      query: () => ({
+        url: "/suppliers?delete_all=true",
+        method: "DELETE",
+      }),
+      invalidatesTags: ["Supplier"],
+    }),
   }),
 });
 
@@ -83,5 +104,6 @@ export const {
   useUpdateSupplierMutation,
   useDeleteSupplierMutation,
   useImportSuppliersMutation,
+  useDeleteAllSuppliersMutation,
 } = suppliersApi;
 

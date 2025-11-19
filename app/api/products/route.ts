@@ -22,6 +22,9 @@ async function getHandler(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const categoryId = searchParams.get("category_id");
     const search = searchParams.get("search");
+    const page = parseInt(searchParams.get("page") || "1");
+    const limit = parseInt(searchParams.get("limit") || "25");
+    const offset = (page - 1) * limit;
 
     let sql = `
       SELECT p.*, c.name as category_name, s.name as supplier_name
@@ -43,10 +46,27 @@ async function getHandler(req: NextRequest) {
       args.push(searchTerm, searchTerm, searchTerm);
     }
 
-    sql += " ORDER BY p.name";
+    // Get total count
+    const countSql = sql.replace(
+      /SELECT p\.\*, c\.name as category_name, s\.name as supplier_name/,
+      "SELECT COUNT(*) as total"
+    );
+    const countResult = await client.execute({ sql: countSql, args });
+    const total = (countResult.rows[0] as any).total as number;
+
+    sql += " ORDER BY p.name LIMIT ? OFFSET ?";
+    args.push(limit, offset);
 
     const result = await client.execute({ sql, args });
-    return NextResponse.json({ products: result.rows });
+    return NextResponse.json({
+      products: result.rows,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    });
   } catch (error) {
     console.error("Error fetching products:", error);
     return NextResponse.json(
@@ -96,5 +116,28 @@ async function postHandler(req: NextRequest) {
   }
 }
 
+async function deleteHandler(req: NextRequest) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const deleteAll = searchParams.get("delete_all") === "true";
+
+    if (deleteAll) {
+      await client.execute("DELETE FROM products");
+      return NextResponse.json({
+        message: "All products deleted successfully",
+      });
+    }
+
+    return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+  } catch (error) {
+    console.error("Error deleting products:", error);
+    return NextResponse.json(
+      { error: "Failed to delete products" },
+      { status: 500 }
+    );
+  }
+}
+
 export const GET = requireAuth(getHandler);
 export const POST = requireAuth(postHandler);
+export const DELETE = requireAuth(deleteHandler);
