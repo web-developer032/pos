@@ -115,7 +115,7 @@ export function Pagination({
             return (
               <Button
                 key={page}
-                variant={currentPage === page ? "default" : "outline"}
+                variant={currentPage === page ? "primary" : "outline"}
                 onClick={() => onPageChange(page as number)}
                 className="px-3 py-1 text-sm"
               >
