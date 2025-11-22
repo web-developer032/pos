@@ -9,6 +9,7 @@ import { useGetSuppliersQuery } from "@/lib/api/suppliersApi";
 import { useGetProductsQuery } from "@/lib/api/productsApi";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
+import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import { Button } from "@/components/ui/Button";
 import { useCurrency } from "@/lib/hooks/useCurrency";
 import toast from "react-hot-toast";
@@ -108,6 +109,16 @@ export function PurchaseOrderForm({ onSuccess }: PurchaseOrderFormProps) {
     }
   };
 
+  // Get product options for searchable select
+  const getProductOptions = () => {
+    return (
+      productsData?.products.map((p) => ({
+        value: p.id,
+        label: `${p.name}${p.barcode ? ` (${p.barcode})` : ""}${p.sku ? ` [${p.sku}]` : ""} - ${formatCurrency(p.cost_price)}`,
+      })) || []
+    );
+  };
+
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
       <Select
@@ -158,25 +169,24 @@ export function PurchaseOrderForm({ onSuccess }: PurchaseOrderFormProps) {
             </div>
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <Select
+              <SearchableSelect
                 label="Product *"
                 options={[
                   { value: 0, label: "Select Product" },
-                  ...(productsData?.products.map((p) => ({
-                    value: p.id,
-                    label: `${p.name} (${formatCurrency(p.cost_price)})`,
-                  })) || []),
+                  ...getProductOptions(),
                 ]}
-                {...register(`items.${index}.product_id`, {
-                  valueAsNumber: true,
-                  onChange: (e) => {
-                    handleProductChange(
-                      index,
-                      Number(e.target.value),
-                      setValue
-                    );
-                  },
-                })}
+                value={watch(`items.${index}.product_id`) || 0}
+                onChange={(val) => {
+                  const productId = Number(val);
+                  if (productId > 0) {
+                    setValue(`items.${index}.product_id`, productId, {
+                      shouldValidate: true,
+                    });
+                    handleProductChange(index, productId, setValue);
+                  }
+                }}
+                placeholder="Search and select product..."
+                searchPlaceholder="Type product name, barcode, or SKU..."
                 error={errors.items?.[index]?.product_id?.message}
               />
 
