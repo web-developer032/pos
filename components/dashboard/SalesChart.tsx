@@ -22,7 +22,7 @@ export function SalesChart() {
   if (isLoading) {
     return (
       <div className="rounded-lg bg-white p-6 shadow">
-        <h3 className="mb-4 text-lg font-semibold ">
+        <h3 className="mb-4 text-lg font-semibold">
           Sales Trend (Last 7 Days)
         </h3>
         <div>Loading...</div>
@@ -36,14 +36,16 @@ export function SalesChart() {
     salesByDate[date] = (salesByDate[date] || 0) + sale.final_amount;
   });
 
-  const chartData = Object.entries(salesByDate).map(([date, revenue]) => ({
-    date: format(new Date(date), "MMM dd"),
-    revenue: revenue.toFixed(2),
-  }));
+  const chartData = Object.entries(salesByDate)
+    .sort(([dateA], [dateB]) => dateA.localeCompare(dateB))
+    .map(([date, revenue]) => ({
+      date: format(new Date(date), "MMM dd"),
+      revenue: revenue.toFixed(2),
+    }));
 
   return (
     <div className="rounded-lg bg-white p-6 shadow">
-      <h3 className="mb-4 text-lg font-semibold ">Sales Trend (Last 7 Days)</h3>
+      <h3 className="mb-4 text-lg font-semibold">Sales Trend (Last 7 Days)</h3>
       <ResponsiveContainer width="100%" height={300}>
         <LineChart data={chartData}>
           <CartesianGrid strokeDasharray="3 3" />

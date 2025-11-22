@@ -39,10 +39,12 @@ export default function ReportsPage() {
     salesByDate[date] = (salesByDate[date] || 0) + sale.final_amount;
   });
 
-  const chartData = Object.entries(salesByDate).map(([date, revenue]) => ({
-    date: format(new Date(date), "MMM dd"),
-    revenue: parseFloat(revenue.toFixed(2)),
-  }));
+  const chartData = Object.entries(salesByDate)
+    .sort(([dateA], [dateB]) => dateA.localeCompare(dateB))
+    .map(([date, revenue]) => ({
+      date: format(new Date(date), "MMM dd"),
+      revenue: parseFloat(revenue.toFixed(2)),
+    }));
 
   const totalRevenue =
     data?.sales.reduce((sum, sale) => sum + sale.final_amount, 0) || 0;
