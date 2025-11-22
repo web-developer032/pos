@@ -1,16 +1,20 @@
 "use client";
 
 import { useState } from "react";
-import { useForm, useFieldArray } from "react-hook-form";
+import { useForm, useFieldArray, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useCreatePurchaseOrderMutation } from "@/lib/api/purchaseOrdersApi";
-import { useGetSuppliersQuery } from "@/lib/api/suppliersApi";
+import {
+  useGetSuppliersQuery,
+  useCreateSupplierMutation,
+} from "@/lib/api/suppliersApi";
 import { useGetProductsQuery } from "@/lib/api/productsApi";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import { Button } from "@/components/ui/Button";
+import { Modal } from "@/components/ui/Modal";
 import { useCurrency } from "@/lib/hooks/useCurrency";
 import toast from "react-hot-toast";
 
@@ -37,9 +41,96 @@ interface PurchaseOrderFormProps {
   onSuccess?: () => void;
 }
 
+// Inline Supplier Form Component
+function InlineSupplierForm({
+  onSuccess,
+}: {
+  onSuccess: (supplierId: number) => void;
+}) {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm({
+    defaultValues: {
+      name: "",
+      contact_person: "",
+      email: "",
+      phone: "",
+      address: "",
+    },
+  });
+  const [createSupplier] = useCreateSupplierMutation();
+
+  const onSubmit = async (data: {
+    name: string;
+    contact_person?: string;
+    email?: string;
+    phone?: string;
+    address?: string;
+  }) => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      const result = await createSupplier({
+        name: data.name,
+        contact_person: data.contact_person || undefined,
+        email: data.email || undefined,
+        phone: data.phone || undefined,
+        address: data.address || undefined,
+      }).unwrap();
+      onSuccess(result.supplier.id);
+    } catch (error: unknown) {
+      const err = error as { data?: { error?: string } };
+      toast.error(err.data?.error || "Failed to create supplier");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+      <Input
+        label="Name *"
+        {...register("name", { required: "Name is required" })}
+        error={errors.name?.message as string}
+      />
+      <Input
+        label="Contact Person"
+        {...register("contact_person")}
+        error={errors.contact_person?.message as string}
+      />
+      <Input
+        label="Email"
+        type="email"
+        {...register("email")}
+        error={errors.email?.message as string}
+      />
+      <Input
+        label="Phone"
+        {...register("phone")}
+        error={errors.phone?.message as string}
+      />
+      <Input
+        label="Address"
+        {...register("address")}
+        error={errors.address?.message as string}
+      />
+      <div className="flex justify-end space-x-2">
+        <Button type="submit" disabled={isSubmitting}>
+          {isSubmitting ? "Creating..." : "Create"}
+        </Button>
+      </div>
+    </form>
+  );
+}
+
 export function PurchaseOrderForm({ onSuccess }: PurchaseOrderFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { data: suppliersData } = useGetSuppliersQuery();
+  const [showSupplierModal, setShowSupplierModal] = useState(false);
+  const { data: suppliersData, refetch: refetchSuppliers } =
+    useGetSuppliersQuery();
   const { data: productsData } = useGetProductsQuery();
   const [createPurchaseOrder] = useCreatePurchaseOrderMutation();
   const { format: formatCurrency } = useCurrency();
@@ -60,7 +151,7 @@ export function PurchaseOrderForm({ onSuccess }: PurchaseOrderFormProps) {
     },
   });
 
-  const { fields, append, remove } = useFieldArray({
+  const { fields, append, prepend, remove } = useFieldArray({
     control,
     name: "items",
   });
@@ -120,19 +211,42 @@ export function PurchaseOrderForm({ onSuccess }: PurchaseOrderFormProps) {
   };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-      <Select
-        label="Supplier *"
-        options={[
-          { value: 0, label: "Select Supplier" },
-          ...(suppliersData?.suppliers.map((s) => ({
-            value: s.id,
-            label: s.name,
-          })) || []),
-        ]}
-        {...register("supplier_id", { valueAsNumber: true })}
-        error={errors.supplier_id?.message}
-      />
+    <>
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <div>
+          <Controller
+            name="supplier_id"
+            control={control}
+            render={({ field }) => (
+              <div>
+                <Select
+                  label="Supplier *"
+                  options={[
+                    { value: 0, label: "Select Supplier" },
+                    ...(suppliersData?.suppliers.map((s) => ({
+                      value: s.id,
+                      label: s.name,
+                    })) || []),
+                  ]}
+                  value={field.value?.toString() || "0"}
+                  onChange={(e) => {
+                    field.onChange(
+                      e.target.value === "0" ? 0 : Number(e.target.value)
+                    );
+                  }}
+                  error={errors.supplier_id?.message}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowSupplierModal(true)}
+                  className="mt-1 text-sm text-indigo-600 hover:text-indigo-800"
+                >
+                  + Add New Supplier
+                </button>
+              </div>
+            )}
+          />
+        </div>
 
       <div className="space-y-4">
         <div className="flex items-center justify-between">
@@ -140,14 +254,15 @@ export function PurchaseOrderForm({ onSuccess }: PurchaseOrderFormProps) {
           <Button
             type="button"
             variant="outline"
-            onClick={() => append({ product_id: 0, quantity: 1, unit_cost: 0 })}
+            onClick={() => prepend({ product_id: 0, quantity: 1, unit_cost: 0 })}
             className="text-sm"
           >
             + Add Item
           </Button>
         </div>
 
-        {fields.map((field, index) => (
+        <div className="max-h-[400px] overflow-y-auto space-y-4 pr-2 form-scrollbar">
+          {fields.map((field, index) => (
           <div
             key={field.id}
             className="rounded-lg border border-gray-200 p-4 space-y-3"
@@ -223,8 +338,9 @@ export function PurchaseOrderForm({ onSuccess }: PurchaseOrderFormProps) {
                   )}
                 </div>
               )}
-          </div>
-        ))}
+            </div>
+          ))}
+        </div>
 
         {errors.items && (
           <p className="text-sm text-red-600">{errors.items.message}</p>
@@ -240,12 +356,28 @@ export function PurchaseOrderForm({ onSuccess }: PurchaseOrderFormProps) {
         </div>
       </div>
 
-      <div className="flex justify-end space-x-2 pt-4">
-        <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? "Creating..." : "Create Purchase Order"}
-        </Button>
-      </div>
-    </form>
+        <div className="flex justify-end space-x-2 pt-4">
+          <Button type="submit" disabled={isSubmitting}>
+            {isSubmitting ? "Creating..." : "Create Purchase Order"}
+          </Button>
+        </div>
+      </form>
+
+      <Modal
+        isOpen={showSupplierModal}
+        onClose={() => setShowSupplierModal(false)}
+        title="Add New Supplier"
+      >
+        <InlineSupplierForm
+          onSuccess={async (supplierId: number) => {
+            await refetchSuppliers();
+            setValue("supplier_id", supplierId);
+            setShowSupplierModal(false);
+            toast.success("Supplier created and selected");
+          }}
+        />
+      </Modal>
+    </>
   );
 }
 

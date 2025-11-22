@@ -1,6 +1,7 @@
 "use client";
 
-import { ReactNode, useEffect } from "react";
+import { ReactNode, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 
 interface ModalProps {
   isOpen: boolean;
@@ -17,6 +18,13 @@ export function Modal({
   children,
   size = "md",
 }: ModalProps) {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    return () => setMounted(false);
+  }, []);
+
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = "hidden";
@@ -28,7 +36,7 @@ export function Modal({
     };
   }, [isOpen]);
 
-  if (!isOpen) return null;
+  if (!isOpen || !mounted) return null;
 
   const sizeClasses = {
     sm: "max-w-md",
@@ -37,7 +45,7 @@ export function Modal({
     xl: "max-w-4xl",
   };
 
-  return (
+  const modalContent = (
     <div className="fixed inset-0 z-50 overflow-y-auto" onClick={onClose}>
       <div className="flex min-h-screen items-center justify-center px-4 pb-20 pt-4 text-center sm:block sm:p-0">
         <div
@@ -51,7 +59,7 @@ export function Modal({
         >
           {title && (
             <div className="border-b border-gray-200 px-6 py-4">
-              <h3 className="text-lg font-medium ">{title}</h3>
+              <h3 className="text-lg font-medium">{title}</h3>
             </div>
           )}
           <div className="px-6 py-4">{children}</div>
@@ -59,4 +67,6 @@ export function Modal({
       </div>
     </div>
   );
+
+  return createPortal(modalContent, document.body);
 }
