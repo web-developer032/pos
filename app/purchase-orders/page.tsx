@@ -13,6 +13,7 @@ import { useDebounce } from "@/lib/hooks/useDebounce";
 import { Pagination } from "@/components/ui/Pagination";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { Select } from "@/components/ui/Select";
 import { Modal } from "@/components/ui/Modal";
 import { PurchaseOrderForm } from "@/components/purchase-orders/PurchaseOrderForm";
 import { format } from "date-fns";
@@ -22,19 +23,21 @@ export default function PurchaseOrdersPage() {
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(25);
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingPOId, setEditingPOId] = useState<number | null>(null);
   const debouncedSearch = useDebounce(search, 500);
 
-  // Reset to page 1 when search changes
+  // Reset to page 1 when search or status filter changes
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch]);
+  }, [debouncedSearch, statusFilter]);
 
   const { data, isLoading, refetch } = useGetPurchaseOrdersQuery({
     page,
     limit,
     search: debouncedSearch || undefined,
+    status: statusFilter || undefined,
   });
   const [updatePO] = useUpdatePurchaseOrderMutation();
   const [deleteAllPOs] = useDeleteAllPurchaseOrdersMutation();
@@ -118,13 +121,24 @@ export default function PurchaseOrdersPage() {
           </div>
         </div>
 
-        <div className="mb-4">
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
           <Input
             type="text"
             placeholder="Search by PO number, supplier, or user..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="max-w-md"
+            className="max-w-md flex-1"
+          />
+          <Select
+            options={[
+              { value: "", label: "All Statuses" },
+              { value: "pending", label: "Pending" },
+              { value: "completed", label: "Completed" },
+              { value: "cancelled", label: "Cancelled" },
+            ]}
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="w-full sm:w-48"
           />
         </div>
 

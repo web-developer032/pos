@@ -46,7 +46,7 @@ export const purchaseOrdersApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
     getPurchaseOrders: builder.query<
       { purchase_orders: PurchaseOrder[]; pagination: PaginationInfo },
-      { page?: number; limit?: number; search?: string } | void
+      { page?: number; limit?: number; search?: string; status?: string } | void
     >({
       query: (params) => {
         const searchParams = new URLSearchParams();
@@ -58,6 +58,9 @@ export const purchaseOrdersApi = apiSlice.injectEndpoints({
         }
         if (params?.search) {
           searchParams.append("search", params.search);
+        }
+        if (params?.status) {
+          searchParams.append("status", params.status);
         }
         const query = searchParams.toString();
         return `/purchase-orders${query ? `?${query}` : ""}`;

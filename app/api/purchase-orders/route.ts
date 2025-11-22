@@ -20,6 +20,7 @@ async function getHandler(req: NextRequest) {
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "25");
     const search = searchParams.get("search") || "";
+    const status = searchParams.get("status") || "";
     const offset = (page - 1) * limit;
 
     let sql = `
@@ -35,6 +36,11 @@ async function getHandler(req: NextRequest) {
       sql += ` AND (po.po_number LIKE ? OR s.name LIKE ? OR u.username LIKE ?)`;
       const searchPattern = `%${search}%`;
       args.push(searchPattern, searchPattern, searchPattern);
+    }
+
+    if (status && ["pending", "completed", "cancelled"].includes(status)) {
+      sql += ` AND po.status = ?`;
+      args.push(status);
     }
 
     // Get total count
