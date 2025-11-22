@@ -14,13 +14,18 @@ function ensureDbDirectory() {
 }
 
 // Initialize libSQL client
-// For local development, database is stored in data/db folder
-// For production, use a remote database URL
+// For production/Vercel: use TURSO_DATABASE_URL and TURSO_AUTH_TOKEN
+// For local development: database is stored in data/db folder
 const getDbPath = () => {
+  // Check for Turso database URL (production/Vercel)
+  if (process.env.TURSO_DATABASE_URL) {
+    return process.env.TURSO_DATABASE_URL;
+  }
+  // Fallback to DATABASE_URL for backward compatibility
   if (process.env.DATABASE_URL) {
     return process.env.DATABASE_URL;
   }
-  // Use absolute path to ensure consistency
+  // Use absolute path to ensure consistency for local development
   const dbDir = join(process.cwd(), "data", "db");
   const dbFile = join(dbDir, "local.db");
 
@@ -43,13 +48,22 @@ const getDbPath = () => {
   return fileUrl;
 };
 
-// Ensure directory exists before creating client
-ensureDbDirectory();
+// Get auth token (Turso token for production, optional for local)
+const getAuthToken = () => {
+  return process.env.TURSO_AUTH_TOKEN || process.env.DATABASE_AUTH_TOKEN;
+};
+
+// Ensure directory exists before creating client (only for local file database)
+if (!process.env.TURSO_DATABASE_URL && !process.env.DATABASE_URL) {
+  ensureDbDirectory();
+}
 
 const dbPath = getDbPath();
+const authToken = getAuthToken();
+
 const client = createClient({
   url: dbPath,
-  authToken: process.env.DATABASE_AUTH_TOKEN,
+  authToken: authToken,
 });
 
 export default client;

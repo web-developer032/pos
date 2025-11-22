@@ -22,20 +22,32 @@ A Next.js application with Redux Toolkit for state management, libSQL for databa
 ### Installation
 
 1. Install dependencies:
+
 ```bash
 npm install
 ```
 
 2. Set up environment variables:
-Create a `.env.local` file in the root directory:
+   Create a `.env.local` file in the root directory:
+
+For local development (optional - will use local file database if not set):
+
 ```env
 DATABASE_URL=file:./data/db/local.db
 DATABASE_AUTH_TOKEN=your_auth_token_if_needed
 ```
 
-Note: The database will be automatically stored in the `data/db` folder. The directory will be created automatically if it doesn't exist.
+For production/Vercel deployment:
+
+```env
+TURSO_DATABASE_URL=libsql://your-database-url.turso.io
+TURSO_AUTH_TOKEN=your_turso_auth_token
+```
+
+Note: The database will be automatically stored in the `data/db` folder for local development. The directory will be created automatically if it doesn't exist. For production, use the Turso environment variables.
 
 3. Run the development server:
+
 ```bash
 npm run dev
 ```
@@ -70,9 +82,19 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ## Database Setup
 
-This project uses libSQL. For local development, the database is stored in the `data/db` folder (default: `data/db/local.db`). The directory is created automatically when the application starts.
+This project uses libSQL (Turso).
 
-For production, configure your `DATABASE_URL` environment variable to point to your libSQL instance.
+**For local development:**
+
+- The database is automatically stored in the `data/db` folder (default: `data/db/local.db`)
+- The directory is created automatically when the application starts
+- No environment variables are required for local file-based database
+
+**For production/Vercel deployment:**
+
+- Set `TURSO_DATABASE_URL` to your Turso database URL (e.g., `libsql://your-db.turso.io`)
+- Set `TURSO_AUTH_TOKEN` to your Turso authentication token
+- The application will automatically use these variables when deployed
 
 ## State Management
 
@@ -83,4 +105,3 @@ Redux Toolkit is configured with RTK Query for API handling. Create API slices i
 - ESLint is configured with Next.js recommended rules
 - Prettier is set up with Tailwind CSS plugin for class sorting
 - TypeScript strict mode is enabled
-
