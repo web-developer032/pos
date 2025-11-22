@@ -14,7 +14,6 @@ async function postHandler(req: NextRequest) {
   try {
     const body = await req.json();
     const validated = adjustSchema.parse(body);
-    const user = (req as any).user;
 
     // Update product stock
     const productResult = await client.execute({
@@ -66,7 +65,7 @@ async function postHandler(req: NextRequest) {
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { error: "Invalid input", details: error.errors },
+        { error: "Invalid input", details: error.issues },
         { status: 400 }
       );
     }

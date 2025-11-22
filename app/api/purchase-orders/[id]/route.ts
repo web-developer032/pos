@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/middleware/auth";
 import client from "@/lib/db";
-import { z } from "zod";
 
 async function getHandler(
   req: NextRequest,

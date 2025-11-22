@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/middleware/auth";
 import client from "@/lib/db";
 
-async function getHandler(req: NextRequest) {
+async function getHandler(_req: NextRequest) {
   try {
     const result = await client.execute("SELECT * FROM settings");
     const settings: { [key: string]: string } = {};

@@ -2,7 +2,6 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useAppSelector } from "@/lib/hooks";
 import { useGetMeQuery } from "@/lib/api/authApi";
 import { useAppDispatch } from "@/lib/hooks";
 import { setCredentials } from "@/lib/slices/authSlice";
@@ -18,7 +17,6 @@ export function ProtectedRoute({
 }: ProtectedRouteProps) {
   const router = useRouter();
   const dispatch = useAppDispatch();
-  const { isAuthenticated, user } = useAppSelector((state) => state.auth);
   
   // Always try to get user info from /auth/me (uses cookie)
   // This will work even after page refresh since token is in httpOnly cookie
