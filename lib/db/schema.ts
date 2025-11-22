@@ -180,6 +180,24 @@ export async function initializeDatabase() {
     )
   `);
 
+  // Supplier payments table
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS supplier_payments (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      supplier_id INTEGER NOT NULL,
+      purchase_order_id INTEGER,
+      amount REAL NOT NULL,
+      payment_method TEXT NOT NULL CHECK(payment_method IN ('cash', 'bank_transfer', 'check', 'other')),
+      reference_number TEXT,
+      notes TEXT,
+      user_id INTEGER NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (supplier_id) REFERENCES suppliers(id),
+      FOREIGN KEY (purchase_order_id) REFERENCES purchase_orders(id),
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    )
+  `);
+
   // Settings table
   await client.execute(`
     CREATE TABLE IF NOT EXISTS settings (
@@ -196,5 +214,7 @@ export async function initializeDatabase() {
   await client.execute(`CREATE INDEX IF NOT EXISTS idx_sales_date ON sales(created_at)`);
   await client.execute(`CREATE INDEX IF NOT EXISTS idx_sale_items_sale ON sale_items(sale_id)`);
   await client.execute(`CREATE INDEX IF NOT EXISTS idx_inventory_product ON inventory_transactions(product_id)`);
+  await client.execute(`CREATE INDEX IF NOT EXISTS idx_supplier_payments_supplier ON supplier_payments(supplier_id)`);
+  await client.execute(`CREATE INDEX IF NOT EXISTS idx_supplier_payments_po ON supplier_payments(purchase_order_id)`);
 }
 

@@ -1,5 +1,6 @@
 import { apiSlice } from "./apiSlice";
 import { PaginationInfo } from "./productsApi";
+import type { PurchaseOrder } from "./purchaseOrdersApi";
 
 export interface Supplier {
   id: number;
@@ -25,6 +26,38 @@ export interface UpdateSupplierRequest {
   email?: string;
   phone?: string;
   address?: string;
+}
+
+export interface SupplierLedger {
+  purchase_orders: PurchaseOrder[];
+  payments: SupplierPayment[];
+  summary: {
+    total_purchases: number;
+    total_paid: number;
+    balance: number;
+  };
+}
+
+export interface SupplierPayment {
+  id: number;
+  supplier_id: number;
+  purchase_order_id?: number;
+  amount: number;
+  payment_method: "cash" | "bank_transfer" | "check" | "other";
+  reference_number?: string;
+  notes?: string;
+  user_id: number;
+  created_at: string;
+  user_name?: string;
+  po_number?: string;
+}
+
+export interface CreateSupplierPaymentRequest {
+  purchase_order_id?: number;
+  amount: number;
+  payment_method: "cash" | "bank_transfer" | "check" | "other";
+  reference_number?: string;
+  notes?: string;
 }
 
 export const suppliersApi = apiSlice.injectEndpoints({
@@ -94,6 +127,27 @@ export const suppliersApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ["Supplier"],
     }),
+    getSupplierLedger: builder.query<SupplierLedger, number>({
+      query: (id) => `/suppliers/${id}/ledger`,
+      providesTags: (result, error, id) => [
+        { type: "Supplier", id },
+        "SupplierLedger",
+      ],
+    }),
+    createSupplierPayment: builder.mutation<
+      { payment: SupplierPayment },
+      { supplierId: number; data: CreateSupplierPaymentRequest }
+    >({
+      query: ({ supplierId, data }) => ({
+        url: `/suppliers/${supplierId}/payments`,
+        method: "POST",
+        body: data,
+      }),
+      invalidatesTags: (result, error, { supplierId }) => [
+        { type: "Supplier", id: supplierId },
+        "SupplierLedger",
+      ],
+    }),
   }),
 });
 
@@ -105,5 +159,7 @@ export const {
   useDeleteSupplierMutation,
   useImportSuppliersMutation,
   useDeleteAllSuppliersMutation,
+  useGetSupplierLedgerQuery,
+  useCreateSupplierPaymentMutation,
 } = suppliersApi;
 
