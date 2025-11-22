@@ -25,7 +25,9 @@ async function postHandler(req: NextRequest) {
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
     }
 
-    const currentStock = (productResult.rows[0] as any).stock_quantity;
+    const currentStock = (
+      productResult.rows[0] as unknown as { stock_quantity: number }
+    ).stock_quantity;
     let newStock = currentStock;
 
     if (validated.transaction_type === "purchase") {
@@ -78,4 +80,3 @@ async function postHandler(req: NextRequest) {
 }
 
 export const POST = requireAuth(postHandler);
-

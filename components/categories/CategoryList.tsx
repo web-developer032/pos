@@ -35,8 +35,11 @@ export function CategoryList() {
         await deleteCategory(id).unwrap();
         toast.success("Category deleted successfully");
         refetch();
-      } catch (error: any) {
-        toast.error(error.data?.error || "Failed to delete category");
+      } catch (error) {
+        const errorMessage =
+          (error as { data?: { error?: string } })?.data?.error ||
+          "Failed to delete category";
+        toast.error(errorMessage);
       } finally {
         setDeletingId(null);
       }
@@ -66,26 +69,35 @@ export function CategoryList() {
       await deleteAllCategories().unwrap();
       toast.success("All categories deleted successfully");
       refetch();
-    } catch (error: any) {
-      toast.error(error.data?.error || "Failed to delete all categories");
+    } catch (error) {
+      const errorMessage =
+        (error as { data?: { error?: string } })?.data?.error ||
+        "Failed to delete all categories";
+      toast.error(errorMessage);
     } finally {
       setIsDeletingAll(false);
     }
   };
 
   const handleImport = async (
-    items: any[]
+    items: Record<string, unknown>[]
   ): Promise<{ imported: number; errors: string[] }> => {
     try {
       const categories: CreateCategoryRequest[] = items.map((item) => ({
-        name: item.name || item.Name || "",
-        description: item.description || item.Description || undefined,
+        name: String(item.name || item.Name || ""),
+        description:
+          item.description || item.Description
+            ? String(item.description || item.Description)
+            : undefined,
       }));
 
       const result = await importCategories({ categories }).unwrap();
       return result;
-    } catch (error: any) {
-      throw new Error(error.data?.error || "Failed to import categories");
+    } catch (error) {
+      const errorMessage =
+        (error as { data?: { error?: string } })?.data?.error ||
+        "Failed to import categories";
+      throw new Error(errorMessage);
     }
   };
 

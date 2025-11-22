@@ -21,7 +21,7 @@ interface ImportExportProps<T> {
   templateData?: T[];
 }
 
-export function ImportExport<T extends Record<string, any>>({
+export function ImportExport<T extends Record<string, unknown>>({
   data,
   headers,
   filename,
@@ -107,8 +107,10 @@ export function ImportExport<T extends Record<string, any>>({
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
-    } catch (error: any) {
-      toast.error(error.message || "Failed to import data");
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to import data";
+      toast.error(errorMessage);
       console.error("Import error:", error);
     } finally {
       setIsImporting(false);

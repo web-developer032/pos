@@ -17,7 +17,7 @@ async function getHandler(req: NextRequest) {
       FROM sales
       WHERE 1=1
     `;
-    const args: any[] = [];
+    const args: (string | number)[] = [];
 
     if (startDate) {
       sql += " AND DATE(created_at) >= ?";
@@ -42,4 +42,3 @@ async function getHandler(req: NextRequest) {
 }
 
 export const GET = requireAuth(getHandler);
-

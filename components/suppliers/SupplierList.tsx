@@ -35,8 +35,11 @@ export function SupplierList() {
         await deleteSupplier(id).unwrap();
         toast.success("Supplier deleted successfully");
         refetch();
-      } catch (error: any) {
-        toast.error(error.data?.error || "Failed to delete supplier");
+      } catch (error) {
+        const errorMessage =
+          (error as { data?: { error?: string } })?.data?.error ||
+          "Failed to delete supplier";
+        toast.error(errorMessage);
       } finally {
         setDeletingId(null);
       }
@@ -66,30 +69,47 @@ export function SupplierList() {
       await deleteAllSuppliers().unwrap();
       toast.success("All suppliers deleted successfully");
       refetch();
-    } catch (error: any) {
-      toast.error(error.data?.error || "Failed to delete all suppliers");
+    } catch (error) {
+      const errorMessage =
+        (error as { data?: { error?: string } })?.data?.error ||
+        "Failed to delete all suppliers";
+      toast.error(errorMessage);
     } finally {
       setIsDeletingAll(false);
     }
   };
 
   const handleImport = async (
-    items: any[]
+    items: Record<string, unknown>[]
   ): Promise<{ imported: number; errors: string[] }> => {
     try {
       const suppliers: CreateSupplierRequest[] = items.map((item) => ({
-        name: item.name || item.Name || "",
+        name: String(item.name || item.Name || ""),
         contact_person:
-          item.contact_person || item["Contact Person"] || undefined,
-        email: item.email || item.Email || undefined,
-        phone: item.phone || item.Phone || undefined,
-        address: item.address || item.Address || undefined,
+          item.contact_person || item["Contact Person"]
+            ? String(item.contact_person || item["Contact Person"])
+            : undefined,
+        email:
+          item.email || item.Email
+            ? String(item.email || item.Email)
+            : undefined,
+        phone:
+          item.phone || item.Phone
+            ? String(item.phone || item.Phone)
+            : undefined,
+        address:
+          item.address || item.Address
+            ? String(item.address || item.Address)
+            : undefined,
       }));
 
       const result = await importSuppliers({ suppliers }).unwrap();
       return result;
-    } catch (error: any) {
-      throw new Error(error.data?.error || "Failed to import suppliers");
+    } catch (error) {
+      const errorMessage =
+        (error as { data?: { error?: string } })?.data?.error ||
+        "Failed to import suppliers";
+      throw new Error(errorMessage);
     }
   };
 

@@ -9,11 +9,16 @@ export interface AuthRequest extends NextRequest {
   };
 }
 
+export type RouteContext = { params: Promise<{ [key: string]: string }> };
+
 export function requireAuth(
-  handler: (req: AuthRequest, context?: any) => Promise<NextResponse>,
+  handler: (req: AuthRequest, context?: RouteContext) => Promise<NextResponse>,
   allowedRoles?: string[]
 ) {
-  return async (req: NextRequest, context?: any): Promise<NextResponse> => {
+  return async (
+    req: NextRequest,
+    context?: RouteContext
+  ): Promise<NextResponse> => {
     // Try to get token from cookie first, then from Authorization header
     const cookieToken = req.cookies.get("auth_token")?.value;
     const authHeader = req.headers.get("authorization");

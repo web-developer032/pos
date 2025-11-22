@@ -73,8 +73,11 @@ export function CategoryForm({ categoryId, onSuccess }: CategoryFormProps) {
         toast.success("Category created successfully");
       }
       onSuccess?.();
-    } catch (error: any) {
-      toast.error(error.data?.error || "Failed to save category");
+    } catch (error) {
+      const errorMessage =
+        (error as { data?: { error?: string } })?.data?.error ||
+        "Failed to save category";
+      toast.error(errorMessage);
     } finally {
       setIsSubmitting(false);
     }

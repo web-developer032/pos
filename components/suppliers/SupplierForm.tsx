@@ -85,8 +85,11 @@ export function SupplierForm({ supplierId, onSuccess }: SupplierFormProps) {
         toast.success("Supplier created successfully");
       }
       onSuccess?.();
-    } catch (error: any) {
-      toast.error(error.data?.error || "Failed to save supplier");
+    } catch (error) {
+      const errorMessage =
+        (error as { data?: { error?: string } })?.data?.error ||
+        "Failed to save supplier";
+      toast.error(errorMessage);
     } finally {
       setIsSubmitting(false);
     }

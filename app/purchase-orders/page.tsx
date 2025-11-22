@@ -17,7 +17,10 @@ import toast from "react-hot-toast";
 export default function PurchaseOrdersPage() {
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(25);
-  const { data, isLoading, refetch } = useGetPurchaseOrdersQuery({ page, limit });
+  const { data, isLoading, refetch } = useGetPurchaseOrdersQuery({
+    page,
+    limit,
+  });
   const [updatePO] = useUpdatePurchaseOrderMutation();
   const [deleteAllPOs] = useDeleteAllPurchaseOrdersMutation();
   const [updatingId, setUpdatingId] = useState<number | null>(null);
@@ -55,8 +58,11 @@ export default function PurchaseOrdersPage() {
       await deleteAllPOs().unwrap();
       toast.success("All purchase orders deleted successfully");
       refetch();
-    } catch (error: any) {
-      toast.error(error.data?.error || "Failed to delete all purchase orders");
+    } catch (error) {
+      const errorMessage =
+        (error as { data?: { error?: string } })?.data?.error ||
+        "Failed to delete all purchase orders";
+      toast.error(errorMessage);
     } finally {
       setIsDeletingAll(false);
     }
@@ -80,7 +86,9 @@ export default function PurchaseOrdersPage() {
           <Button
             variant="outline"
             onClick={handleDeleteAll}
-            disabled={isDeletingAll || (data?.purchase_orders.length || 0) === 0}
+            disabled={
+              isDeletingAll || (data?.purchase_orders.length || 0) === 0
+            }
             className="text-red-600 hover:text-red-700"
           >
             {isDeletingAll ? "Deleting..." : "Delete All"}

@@ -56,8 +56,11 @@ export function ProductList() {
         await deleteProduct(id).unwrap();
         toast.success("Product deleted successfully");
         refetch();
-      } catch (error: any) {
-        toast.error(error.data?.error || "Failed to delete product");
+      } catch (error) {
+        const errorMessage =
+          (error as { data?: { error?: string } })?.data?.error ||
+          "Failed to delete product";
+        toast.error(errorMessage);
       } finally {
         setDeletingId(null);
       }
@@ -77,8 +80,11 @@ export function ProductList() {
       await deleteAllProducts().unwrap();
       toast.success("All products deleted successfully");
       refetch();
-    } catch (error: any) {
-      toast.error(error.data?.error || "Failed to delete all products");
+    } catch (error) {
+      const errorMessage =
+        (error as { data?: { error?: string } })?.data?.error ||
+        "Failed to delete all products";
+      toast.error(errorMessage);
     } finally {
       setIsDeletingAll(false);
     }
@@ -95,11 +101,14 @@ export function ProductList() {
   };
 
   const handleImport = async (
-    items: any[]
+    items: Record<string, unknown>[]
   ): Promise<{ imported: number; errors: string[] }> => {
     try {
       // Helper to get field value from CSV (handles multiple case variations)
-      const getField = (item: any, ...fieldNames: string[]): any => {
+      const getField = (
+        item: Record<string, unknown>,
+        ...fieldNames: string[]
+      ): unknown => {
         for (const fieldName of fieldNames) {
           const value = item[fieldName];
           if (value !== undefined && value !== null && value !== "") {
@@ -110,7 +119,7 @@ export function ProductList() {
       };
 
       // Helper to normalize string fields (empty strings become undefined)
-      const normalizeString = (value: any): string | undefined => {
+      const normalizeString = (value: unknown): string | undefined => {
         if (value === null || value === undefined || value === "") {
           return undefined;
         }
@@ -119,7 +128,10 @@ export function ProductList() {
       };
 
       // Helper to parse numbers safely
-      const parseNumber = (value: any, defaultValue: number = 0): number => {
+      const parseNumber = (
+        value: unknown,
+        defaultValue: number = 0
+      ): number => {
         if (value === null || value === undefined || value === "") {
           return defaultValue;
         }
@@ -128,7 +140,10 @@ export function ProductList() {
         return isNaN(parsed) ? defaultValue : parsed;
       };
 
-      const parseIntSafe = (value: any, defaultValue: number = 0): number => {
+      const parseIntSafe = (
+        value: unknown,
+        defaultValue: number = 0
+      ): number => {
         if (value === null || value === undefined || value === "") {
           return defaultValue;
         }
@@ -140,10 +155,11 @@ export function ProductList() {
       // Map CSV data to product format - clean and simple
       const products: CreateProductRequest[] = items
         .map((item): CreateProductRequest | null => {
-          const name = getField(item, "name", "Name", "NAME") || "";
+          const nameValue = getField(item, "name", "Name", "NAME");
+          const name = nameValue ? String(nameValue).trim() : "";
 
           // Skip rows with empty names
-          if (!name || name.trim().length === 0) {
+          if (!name || name.length === 0) {
             return null;
           }
 

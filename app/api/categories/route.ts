@@ -19,7 +19,7 @@ async function getHandler(req: NextRequest) {
     const countResult = await client.execute(
       "SELECT COUNT(*) as total FROM categories"
     );
-    const total = (countResult.rows[0] as any).total as number;
+    const total = (countResult.rows[0] as unknown as { total: number }).total;
 
     const result = await client.execute({
       sql: "SELECT * FROM categories ORDER BY name LIMIT ? OFFSET ?",
@@ -76,13 +76,12 @@ async function deleteHandler(req: NextRequest) {
 
     if (deleteAll) {
       await client.execute("DELETE FROM categories");
-      return NextResponse.json({ message: "All categories deleted successfully" });
+      return NextResponse.json({
+        message: "All categories deleted successfully",
+      });
     }
 
-    return NextResponse.json(
-      { error: "Invalid request" },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   } catch (error) {
     console.error("Error deleting categories:", error);
     return NextResponse.json(

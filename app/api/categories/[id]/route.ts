@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/middleware/auth";
+import { requireAuth, RouteContext } from "@/lib/middleware/auth";
 import client from "@/lib/db";
 import { z } from "zod";
 
@@ -8,11 +8,11 @@ const categorySchema = z.object({
   description: z.string().optional(),
 });
 
-async function getHandler(
-  req: NextRequest,
-  context: { params: Promise<{ id: string }> }
-) {
+async function getHandler(req: NextRequest, context?: RouteContext) {
   try {
+    if (!context) {
+      return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+    }
     const params = await context.params;
     const result = await client.execute({
       sql: "SELECT * FROM categories WHERE id = ?",
@@ -36,17 +36,17 @@ async function getHandler(
   }
 }
 
-async function putHandler(
-  req: NextRequest,
-  context: { params: Promise<{ id: string }> }
-) {
+async function putHandler(req: NextRequest, context?: RouteContext) {
   try {
+    if (!context) {
+      return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+    }
     const params = await context.params;
     const body = await req.json();
     const validated = categorySchema.parse(body);
 
     const updates: string[] = [];
-    const values: any[] = [];
+    const values: (string | null)[] = [];
 
     if (validated.name !== undefined) {
       updates.push("name = ?");
@@ -87,11 +87,11 @@ async function putHandler(
   }
 }
 
-async function deleteHandler(
-  req: NextRequest,
-  context: { params: Promise<{ id: string }> }
-) {
+async function deleteHandler(req: NextRequest, context?: RouteContext) {
   try {
+    if (!context) {
+      return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+    }
     const params = await context.params;
     await client.execute({
       sql: "DELETE FROM categories WHERE id = ?",

@@ -7,13 +7,14 @@ import { useCallback, useRef } from "react";
  * @param delay - Delay in milliseconds (default: 1000ms)
  * @returns Throttled callback function
  */
-export function useThrottledCallback<T extends (...args: any[]) => any>(
+export function useThrottledCallback<T extends (...args: unknown[]) => unknown>(
   callback: T,
   delay: number = 1000
 ): T {
   const lastRun = useRef<number>(0);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   return useCallback(
     ((...args: Parameters<T>) => {
       const now = Date.now();
@@ -38,4 +39,3 @@ export function useThrottledCallback<T extends (...args: any[]) => any>(
     [callback, delay]
   );
 }
-

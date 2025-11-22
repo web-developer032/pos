@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/middleware/auth";
+import { requireAuth, AuthRequest } from "@/lib/middleware/auth";
 import client from "@/lib/db";
 import { z } from "zod";
 
@@ -28,7 +28,7 @@ async function getHandler(req: NextRequest) {
       JOIN suppliers s ON po.supplier_id = s.id
       JOIN users u ON po.user_id = u.id
     `);
-    const total = (countResult.rows[0] as any).total as number;
+    const total = (countResult.rows[0] as unknown as { total: number }).total;
 
     const result = await client.execute({
       sql: `
@@ -59,11 +59,14 @@ async function getHandler(req: NextRequest) {
   }
 }
 
-async function postHandler(req: NextRequest) {
+async function postHandler(req: AuthRequest) {
   try {
     const body = await req.json();
     const validated = poSchema.parse(body);
-    const user = (req as any).user;
+    const user = req.user;
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
     const poNumber = `PO-${Date.now()}`;
     const totalAmount = validated.items.reduce(
@@ -77,7 +80,7 @@ async function postHandler(req: NextRequest) {
       args: [poNumber, validated.supplier_id, user.userId, totalAmount],
     });
 
-    const poId = (poResult.rows[0] as any).id;
+    const poId = (poResult.rows[0] as unknown as { id: number }).id;
 
     for (const item of validated.items) {
       await client.execute({
@@ -119,13 +122,12 @@ async function deleteHandler(req: NextRequest) {
 
     if (deleteAll) {
       await client.execute("DELETE FROM purchase_orders");
-      return NextResponse.json({ message: "All purchase orders deleted successfully" });
+      return NextResponse.json({
+        message: "All purchase orders deleted successfully",
+      });
     }
 
-    return NextResponse.json(
-      { error: "Invalid request" },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   } catch (error) {
     console.error("Error deleting purchase orders:", error);
     return NextResponse.json(
@@ -138,4 +140,3 @@ async function deleteHandler(req: NextRequest) {
 export const GET = requireAuth(getHandler);
 export const POST = requireAuth(postHandler);
 export const DELETE = requireAuth(deleteHandler);
-

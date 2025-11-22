@@ -20,7 +20,7 @@ async function getHandler(req: NextRequest) {
     const offset = (page - 1) * limit;
 
     let sql = "SELECT * FROM customers WHERE 1=1";
-    const args: any[] = [];
+    const args: (string | number)[] = [];
 
     if (search) {
       sql += " AND (name LIKE ? OR email LIKE ? OR phone LIKE ?)";
@@ -31,7 +31,7 @@ async function getHandler(req: NextRequest) {
     // Get total count
     const countSql = sql.replace(/SELECT \*/, "SELECT COUNT(*) as total");
     const countResult = await client.execute({ sql: countSql, args });
-    const total = (countResult.rows[0] as any).total as number;
+    const total = (countResult.rows[0] as unknown as { total: number }).total;
 
     sql += " ORDER BY name LIMIT ? OFFSET ?";
     args.push(limit, offset);
@@ -94,13 +94,12 @@ async function deleteHandler(req: NextRequest) {
 
     if (deleteAll) {
       await client.execute("DELETE FROM customers");
-      return NextResponse.json({ message: "All customers deleted successfully" });
+      return NextResponse.json({
+        message: "All customers deleted successfully",
+      });
     }
 
-    return NextResponse.json(
-      { error: "Invalid request" },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   } catch (error) {
     console.error("Error deleting customers:", error);
     return NextResponse.json(
@@ -113,4 +112,3 @@ async function deleteHandler(req: NextRequest) {
 export const GET = requireAuth(getHandler);
 export const POST = requireAuth(postHandler);
 export const DELETE = requireAuth(deleteHandler);
-

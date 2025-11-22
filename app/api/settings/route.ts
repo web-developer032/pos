@@ -6,8 +6,9 @@ async function getHandler(_req: NextRequest) {
   try {
     const result = await client.execute("SELECT * FROM settings");
     const settings: { [key: string]: string } = {};
-    result.rows.forEach((row: any) => {
-      settings[row.key] = row.value;
+    result.rows.forEach((row) => {
+      const rowData = row as unknown as { key: string; value: string };
+      settings[rowData.key] = rowData.value;
     });
     return NextResponse.json({ settings });
   } catch (error) {
@@ -43,4 +44,3 @@ async function putHandler(req: NextRequest) {
 
 export const GET = requireAuth(getHandler);
 export const PUT = requireAuth(putHandler, ["admin", "manager"]);
-

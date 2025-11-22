@@ -60,8 +60,11 @@ export function PaymentModal({
       toast.success("Sale completed successfully!");
       onSuccess();
       onClose();
-    } catch (error: any) {
-      toast.error(error.data?.error || "Failed to complete sale");
+    } catch (error) {
+      const errorMessage =
+        (error as { data?: { error?: string } })?.data?.error ||
+        "Failed to complete sale";
+      toast.error(errorMessage);
     }
   };
 

@@ -3,7 +3,10 @@
 import { useState } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
-import { useGetSalesQuery, useDeleteAllSalesMutation } from "@/lib/api/salesApi";
+import {
+  useGetSalesQuery,
+  useDeleteAllSalesMutation,
+} from "@/lib/api/salesApi";
 import { useCurrency } from "@/lib/hooks/useCurrency";
 import { Pagination } from "@/components/ui/Pagination";
 import { Button } from "@/components/ui/Button";
@@ -32,8 +35,11 @@ export default function SalesPage() {
       await deleteAllSales().unwrap();
       toast.success("All sales deleted successfully");
       refetch();
-    } catch (error: any) {
-      toast.error(error.data?.error || "Failed to delete all sales");
+    } catch (error) {
+      const errorMessage =
+        (error as { data?: { error?: string } })?.data?.error ||
+        "Failed to delete all sales";
+      toast.error(errorMessage);
     } finally {
       setIsDeletingAll(false);
     }

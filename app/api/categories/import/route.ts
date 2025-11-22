@@ -28,8 +28,10 @@ async function postHandler(req: NextRequest) {
           args: [category.name, category.description || null],
         });
         imported++;
-      } catch (error: any) {
-        errors.push(`Row ${i + 1} (${category.name}): ${error.message || "Failed to import"}`);
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : "Failed to import";
+        errors.push(`Row ${i + 1} (${category.name}): ${errorMessage}`);
       }
     }
 
@@ -54,4 +56,3 @@ async function postHandler(req: NextRequest) {
 }
 
 export const POST = requireAuth(postHandler);
-

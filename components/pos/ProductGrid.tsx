@@ -20,7 +20,11 @@ import toast from "react-hot-toast";
 export function ProductGrid() {
   const [search, setSearch] = useState("");
   const [categoryId, setCategoryId] = useState<number | undefined>();
-  const [editingProduct, setEditingProduct] = useState<any | null>(null);
+  const [editingProduct, setEditingProduct] = useState<{
+    id: number;
+    name: string;
+    selling_price: number;
+  } | null>(null);
   const [newPrice, setNewPrice] = useState("");
   const debouncedSearch = useDebounce(search, 500);
   const { data, isLoading, refetch } = useGetProductsQuery({
@@ -33,7 +37,12 @@ export function ProductGrid() {
   const dispatch = useAppDispatch();
   const { format: formatCurrency } = useCurrency();
 
-  const handleAddToCart = (product: any) => {
+  const handleAddToCart = (product: {
+    id: number;
+    name: string;
+    selling_price: number;
+    stock_quantity: number;
+  }) => {
     dispatch(
       addItem({
         product_id: product.id,
@@ -46,7 +55,10 @@ export function ProductGrid() {
     toast.success("Added to cart");
   };
 
-  const handleEditPrice = (product: any, e: React.MouseEvent) => {
+  const handleEditPrice = (
+    product: { id: number; selling_price: number; name: string },
+    e: React.MouseEvent
+  ) => {
     e.stopPropagation();
     setEditingProduct(product);
     setNewPrice(product.selling_price.toString());
@@ -75,8 +87,11 @@ export function ProductGrid() {
       refetch();
       setEditingProduct(null);
       setNewPrice("");
-    } catch (error: any) {
-      toast.error(error.data?.error || "Failed to update price");
+    } catch (error) {
+      const errorMessage =
+        (error as { data?: { error?: string } })?.data?.error ||
+        "Failed to update price";
+      toast.error(errorMessage);
     }
   }, [editingProduct, newPrice, updateProduct, refetch]);
 

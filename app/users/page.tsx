@@ -3,7 +3,10 @@
 import { useState } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
-import { useGetUsersQuery, useDeleteAllUsersMutation } from "@/lib/api/usersApi";
+import {
+  useGetUsersQuery,
+  useDeleteAllUsersMutation,
+} from "@/lib/api/usersApi";
 import { Pagination } from "@/components/ui/Pagination";
 import { Button } from "@/components/ui/Button";
 import { format } from "date-fns";
@@ -14,7 +17,7 @@ export default function UsersPage() {
     <ProtectedRoute allowedRoles={["admin"]}>
       <DashboardLayout>
         <div className="mb-6">
-          <h1 className="text-3xl font-bold ">Users</h1>
+          <h1 className="text-3xl font-bold">Users</h1>
         </div>
         <UsersList />
       </DashboardLayout>
@@ -42,8 +45,11 @@ function UsersList() {
       await deleteAllUsers().unwrap();
       toast.success("All non-admin users deleted successfully");
       refetch();
-    } catch (error: any) {
-      toast.error(error.data?.error || "Failed to delete all users");
+    } catch (error) {
+      const errorMessage =
+        (error as { data?: { error?: string } })?.data?.error ||
+        "Failed to delete all users";
+      toast.error(errorMessage);
     } finally {
       setIsDeletingAll(false);
     }
@@ -67,36 +73,38 @@ function UsersList() {
       </div>
       <div className="overflow-hidden rounded-lg bg-white shadow">
         <table className="min-w-full divide-y divide-gray-200">
-        <thead className="bg-gray-50">
-          <tr>
-            <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">
-              Username
-            </th>
-            <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">
-              Email
-            </th>
-            <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">
-              Role
-            </th>
-            <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">
-              Created
-            </th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-200 bg-white ">
-          {data?.users.map((user) => (
-            <tr key={user.id}>
-              <td className="px-6 py-4 text-sm font-medium">{user.username}</td>
-              <td className="px-6 py-4 text-sm">{user.email}</td>
-              <td className="px-6 py-4 text-sm capitalize">{user.role}</td>
-              <td className="px-6 py-4 text-sm">
-                {user.created_at &&
-                  format(new Date(user.created_at), "MMM dd, yyyy")}
-              </td>
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">
+                Username
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">
+                Email
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">
+                Role
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">
+                Created
+              </th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody className="divide-y divide-gray-200 bg-white">
+            {data?.users.map((user) => (
+              <tr key={user.id}>
+                <td className="px-6 py-4 text-sm font-medium">
+                  {user.username}
+                </td>
+                <td className="px-6 py-4 text-sm">{user.email}</td>
+                <td className="px-6 py-4 text-sm capitalize">{user.role}</td>
+                <td className="px-6 py-4 text-sm">
+                  {user.created_at &&
+                    format(new Date(user.created_at), "MMM dd, yyyy")}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
 
       {data?.pagination && (

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/middleware/auth";
+import { requireAuth, AuthRequest } from "@/lib/middleware/auth";
 import client from "@/lib/db";
 import { z } from "zod";
 
@@ -31,7 +31,7 @@ async function getHandler(req: NextRequest) {
       LEFT JOIN customers c ON s.customer_id = c.id
       WHERE 1=1
     `;
-    const args: any[] = [];
+    const args: (string | number)[] = [];
 
     if (startDate) {
       sql += " AND DATE(s.created_at) >= ?";
@@ -48,7 +48,7 @@ async function getHandler(req: NextRequest) {
       "SELECT COUNT(*) as total"
     );
     const countResult = await client.execute({ sql: countSql, args });
-    const total = (countResult.rows[0] as any).total as number;
+    const total = (countResult.rows[0] as unknown as { total: number }).total;
 
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "25");
@@ -76,11 +76,14 @@ async function getHandler(req: NextRequest) {
   }
 }
 
-async function postHandler(req: NextRequest) {
+async function postHandler(req: AuthRequest) {
   try {
     const body = await req.json();
     const validated = saleSchema.parse(body);
-    const user = (req as any).user;
+    const user = req.user;
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
     // Generate sale number
     const saleNumber = `SALE-${Date.now()}`;
@@ -113,7 +116,7 @@ async function postHandler(req: NextRequest) {
       ],
     });
 
-    const saleId = (saleResult.rows[0] as any).id;
+    const saleId = (saleResult.rows[0] as unknown as { id: number }).id;
 
     // Create sale items and update inventory
     for (const item of validated.items) {
@@ -160,10 +163,7 @@ async function postHandler(req: NextRequest) {
       args: [saleId],
     });
 
-    return NextResponse.json(
-      { sale: fullSaleResult.rows[0] },
-      { status: 201 }
-    );
+    return NextResponse.json({ sale: fullSaleResult.rows[0] }, { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
@@ -189,10 +189,7 @@ async function deleteHandler(req: NextRequest) {
       return NextResponse.json({ message: "All sales deleted successfully" });
     }
 
-    return NextResponse.json(
-      { error: "Invalid request" },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   } catch (error) {
     console.error("Error deleting sales:", error);
     return NextResponse.json(
@@ -205,4 +202,3 @@ async function deleteHandler(req: NextRequest) {
 export const GET = requireAuth(getHandler);
 export const POST = requireAuth(postHandler);
 export const DELETE = requireAuth(deleteHandler);
-

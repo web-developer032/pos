@@ -37,8 +37,10 @@ async function postHandler(req: NextRequest) {
           ],
         });
         imported++;
-      } catch (error: any) {
-        errors.push(`Row ${i + 1} (${supplier.name}): ${error.message || "Failed to import"}`);
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : "Failed to import";
+        errors.push(`Row ${i + 1} (${supplier.name}): ${errorMessage}`);
       }
     }
 
@@ -63,4 +65,3 @@ async function postHandler(req: NextRequest) {
 }
 
 export const POST = requireAuth(postHandler);
-

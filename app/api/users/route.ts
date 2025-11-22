@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/middleware/auth";
+import { requireAuth, AuthRequest } from "@/lib/middleware/auth";
 import client from "@/lib/db";
 import { hashPassword } from "@/lib/auth/auth";
 import { z } from "zod";
@@ -22,7 +22,7 @@ async function getHandler(req: NextRequest) {
     const countResult = await client.execute(
       "SELECT COUNT(*) as total FROM users"
     );
-    const total = (countResult.rows[0] as any).total as number;
+    const total = (countResult.rows[0] as unknown as { total: number }).total;
 
     const result = await client.execute({
       sql: "SELECT id, username, email, role, created_at FROM users ORDER BY username LIMIT ? OFFSET ?",
@@ -46,10 +46,10 @@ async function getHandler(req: NextRequest) {
   }
 }
 
-async function postHandler(req: NextRequest) {
+async function postHandler(req: AuthRequest) {
   try {
-    const user = (req as any).user;
-    if (user.role !== "admin") {
+    const user = req.user;
+    if (!user || user.role !== "admin") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -79,10 +79,10 @@ async function postHandler(req: NextRequest) {
   }
 }
 
-async function deleteHandler(req: NextRequest) {
+async function deleteHandler(req: AuthRequest) {
   try {
-    const user = (req as any).user;
-    if (user.role !== "admin") {
+    const user = req.user;
+    if (!user || user.role !== "admin") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -91,13 +91,12 @@ async function deleteHandler(req: NextRequest) {
 
     if (deleteAll) {
       await client.execute("DELETE FROM users WHERE role != 'admin'");
-      return NextResponse.json({ message: "All non-admin users deleted successfully" });
+      return NextResponse.json({
+        message: "All non-admin users deleted successfully",
+      });
     }
 
-    return NextResponse.json(
-      { error: "Invalid request" },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   } catch (error) {
     console.error("Error deleting users:", error);
     return NextResponse.json(
@@ -110,4 +109,3 @@ async function deleteHandler(req: NextRequest) {
 export const GET = requireAuth(getHandler, ["admin"]);
 export const POST = requireAuth(postHandler, ["admin"]);
 export const DELETE = requireAuth(deleteHandler, ["admin"]);
-

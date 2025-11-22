@@ -85,8 +85,11 @@ export function CustomerForm({ customerId, onSuccess }: CustomerFormProps) {
         toast.success("Customer created successfully");
       }
       onSuccess?.();
-    } catch (error: any) {
-      toast.error(error.data?.error || "Failed to save customer");
+    } catch (error) {
+      const errorMessage =
+        (error as { data?: { error?: string } })?.data?.error ||
+        "Failed to save customer";
+      toast.error(errorMessage);
     } finally {
       setIsSubmitting(false);
     }

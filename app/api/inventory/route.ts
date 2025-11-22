@@ -15,7 +15,7 @@ async function getHandler(req: NextRequest) {
       FROM products p
       LEFT JOIN categories c ON p.category_id = c.id
     `);
-    const total = (countResult.rows[0] as any).total as number;
+    const total = (countResult.rows[0] as unknown as { total: number }).total;
 
     const result = await client.execute({
       sql: `
@@ -47,4 +47,3 @@ async function getHandler(req: NextRequest) {
 }
 
 export const GET = requireAuth(getHandler);
-

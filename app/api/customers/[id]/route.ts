@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/middleware/auth";
+import { requireAuth, RouteContext } from "@/lib/middleware/auth";
 import client from "@/lib/db";
 import { z } from "zod";
 
@@ -11,11 +11,11 @@ const customerSchema = z.object({
   loyalty_points: z.number().int().min(0).optional(),
 });
 
-async function getHandler(
-  req: NextRequest,
-  context: { params: Promise<{ id: string }> }
-) {
+async function getHandler(req: NextRequest, context?: RouteContext) {
   try {
+    if (!context) {
+      return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+    }
     const params = await context.params;
     const result = await client.execute({
       sql: "SELECT * FROM customers WHERE id = ?",
@@ -23,7 +23,10 @@ async function getHandler(
     });
 
     if (result.rows.length === 0) {
-      return NextResponse.json({ error: "Customer not found" }, { status: 404 });
+      return NextResponse.json(
+        { error: "Customer not found" },
+        { status: 404 }
+      );
     }
 
     return NextResponse.json({ customer: result.rows[0] });
@@ -36,17 +39,17 @@ async function getHandler(
   }
 }
 
-async function putHandler(
-  req: NextRequest,
-  context: { params: Promise<{ id: string }> }
-) {
+async function putHandler(req: NextRequest, context?: RouteContext) {
   try {
+    if (!context) {
+      return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+    }
     const params = await context.params;
     const body = await req.json();
     const validated = customerSchema.parse(body);
 
     const updates: string[] = [];
-    const values: any[] = [];
+    const values: (string | number | null)[] = [];
 
     if (validated.name !== undefined) {
       updates.push("name = ?");
@@ -70,7 +73,10 @@ async function putHandler(
     }
 
     if (updates.length === 0) {
-      return NextResponse.json({ error: "No fields to update" }, { status: 400 });
+      return NextResponse.json(
+        { error: "No fields to update" },
+        { status: 400 }
+      );
     }
 
     updates.push("updated_at = CURRENT_TIMESTAMP");
@@ -97,11 +103,11 @@ async function putHandler(
   }
 }
 
-async function deleteHandler(
-  req: NextRequest,
-  context: { params: Promise<{ id: string }> }
-) {
+async function deleteHandler(req: NextRequest, context?: RouteContext) {
   try {
+    if (!context) {
+      return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+    }
     const params = await context.params;
     await client.execute({
       sql: "DELETE FROM customers WHERE id = ?",
@@ -121,4 +127,3 @@ async function deleteHandler(
 export const GET = requireAuth(getHandler);
 export const PUT = requireAuth(putHandler);
 export const DELETE = requireAuth(deleteHandler);
-

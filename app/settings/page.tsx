@@ -50,8 +50,11 @@ function SettingsForm() {
     try {
       await updateSettings({ settings: formData }).unwrap();
       toast.success("Settings updated successfully");
-    } catch (error: any) {
-      toast.error(error.data?.error || "Failed to update settings");
+    } catch (error) {
+      const errorMessage =
+        (error as { data?: { error?: string } })?.data?.error ||
+        "Failed to update settings";
+      toast.error(errorMessage);
     }
   };
 

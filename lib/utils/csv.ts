@@ -5,7 +5,7 @@
 /**
  * Convert array of objects to CSV string
  */
-export function arrayToCSV<T extends Record<string, any>>(
+export function arrayToCSV<T extends Record<string, unknown>>(
   data: T[],
   headers: string[]
 ): string {
@@ -14,13 +14,17 @@ export function arrayToCSV<T extends Record<string, any>>(
   }
 
   // Escape CSV values
-  const escapeCSV = (value: any): string => {
+  const escapeCSV = (value: unknown): string => {
     if (value === null || value === undefined) {
       return "";
     }
     const stringValue = String(value);
     // If value contains comma, newline, or quote, wrap in quotes and escape quotes
-    if (stringValue.includes(",") || stringValue.includes("\n") || stringValue.includes('"')) {
+    if (
+      stringValue.includes(",") ||
+      stringValue.includes("\n") ||
+      stringValue.includes('"')
+    ) {
       return `"${stringValue.replace(/"/g, '""')}"`;
     }
     return stringValue;
@@ -131,4 +135,3 @@ export function readFileAsText(file: File): Promise<string> {
     reader.readAsText(file);
   });
 }
-

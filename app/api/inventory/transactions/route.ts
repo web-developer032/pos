@@ -13,7 +13,7 @@ async function getHandler(req: NextRequest) {
       JOIN products p ON it.product_id = p.id
       WHERE 1=1
     `;
-    const args: any[] = [];
+    const args: (string | number)[] = [];
 
     if (productId) {
       sql += " AND it.product_id = ?";
@@ -34,4 +34,3 @@ async function getHandler(req: NextRequest) {
 }
 
 export const GET = requireAuth(getHandler);
-

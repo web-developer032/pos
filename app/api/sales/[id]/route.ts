@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/middleware/auth";
+import { requireAuth, RouteContext } from "@/lib/middleware/auth";
 import client from "@/lib/db";
 
-async function getHandler(
-  req: NextRequest,
-  context: { params: Promise<{ id: string }> }
-) {
+async function getHandler(req: NextRequest, context?: RouteContext) {
   try {
+    if (!context) {
+      return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+    }
     const params = await context.params;
     const saleResult = await client.execute({
       sql: `SELECT s.*, u.username as user_name, c.name as customer_name
@@ -43,4 +43,3 @@ async function getHandler(
 }
 
 export const GET = requireAuth(getHandler);
-

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/middleware/auth";
+import { requireAuth, RouteContext } from "@/lib/middleware/auth";
 import client from "@/lib/db";
 import { z } from "zod";
 
@@ -11,11 +11,11 @@ const supplierSchema = z.object({
   address: z.string().optional(),
 });
 
-async function getHandler(
-  req: NextRequest,
-  context: { params: Promise<{ id: string }> }
-) {
+async function getHandler(req: NextRequest, context?: RouteContext) {
   try {
+    if (!context) {
+      return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+    }
     const params = await context.params;
     const result = await client.execute({
       sql: "SELECT * FROM suppliers WHERE id = ?",
@@ -23,7 +23,10 @@ async function getHandler(
     });
 
     if (result.rows.length === 0) {
-      return NextResponse.json({ error: "Supplier not found" }, { status: 404 });
+      return NextResponse.json(
+        { error: "Supplier not found" },
+        { status: 404 }
+      );
     }
 
     return NextResponse.json({ supplier: result.rows[0] });
@@ -36,17 +39,17 @@ async function getHandler(
   }
 }
 
-async function putHandler(
-  req: NextRequest,
-  context: { params: Promise<{ id: string }> }
-) {
+async function putHandler(req: NextRequest, context?: RouteContext) {
   try {
+    if (!context) {
+      return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+    }
     const params = await context.params;
     const body = await req.json();
     const validated = supplierSchema.parse(body);
 
     const updates: string[] = [];
-    const values: any[] = [];
+    const values: (string | number | null)[] = [];
 
     if (validated.name !== undefined) {
       updates.push("name = ?");
@@ -70,7 +73,10 @@ async function putHandler(
     }
 
     if (updates.length === 0) {
-      return NextResponse.json({ error: "No fields to update" }, { status: 400 });
+      return NextResponse.json(
+        { error: "No fields to update" },
+        { status: 400 }
+      );
     }
 
     values.push(params.id);
@@ -96,11 +102,11 @@ async function putHandler(
   }
 }
 
-async function deleteHandler(
-  req: NextRequest,
-  context: { params: Promise<{ id: string }> }
-) {
+async function deleteHandler(req: NextRequest, context?: RouteContext) {
   try {
+    if (!context) {
+      return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+    }
     const params = await context.params;
     await client.execute({
       sql: "DELETE FROM suppliers WHERE id = ?",
@@ -120,4 +126,3 @@ async function deleteHandler(
 export const GET = requireAuth(getHandler);
 export const PUT = requireAuth(putHandler);
 export const DELETE = requireAuth(deleteHandler);
-

@@ -39,8 +39,11 @@ export function StockAdjustmentForm({
       }).unwrap();
       toast.success("Stock adjusted successfully");
       onSuccess?.();
-    } catch (error: any) {
-      toast.error(error.data?.error || "Failed to adjust stock");
+    } catch (error) {
+      const errorMessage =
+        (error as { data?: { error?: string } })?.data?.error ||
+        "Failed to adjust stock";
+      toast.error(errorMessage);
     }
   };
 

@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/middleware/auth";
+import { requireAuth, RouteContext } from "@/lib/middleware/auth";
 import client from "@/lib/db";
 
-async function getHandler(
-  req: NextRequest,
-  context: { params: Promise<{ id: string }> }
-) {
+async function getHandler(req: NextRequest, context?: RouteContext) {
   try {
+    if (!context) {
+      return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+    }
     const params = await context.params;
     const poResult = await client.execute({
       sql: `SELECT po.*, s.name as supplier_name, u.username as user_name
@@ -45,11 +45,11 @@ async function getHandler(
   }
 }
 
-async function putHandler(
-  req: NextRequest,
-  context: { params: Promise<{ id: string }> }
-) {
+async function putHandler(req: NextRequest, context?: RouteContext) {
   try {
+    if (!context) {
+      return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+    }
     const params = await context.params;
     const body = await req.json();
     const status = body.status;
@@ -70,7 +70,10 @@ async function putHandler(
         args: [params.id],
       });
 
-      for (const item of itemsResult.rows as any[]) {
+      for (const item of itemsResult.rows as unknown as {
+        product_id: number;
+        quantity: number;
+      }[]) {
         await client.execute({
           sql: "UPDATE products SET stock_quantity = stock_quantity + ? WHERE id = ?",
           args: [item.quantity, item.product_id],
@@ -79,7 +82,12 @@ async function putHandler(
         await client.execute({
           sql: `INSERT INTO inventory_transactions (product_id, transaction_type, quantity, reference_id) 
                 VALUES (?, ?, ?, ?)`,
-          args: [item.product_id, "purchase", item.quantity, parseInt(params.id)],
+          args: [
+            item.product_id,
+            "purchase",
+            item.quantity,
+            parseInt(params.id),
+          ],
         });
       }
     }
@@ -96,4 +104,3 @@ async function putHandler(
 
 export const GET = requireAuth(getHandler);
 export const PUT = requireAuth(putHandler);
-

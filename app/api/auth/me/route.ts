@@ -1,9 +1,12 @@
-import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/middleware/auth";
+import { NextResponse } from "next/server";
+import { requireAuth, AuthRequest } from "@/lib/middleware/auth";
 import client from "@/lib/db";
 
-async function handler(req: NextRequest) {
-  const user = (req as any).user;
+async function handler(req: AuthRequest) {
+  const user = req.user;
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
   const result = await client.execute({
     sql: "SELECT id, username, email, role FROM users WHERE id = ?",
@@ -20,4 +23,3 @@ async function handler(req: NextRequest) {
 }
 
 export const GET = requireAuth(handler);
-

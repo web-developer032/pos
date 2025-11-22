@@ -33,7 +33,7 @@ async function getHandler(req: NextRequest) {
       LEFT JOIN suppliers s ON p.supplier_id = s.id
       WHERE 1=1
     `;
-    const args: any[] = [];
+    const args: (string | number)[] = [];
 
     if (categoryId) {
       sql += " AND p.category_id = ?";
@@ -52,7 +52,7 @@ async function getHandler(req: NextRequest) {
       "SELECT COUNT(*) as total"
     );
     const countResult = await client.execute({ sql: countSql, args });
-    const total = (countResult.rows[0] as any).total as number;
+    const total = (countResult.rows[0] as unknown as { total: number }).total;
 
     sql += " ORDER BY p.name LIMIT ? OFFSET ?";
     args.push(limit, offset);
