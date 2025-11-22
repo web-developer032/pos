@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, forwardRef } from "react";
+import { createPortal } from "react-dom";
 
 interface SearchableSelectProps {
   label?: string;
@@ -35,12 +36,24 @@ export const SearchableSelect = forwardRef<
     const [isOpen, setIsOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
     const [highlightedIndex, setHighlightedIndex] = useState(-1);
+    const [mounted, setMounted] = useState(false);
+    const [dropdownPosition, setDropdownPosition] = useState({
+      top: 0,
+      left: 0,
+      width: 0,
+    });
     const containerRef = useRef<HTMLDivElement>(null);
     const internalInputRef = useRef<HTMLInputElement>(null);
     const listRef = useRef<HTMLUListElement>(null);
 
     // Use forwarded ref or internal ref
-    const inputRef = (ref as React.RefObject<HTMLInputElement>) || internalInputRef;
+    const inputRef =
+      (ref as React.RefObject<HTMLInputElement>) || internalInputRef;
+
+    useEffect(() => {
+      setMounted(true);
+      return () => setMounted(false);
+    }, []);
 
     const selectedOption = options.find((opt) => opt.value === value);
 
@@ -60,9 +73,12 @@ export const SearchableSelect = forwardRef<
     // Close dropdown when clicking outside
     useEffect(() => {
       const handleClickOutside = (event: MouseEvent) => {
+        const target = event.target as Node;
         if (
           containerRef.current &&
-          !containerRef.current.contains(event.target as Node)
+          !containerRef.current.contains(target) &&
+          listRef.current &&
+          !listRef.current.contains(target)
         ) {
           setIsOpen(false);
           setSearchTerm("");
@@ -70,11 +86,25 @@ export const SearchableSelect = forwardRef<
         }
       };
 
-      document.addEventListener("mousedown", handleClickOutside);
-      return () => {
-        document.removeEventListener("mousedown", handleClickOutside);
-      };
-    }, []);
+      if (isOpen) {
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => {
+          document.removeEventListener("mousedown", handleClickOutside);
+        };
+      }
+    }, [isOpen]);
+
+    // Update dropdown position when opening
+    useEffect(() => {
+      if (isOpen && containerRef.current && mounted) {
+        const rect = containerRef.current.getBoundingClientRect();
+        setDropdownPosition({
+          top: rect.bottom + window.scrollY,
+          left: rect.left + window.scrollX,
+          width: rect.width,
+        });
+      }
+    }, [isOpen, mounted]);
 
     // Scroll highlighted item into view
     useEffect(() => {
@@ -190,34 +220,44 @@ export const SearchableSelect = forwardRef<
             </svg>
           </div>
 
-          {isOpen && (
-            <ul
-              ref={listRef}
-              className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-md border border-gray-300 bg-white py-1 shadow-lg"
-            >
-              {filteredOptions.length === 0 ? (
-                <li className="px-4 py-2 text-sm text-gray-500">
-                  No options found
-                </li>
-              ) : (
-                filteredOptions.map((option, index) => (
-                  <li
-                    key={option.value}
-                    onClick={() => handleSelect(option.value)}
-                    className={`cursor-pointer px-4 py-2 text-sm ${
-                      option.value === value
-                        ? "bg-indigo-100 text-indigo-900"
-                        : index === highlightedIndex
-                          ? "bg-gray-100 text-gray-900"
-                          : "text-gray-900 hover:bg-gray-100"
-                    }`}
-                    onMouseEnter={() => setHighlightedIndex(index)}
-                  >
-                    {option.label}
-                  </li>
-                ))
+          {isOpen && mounted && (
+            <>
+              {createPortal(
+                <ul
+                  ref={listRef}
+                  className="fixed z-[60] max-h-60 overflow-auto rounded-md border border-gray-300 bg-white py-1 shadow-lg"
+                  style={{
+                    top: `${dropdownPosition.top}px`,
+                    left: `${dropdownPosition.left}px`,
+                    width: `${dropdownPosition.width}px`,
+                  }}
+                >
+                  {filteredOptions.length === 0 ? (
+                    <li className="px-4 py-2 text-sm text-gray-500">
+                      No options found
+                    </li>
+                  ) : (
+                    filteredOptions.map((option, index) => (
+                      <li
+                        key={option.value}
+                        onClick={() => handleSelect(option.value)}
+                        className={`cursor-pointer px-4 py-2 text-sm ${
+                          option.value === value
+                            ? "bg-indigo-100 text-indigo-900"
+                            : index === highlightedIndex
+                              ? "bg-gray-100 text-gray-900"
+                              : "text-gray-900 hover:bg-gray-100"
+                        }`}
+                        onMouseEnter={() => setHighlightedIndex(index)}
+                      >
+                        {option.label}
+                      </li>
+                    ))
+                  )}
+                </ul>,
+                document.body
               )}
-            </ul>
+            </>
           )}
         </div>
         {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
@@ -227,4 +267,3 @@ export const SearchableSelect = forwardRef<
 );
 
 SearchableSelect.displayName = "SearchableSelect";
-
