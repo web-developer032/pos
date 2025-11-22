@@ -83,7 +83,10 @@ export const suppliersApi = apiSlice.injectEndpoints({
       query: (id) => `/suppliers/${id}`,
       providesTags: (result, error, id) => [{ type: "Supplier", id }],
     }),
-    createSupplier: builder.mutation<{ supplier: Supplier }, CreateSupplierRequest>({
+    createSupplier: builder.mutation<
+      { supplier: Supplier },
+      CreateSupplierRequest
+    >({
       query: (body) => ({
         url: "/suppliers",
         method: "POST",
@@ -129,10 +132,7 @@ export const suppliersApi = apiSlice.injectEndpoints({
     }),
     getSupplierLedger: builder.query<SupplierLedger, number>({
       query: (id) => `/suppliers/${id}/ledger`,
-      providesTags: (result, error, id) => [
-        { type: "Supplier", id },
-        "SupplierLedger",
-      ],
+      providesTags: (result, error, id) => [{ type: "Supplier", id }],
     }),
     createSupplierPayment: builder.mutation<
       { payment: SupplierPayment },
@@ -145,7 +145,6 @@ export const suppliersApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: (result, error, { supplierId }) => [
         { type: "Supplier", id: supplierId },
-        "SupplierLedger",
       ],
     }),
   }),
@@ -162,4 +161,3 @@ export const {
   useGetSupplierLedgerQuery,
   useCreateSupplierPaymentMutation,
 } = suppliersApi;
-

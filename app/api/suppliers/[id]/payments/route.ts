@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { requireAuth, RouteContext, AuthRequest } from "@/lib/middleware/auth";
 import client from "@/lib/db";
 import { z } from "zod";
@@ -78,10 +78,7 @@ async function postHandler(req: AuthRequest, context?: RouteContext) {
       ],
     });
 
-    return NextResponse.json(
-      { payment: result.rows[0] },
-      { status: 201 }
-    );
+    return NextResponse.json({ payment: result.rows[0] }, { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
@@ -98,4 +95,3 @@ async function postHandler(req: AuthRequest, context?: RouteContext) {
 }
 
 export const POST = requireAuth(postHandler);
-
