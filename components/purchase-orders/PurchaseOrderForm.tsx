@@ -188,7 +188,7 @@ export function PurchaseOrderForm({
     }
   }, [purchaseOrderData, isEditMode, reset]);
 
-  const { fields, append, prepend, remove } = useFieldArray({
+  const { fields, prepend, remove } = useFieldArray({
     control,
     name: "items",
   });
@@ -207,7 +207,6 @@ export function PurchaseOrderForm({
   };
 
   const watchedItems = watch("items");
-  const supplierId = watch("supplier_id");
 
   const calculateTotal = () => {
     return watchedItems.reduce(
@@ -257,11 +256,7 @@ export function PurchaseOrderForm({
     }
   };
 
-  const handleProductChange = (
-    index: number,
-    productId: number,
-    setValue: (name: string, value: number) => void
-  ) => {
+  const handleProductChange = (index: number, productId: number) => {
     const product = productsData?.products.find((p) => p.id === productId);
     if (product) {
       setValue(`items.${index}.unit_cost`, product.cost_price);
@@ -316,116 +311,116 @@ export function PurchaseOrderForm({
           />
         </div>
 
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <label className="text-sm font-medium text-gray-700">Items *</label>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={handleAddItem}
-            className="text-sm"
-          >
-            + Add Item
-          </Button>
-        </div>
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <label className="text-sm font-medium text-gray-700">Items *</label>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleAddItem}
+              className="text-sm"
+            >
+              + Add Item
+            </Button>
+          </div>
 
-        <div className="max-h-[400px] overflow-y-auto space-y-4 pr-2 form-scrollbar">
-          {fields.map((field, index) => (
-          <div
-            key={field.id}
-            className="rounded-lg border border-gray-200 p-4 space-y-3"
-          >
-            <div className="flex items-start justify-between">
-              <span className="text-sm font-medium text-gray-600">
-                Item {index + 1}
-              </span>
-              {fields.length > 1 && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => remove(index)}
-                  className="text-red-600 hover:text-red-700 text-sm"
-                >
-                  Remove
-                </Button>
-              )}
-            </div>
-
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <SearchableSelect
-                ref={(el) => {
-                  productInputRefs.current[index] = el;
-                }}
-                label="Product *"
-                options={[
-                  { value: 0, label: "Select Product" },
-                  ...getProductOptions(),
-                ]}
-                value={watch(`items.${index}.product_id`) || 0}
-                onChange={(val) => {
-                  const productId = Number(val);
-                  if (productId > 0) {
-                    setValue(`items.${index}.product_id`, productId, {
-                      shouldValidate: true,
-                    });
-                    handleProductChange(index, productId, setValue);
-                  }
-                }}
-                placeholder="Search and select product..."
-                searchPlaceholder="Type product name, barcode, or SKU..."
-                error={errors.items?.[index]?.product_id?.message}
-              />
-
-              <Input
-                label="Quantity *"
-                type="number"
-                min="1"
-                {...register(`items.${index}.quantity`, {
-                  valueAsNumber: true,
-                })}
-                error={errors.items?.[index]?.quantity?.message}
-              />
-
-              <Input
-                label="Unit Cost *"
-                type="number"
-                step="0.01"
-                min="0"
-                {...register(`items.${index}.unit_cost`, {
-                  valueAsNumber: true,
-                })}
-                error={errors.items?.[index]?.unit_cost?.message}
-              />
-            </div>
-
-            {watchedItems[index]?.product_id &&
-              watchedItems[index]?.quantity &&
-              watchedItems[index]?.unit_cost && (
-                <div className="text-sm text-gray-600">
-                  Subtotal:{" "}
-                  {formatCurrency(
-                    (watchedItems[index].quantity || 0) *
-                      (watchedItems[index].unit_cost || 0)
+          <div className="form-scrollbar max-h-[400px] space-y-4 overflow-y-auto pr-2">
+            {fields.map((field, index) => (
+              <div
+                key={field.id}
+                className="space-y-3 rounded-lg border border-gray-200 p-4"
+              >
+                <div className="flex items-start justify-between">
+                  <span className="text-sm font-medium text-gray-600">
+                    Item {index + 1}
+                  </span>
+                  {fields.length > 1 && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => remove(index)}
+                      className="text-sm text-red-600 hover:text-red-700"
+                    >
+                      Remove
+                    </Button>
                   )}
                 </div>
-              )}
-            </div>
-          ))}
+
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  <SearchableSelect
+                    ref={(el) => {
+                      productInputRefs.current[index] = el;
+                    }}
+                    label="Product *"
+                    options={[
+                      { value: 0, label: "Select Product" },
+                      ...getProductOptions(),
+                    ]}
+                    value={watch(`items.${index}.product_id`) || 0}
+                    onChange={(val) => {
+                      const productId = Number(val);
+                      if (productId > 0) {
+                        setValue(`items.${index}.product_id`, productId, {
+                          shouldValidate: true,
+                        });
+                        handleProductChange(index, productId);
+                      }
+                    }}
+                    placeholder="Search and select product..."
+                    searchPlaceholder="Type product name, barcode, or SKU..."
+                    error={errors.items?.[index]?.product_id?.message}
+                  />
+
+                  <Input
+                    label="Quantity *"
+                    type="number"
+                    min="1"
+                    {...register(`items.${index}.quantity`, {
+                      valueAsNumber: true,
+                    })}
+                    error={errors.items?.[index]?.quantity?.message}
+                  />
+
+                  <Input
+                    label="Unit Cost *"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    {...register(`items.${index}.unit_cost`, {
+                      valueAsNumber: true,
+                    })}
+                    error={errors.items?.[index]?.unit_cost?.message}
+                  />
+                </div>
+
+                {watchedItems[index]?.product_id &&
+                  watchedItems[index]?.quantity &&
+                  watchedItems[index]?.unit_cost && (
+                    <div className="text-sm text-gray-600">
+                      Subtotal:{" "}
+                      {formatCurrency(
+                        (watchedItems[index].quantity || 0) *
+                          (watchedItems[index].unit_cost || 0)
+                      )}
+                    </div>
+                  )}
+              </div>
+            ))}
+          </div>
+
+          {errors.items && (
+            <p className="text-sm text-red-600">{errors.items.message}</p>
+          )}
         </div>
 
-        {errors.items && (
-          <p className="text-sm text-red-600">{errors.items.message}</p>
-        )}
-      </div>
-
-      <div className="border-t border-gray-200 pt-4">
-        <div className="flex justify-between items-center">
-          <span className="text-lg font-semibold">Total:</span>
-          <span className="text-lg font-bold text-indigo-600">
-            {formatCurrency(calculateTotal())}
-          </span>
+        <div className="border-t border-gray-200 pt-4">
+          <div className="flex items-center justify-between">
+            <span className="text-lg font-semibold">Total:</span>
+            <span className="text-lg font-bold text-indigo-600">
+              {formatCurrency(calculateTotal())}
+            </span>
+          </div>
         </div>
-      </div>
 
         <div className="flex justify-end space-x-2 pt-4">
           <Button type="submit" disabled={isSubmitting}>
@@ -457,4 +452,3 @@ export function PurchaseOrderForm({
     </>
   );
 }
-
