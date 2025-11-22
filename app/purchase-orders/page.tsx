@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import {
@@ -9,17 +9,31 @@ import {
   useDeleteAllPurchaseOrdersMutation,
 } from "@/lib/api/purchaseOrdersApi";
 import { useCurrency } from "@/lib/hooks/useCurrency";
+import { useDebounce } from "@/lib/hooks/useDebounce";
 import { Pagination } from "@/components/ui/Pagination";
 import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { Modal } from "@/components/ui/Modal";
+import { PurchaseOrderForm } from "@/components/purchase-orders/PurchaseOrderForm";
 import { format } from "date-fns";
 import toast from "react-hot-toast";
 
 export default function PurchaseOrdersPage() {
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(25);
+  const [search, setSearch] = useState("");
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const debouncedSearch = useDebounce(search, 500);
+
+  // Reset to page 1 when search changes
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch]);
+
   const { data, isLoading, refetch } = useGetPurchaseOrdersQuery({
     page,
     limit,
+    search: debouncedSearch || undefined,
   });
   const [updatePO] = useUpdatePurchaseOrderMutation();
   const [deleteAllPOs] = useDeleteAllPurchaseOrdersMutation();
@@ -83,16 +97,34 @@ export default function PurchaseOrdersPage() {
       <DashboardLayout>
         <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="text-3xl font-bold">Purchase Orders</h1>
-          <Button
-            variant="outline"
-            onClick={handleDeleteAll}
-            disabled={
-              isDeletingAll || (data?.purchase_orders.length || 0) === 0
-            }
-            className="text-red-600 hover:text-red-700"
-          >
-            {isDeletingAll ? "Deleting..." : "Delete All"}
-          </Button>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Button
+              onClick={() => setIsModalOpen(true)}
+              className="bg-indigo-600 hover:bg-indigo-700"
+            >
+              + Create Purchase Order
+            </Button>
+            <Button
+              variant="outline"
+              onClick={handleDeleteAll}
+              disabled={
+                isDeletingAll || (data?.purchase_orders.length || 0) === 0
+              }
+              className="text-red-600 hover:text-red-700"
+            >
+              {isDeletingAll ? "Deleting..." : "Delete All"}
+            </Button>
+          </div>
+        </div>
+
+        <div className="mb-4">
+          <Input
+            type="text"
+            placeholder="Search by PO number, supplier, or user..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="max-w-md"
+          />
         </div>
 
         <div className="overflow-hidden rounded-lg bg-white shadow">
@@ -189,6 +221,20 @@ export default function PurchaseOrdersPage() {
             />
           </div>
         )}
+
+        <Modal
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          title="Create Purchase Order"
+          size="lg"
+        >
+          <PurchaseOrderForm
+            onSuccess={() => {
+              setIsModalOpen(false);
+              refetch();
+            }}
+          />
+        </Modal>
       </DashboardLayout>
     </ProtectedRoute>
   );

@@ -19,28 +19,36 @@ async function getHandler(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "25");
+    const search = searchParams.get("search") || "";
     const offset = (page - 1) * limit;
 
-    // Get total count
-    const countResult = await client.execute(`
-      SELECT COUNT(*) as total
+    let sql = `
+      SELECT po.*, s.name as supplier_name, u.username as user_name
       FROM purchase_orders po
       JOIN suppliers s ON po.supplier_id = s.id
       JOIN users u ON po.user_id = u.id
-    `);
+      WHERE 1=1
+    `;
+    const args: (string | number)[] = [];
+
+    if (search) {
+      sql += ` AND (po.po_number LIKE ? OR s.name LIKE ? OR u.username LIKE ?)`;
+      const searchPattern = `%${search}%`;
+      args.push(searchPattern, searchPattern, searchPattern);
+    }
+
+    // Get total count
+    const countSql = sql.replace(
+      /SELECT po\.\*, s\.name as supplier_name, u\.username as user_name/,
+      "SELECT COUNT(*) as total"
+    );
+    const countResult = await client.execute({ sql: countSql, args });
     const total = (countResult.rows[0] as unknown as { total: number }).total;
 
-    const result = await client.execute({
-      sql: `
-        SELECT po.*, s.name as supplier_name, u.username as user_name
-        FROM purchase_orders po
-        JOIN suppliers s ON po.supplier_id = s.id
-        JOIN users u ON po.user_id = u.id
-        ORDER BY po.created_at DESC
-        LIMIT ? OFFSET ?
-      `,
-      args: [limit, offset],
-    });
+    sql += " ORDER BY po.created_at DESC LIMIT ? OFFSET ?";
+    args.push(limit, offset);
+
+    const result = await client.execute({ sql, args });
     return NextResponse.json({
       purchase_orders: result.rows,
       pagination: {
