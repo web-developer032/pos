@@ -23,6 +23,7 @@ export default function PurchaseOrdersPage() {
   const [limit, setLimit] = useState(25);
   const [search, setSearch] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingPOId, setEditingPOId] = useState<number | null>(null);
   const debouncedSearch = useDebounce(search, 500);
 
   // Reset to page 1 when search changes
@@ -181,6 +182,12 @@ export default function PurchaseOrdersPage() {
                     {po.status === "pending" && (
                       <>
                         <button
+                          onClick={() => setEditingPOId(po.id)}
+                          className="mr-4 text-indigo-600 hover:text-indigo-900"
+                        >
+                          Edit
+                        </button>
+                        <button
                           onClick={() => handleStatusChange(po.id, "completed")}
                           disabled={updatingId === po.id}
                           className="mr-4 text-green-600 hover:text-green-900 disabled:cursor-not-allowed disabled:opacity-50"
@@ -223,14 +230,19 @@ export default function PurchaseOrdersPage() {
         )}
 
         <Modal
-          isOpen={isModalOpen}
-          onClose={() => setIsModalOpen(false)}
-          title="Create Purchase Order"
+          isOpen={isModalOpen || editingPOId !== null}
+          onClose={() => {
+            setIsModalOpen(false);
+            setEditingPOId(null);
+          }}
+          title={editingPOId ? "Edit Purchase Order" : "Create Purchase Order"}
           size="lg"
         >
           <PurchaseOrderForm
+            purchaseOrderId={editingPOId || undefined}
             onSuccess={() => {
               setIsModalOpen(false);
+              setEditingPOId(null);
               refetch();
             }}
           />

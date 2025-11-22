@@ -1,10 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useForm, useFieldArray, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useCreatePurchaseOrderMutation } from "@/lib/api/purchaseOrdersApi";
+import {
+  useCreatePurchaseOrderMutation,
+  useGetPurchaseOrderQuery,
+  useUpdatePurchaseOrderItemsMutation,
+} from "@/lib/api/purchaseOrdersApi";
 import {
   useGetSuppliersQuery,
   useCreateSupplierMutation,
@@ -38,6 +42,7 @@ const purchaseOrderSchema = z.object({
 type PurchaseOrderFormData = z.infer<typeof purchaseOrderSchema>;
 
 interface PurchaseOrderFormProps {
+  purchaseOrderId?: number;
   onSuccess?: () => void;
 }
 
@@ -126,14 +131,28 @@ function InlineSupplierForm({
   );
 }
 
-export function PurchaseOrderForm({ onSuccess }: PurchaseOrderFormProps) {
+export function PurchaseOrderForm({
+  purchaseOrderId,
+  onSuccess,
+}: PurchaseOrderFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSupplierModal, setShowSupplierModal] = useState(false);
+  const productInputRefs = useRef<{ [key: number]: HTMLInputElement | null }>(
+    {}
+  );
   const { data: suppliersData, refetch: refetchSuppliers } =
     useGetSuppliersQuery();
   const { data: productsData } = useGetProductsQuery();
+  const { data: purchaseOrderData } = useGetPurchaseOrderQuery(
+    purchaseOrderId!,
+    {
+      skip: !purchaseOrderId,
+    }
+  );
   const [createPurchaseOrder] = useCreatePurchaseOrderMutation();
+  const [updatePurchaseOrderItems] = useUpdatePurchaseOrderItemsMutation();
   const { format: formatCurrency } = useCurrency();
+  const isEditMode = !!purchaseOrderId;
 
   const {
     register,
@@ -151,10 +170,41 @@ export function PurchaseOrderForm({ onSuccess }: PurchaseOrderFormProps) {
     },
   });
 
+  // Load existing data when editing
+  useEffect(() => {
+    if (purchaseOrderData && isEditMode) {
+      const { purchase_order, items } = purchaseOrderData;
+      reset({
+        supplier_id: purchase_order.supplier_id,
+        items:
+          items.length > 0
+            ? items.map((item) => ({
+                product_id: item.product_id,
+                quantity: item.quantity,
+                unit_cost: item.unit_cost,
+              }))
+            : [{ product_id: 0, quantity: 1, unit_cost: 0 }],
+      });
+    }
+  }, [purchaseOrderData, isEditMode, reset]);
+
   const { fields, append, prepend, remove } = useFieldArray({
     control,
     name: "items",
   });
+
+  const handleAddItem = () => {
+    const newIndex = 0; // Since we're prepending, new item is always at index 0
+    prepend({ product_id: 0, quantity: 1, unit_cost: 0 });
+    // Focus the product input after a short delay to ensure DOM is updated
+    setTimeout(() => {
+      const productInput = productInputRefs.current[newIndex];
+      if (productInput) {
+        productInput.focus();
+        productInput.click(); // Also open the dropdown
+      }
+    }, 100);
+  };
 
   const watchedItems = watch("items");
   const supplierId = watch("supplier_id");
@@ -170,20 +220,38 @@ export function PurchaseOrderForm({ onSuccess }: PurchaseOrderFormProps) {
     if (isSubmitting) return;
     setIsSubmitting(true);
     try {
-      await createPurchaseOrder({
-        supplier_id: data.supplier_id,
-        items: data.items.map((item) => ({
-          product_id: item.product_id,
-          quantity: item.quantity,
-          unit_cost: item.unit_cost,
-        })),
-      }).unwrap();
-      toast.success("Purchase order created successfully");
-      reset();
+      if (isEditMode && purchaseOrderId) {
+        await updatePurchaseOrderItems({
+          id: purchaseOrderId,
+          data: {
+            supplier_id: data.supplier_id,
+            items: data.items.map((item) => ({
+              product_id: item.product_id,
+              quantity: item.quantity,
+              unit_cost: item.unit_cost,
+            })),
+          },
+        }).unwrap();
+        toast.success("Purchase order updated successfully");
+      } else {
+        await createPurchaseOrder({
+          supplier_id: data.supplier_id,
+          items: data.items.map((item) => ({
+            product_id: item.product_id,
+            quantity: item.quantity,
+            unit_cost: item.unit_cost,
+          })),
+        }).unwrap();
+        toast.success("Purchase order created successfully");
+        reset();
+      }
       onSuccess?.();
     } catch (error: unknown) {
       const err = error as { data?: { error?: string } };
-      toast.error(err.data?.error || "Failed to create purchase order");
+      toast.error(
+        err.data?.error ||
+          `Failed to ${isEditMode ? "update" : "create"} purchase order`
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -254,7 +322,7 @@ export function PurchaseOrderForm({ onSuccess }: PurchaseOrderFormProps) {
           <Button
             type="button"
             variant="outline"
-            onClick={() => prepend({ product_id: 0, quantity: 1, unit_cost: 0 })}
+            onClick={handleAddItem}
             className="text-sm"
           >
             + Add Item
@@ -285,6 +353,9 @@ export function PurchaseOrderForm({ onSuccess }: PurchaseOrderFormProps) {
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <SearchableSelect
+                ref={(el) => {
+                  productInputRefs.current[index] = el;
+                }}
                 label="Product *"
                 options={[
                   { value: 0, label: "Select Product" },
@@ -358,7 +429,13 @@ export function PurchaseOrderForm({ onSuccess }: PurchaseOrderFormProps) {
 
         <div className="flex justify-end space-x-2 pt-4">
           <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? "Creating..." : "Create Purchase Order"}
+            {isSubmitting
+              ? isEditMode
+                ? "Updating..."
+                : "Creating..."
+              : isEditMode
+                ? "Update Purchase Order"
+                : "Create Purchase Order"}
           </Button>
         </div>
       </form>

@@ -36,8 +36,11 @@ export const SearchableSelect = forwardRef<
     const [searchTerm, setSearchTerm] = useState("");
     const [highlightedIndex, setHighlightedIndex] = useState(-1);
     const containerRef = useRef<HTMLDivElement>(null);
-    const inputRef = useRef<HTMLInputElement>(null);
+    const internalInputRef = useRef<HTMLInputElement>(null);
     const listRef = useRef<HTMLUListElement>(null);
+
+    // Use forwarded ref or internal ref
+    const inputRef = (ref as React.RefObject<HTMLInputElement>) || internalInputRef;
 
     const selectedOption = options.find((opt) => opt.value === value);
 
@@ -146,7 +149,7 @@ export const SearchableSelect = forwardRef<
         )}
         <div className="relative">
           <input
-            ref={ref || inputRef}
+            ref={inputRef}
             type="text"
             value={
               isOpen

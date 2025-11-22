@@ -33,6 +33,15 @@ export interface CreatePurchaseOrderRequest {
   }[];
 }
 
+export interface UpdatePurchaseOrderItemsRequest {
+  supplier_id?: number;
+  items?: {
+    product_id: number;
+    quantity: number;
+    unit_cost: number;
+  }[];
+}
+
 export const purchaseOrdersApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
     getPurchaseOrders: builder.query<
@@ -88,6 +97,20 @@ export const purchaseOrdersApi = apiSlice.injectEndpoints({
         "Product",
       ],
     }),
+    updatePurchaseOrderItems: builder.mutation<
+      { purchase_order: PurchaseOrder },
+      { id: number; data: UpdatePurchaseOrderItemsRequest }
+    >({
+      query: ({ id, data }) => ({
+        url: `/purchase-orders/${id}`,
+        method: "PUT",
+        body: data,
+      }),
+      invalidatesTags: (result, error, { id }) => [
+        { type: "PurchaseOrder", id },
+        "PurchaseOrder",
+      ],
+    }),
     deleteAllPurchaseOrders: builder.mutation<{ message: string }, void>({
       query: () => ({
         url: "/purchase-orders?delete_all=true",
@@ -103,5 +126,6 @@ export const {
   useGetPurchaseOrderQuery,
   useCreatePurchaseOrderMutation,
   useUpdatePurchaseOrderMutation,
+  useUpdatePurchaseOrderItemsMutation,
   useDeleteAllPurchaseOrdersMutation,
 } = purchaseOrdersApi;
