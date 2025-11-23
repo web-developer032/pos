@@ -1,11 +1,13 @@
 "use client";
 
 import { useParams } from "next/navigation";
+import { useRef } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { useGetSaleQuery } from "@/lib/api/salesApi";
 import { useCurrency } from "@/lib/hooks/useCurrency";
 import { Button } from "@/components/ui/Button";
+import { Receipt, type ReceiptRef } from "@/components/pos/Receipt";
 import { format } from "date-fns";
 import Link from "next/link";
 
@@ -14,6 +16,7 @@ export default function SaleDetailPage() {
   const saleId = parseInt(params.id as string);
   const { data, isLoading, error } = useGetSaleQuery(saleId);
   const { format: formatCurrency } = useCurrency();
+  const receiptRef = useRef<ReceiptRef>(null);
 
   if (isLoading) {
     return (
@@ -67,6 +70,12 @@ export default function SaleDetailPage() {
                 Back to Sales
               </Button>
             </Link>
+            <Button
+              onClick={() => receiptRef.current?.print()}
+              className="bg-indigo-600 hover:bg-indigo-700"
+            >
+              Print Receipt
+            </Button>
           </div>
 
           <h1 className="text-3xl font-bold">Sale Details</h1>
@@ -240,6 +249,11 @@ export default function SaleDetailPage() {
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Hidden receipt for printing */}
+        <div className="hidden">
+          <Receipt ref={receiptRef} sale={sale} items={items} />
         </div>
       </DashboardLayout>
     </ProtectedRoute>
