@@ -44,7 +44,7 @@ export const Receipt = forwardRef<ReceiptRef, ReceiptProps>(
           <div className="mb-1 flex justify-between text-sm">
             <span className="text-gray-600">Date:</span>
             <span>
-              {format(new Date(sale.created_at), "MMM dd, yyyy HH:mm")}
+              {format(new Date(sale.created_at), "MMM dd, yyyy hh:mm a")}
             </span>
           </div>
           {sale.customer_name && (

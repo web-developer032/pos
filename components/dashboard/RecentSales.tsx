@@ -31,7 +31,7 @@ export function RecentSales() {
             <div>
               <p className="text-sm font-medium">{sale.sale_number}</p>
               <p className="text-xs text-gray-500">
-                {format(new Date(sale.created_at), "MMM dd, yyyy HH:mm")}
+                {format(new Date(sale.created_at), "MMM dd, yyyy hh:mm a")}
               </p>
             </div>
             <span className="font-semibold">

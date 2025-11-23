@@ -102,7 +102,10 @@ export default function SaleDetailPage() {
                   <div>
                     <dt className="text-sm font-medium text-gray-500">Date</dt>
                     <dd className="mt-1 text-sm">
-                      {format(new Date(sale.created_at), "MMM dd, yyyy HH:mm")}
+                      {format(
+                        new Date(sale.created_at),
+                        "MMM dd, yyyy hh:mm a"
+                      )}
                     </dd>
                   </div>
                   <div>

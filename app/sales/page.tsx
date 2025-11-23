@@ -109,7 +109,7 @@ export default function SalesPage() {
                     {sale.customer_name || "Walk-in"}
                   </td>
                   <td className="px-3 py-4 text-sm text-gray-500 sm:px-6">
-                    {format(new Date(sale.created_at), "MMM dd, yyyy HH:mm")}
+                    {format(new Date(sale.created_at), "MMM dd, yyyy hh:mm a")}
                   </td>
                   <td className="hidden px-3 py-4 text-sm capitalize text-gray-500 sm:table-cell sm:px-6">
                     {sale.payment_method}
