@@ -10,7 +10,7 @@ import {
 import { useCurrency } from "@/lib/hooks/useCurrency";
 import { Pagination } from "@/components/ui/Pagination";
 import { Button } from "@/components/ui/Button";
-import { format } from "date-fns";
+import { formatSystemDate } from "@/lib/utils/dateFormat";
 import Link from "next/link";
 import toast from "react-hot-toast";
 
@@ -109,7 +109,7 @@ export default function SalesPage() {
                     {sale.customer_name || "Walk-in"}
                   </td>
                   <td className="px-3 py-4 text-sm text-gray-500 sm:px-6">
-                    {format(new Date(sale.created_at), "MMM dd, yyyy hh:mm a")}
+                    {formatSystemDate(sale.created_at)}
                   </td>
                   <td className="hidden px-3 py-4 text-sm capitalize text-gray-500 sm:table-cell sm:px-6">
                     {sale.payment_method}

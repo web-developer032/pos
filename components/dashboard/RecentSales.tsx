@@ -2,7 +2,7 @@
 
 import { useGetSalesQuery } from "@/lib/api/salesApi";
 import { useCurrency } from "@/lib/hooks/useCurrency";
-import { format } from "date-fns";
+import { formatSystemDate } from "@/lib/utils/dateFormat";
 
 export function RecentSales() {
   const { data, isLoading } = useGetSalesQuery();
@@ -31,7 +31,7 @@ export function RecentSales() {
             <div>
               <p className="text-sm font-medium">{sale.sale_number}</p>
               <p className="text-xs text-gray-500">
-                {format(new Date(sale.created_at), "MMM dd, yyyy hh:mm a")}
+                {formatSystemDate(sale.created_at)}
               </p>
             </div>
             <span className="font-semibold">

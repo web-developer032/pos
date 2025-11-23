@@ -2,7 +2,7 @@
 
 import { useRef, useImperativeHandle, forwardRef } from "react";
 import { useReactToPrint } from "react-to-print";
-import { format } from "date-fns";
+import { formatSystemDate } from "@/lib/utils/dateFormat";
 import { useCurrency } from "@/lib/hooks/useCurrency";
 import type { Sale, SaleItem } from "@/lib/api/salesApi";
 
@@ -43,9 +43,7 @@ export const Receipt = forwardRef<ReceiptRef, ReceiptProps>(
           </div>
           <div className="mb-1 flex justify-between text-sm">
             <span className="text-gray-600">Date:</span>
-            <span>
-              {format(new Date(sale.created_at), "MMM dd, yyyy hh:mm a")}
-            </span>
+            <span>{formatSystemDate(sale.created_at)}</span>
           </div>
           {sale.customer_name && (
             <div className="mb-1 flex justify-between text-sm">
