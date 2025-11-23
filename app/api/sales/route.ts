@@ -163,7 +163,23 @@ async function postHandler(req: AuthRequest) {
       args: [saleId],
     });
 
-    return NextResponse.json({ sale: fullSaleResult.rows[0] }, { status: 201 });
+    // Get sale items with product details
+    const saleItemsResult = await client.execute({
+      sql: `SELECT si.*, p.name as product_name, p.barcode
+            FROM sale_items si
+            JOIN products p ON si.product_id = p.id
+            WHERE si.sale_id = ?
+            ORDER BY si.id`,
+      args: [saleId],
+    });
+
+    return NextResponse.json(
+      {
+        sale: fullSaleResult.rows[0],
+        items: saleItemsResult.rows,
+      },
+      { status: 201 }
+    );
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(

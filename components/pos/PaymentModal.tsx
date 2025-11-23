@@ -4,10 +4,12 @@ import { useState } from "react";
 import { useAppSelector, useAppDispatch } from "@/lib/hooks";
 import { useCurrency } from "@/lib/hooks/useCurrency";
 import { useCreateSaleMutation } from "@/lib/api/salesApi";
+import type { Sale, SaleItem } from "@/lib/api/salesApi";
 import { clearCart } from "@/lib/slices/cartSlice";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { Select } from "@/components/ui/Select";
+import { Receipt } from "@/components/pos/Receipt";
 import toast from "react-hot-toast";
 
 interface PaymentModalProps {
@@ -29,6 +31,11 @@ export function PaymentModal({
   const [paymentMethod, setPaymentMethod] = useState<
     "cash" | "card" | "digital"
   >("cash");
+  const [showReceipt, setShowReceipt] = useState(false);
+  const [saleData, setSaleData] = useState<{
+    sale: Sale;
+    items: SaleItem[];
+  } | null>(null);
   const { format: formatCurrency } = useCurrency();
 
   const subtotal = items.reduce(
@@ -44,7 +51,7 @@ export function PaymentModal({
     }
 
     try {
-      await createSale({
+      const result = await createSale({
         customer_id: customerId,
         items: items.map((item) => ({
           product_id: item.product_id,
@@ -56,10 +63,15 @@ export function PaymentModal({
         payment_method: paymentMethod,
       }).unwrap();
 
+      // Store sale data for receipt
+      setSaleData(result);
       dispatch(clearCart());
       toast.success("Sale completed successfully!");
-      onSuccess();
+
+      // Close payment modal and show receipt
       onClose();
+      setShowReceipt(true);
+      onSuccess();
     } catch (error) {
       const errorMessage =
         (error as { data?: { error?: string } })?.data?.error ||
@@ -68,50 +80,79 @@ export function PaymentModal({
     }
   };
 
+  const handleReceiptClose = () => {
+    setShowReceipt(false);
+    setSaleData(null);
+  };
+
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Complete Payment" size="md">
-      <div className="space-y-4">
-        <div className="rounded border p-4">
-          <div className="mb-2 flex justify-between">
-            <span>Subtotal:</span>
-            <span>{formatCurrency(subtotal)}</span>
+    <>
+      <Modal
+        isOpen={isOpen}
+        onClose={onClose}
+        title="Complete Payment"
+        size="md"
+      >
+        <div className="space-y-4">
+          <div className="rounded border p-4">
+            <div className="mb-2 flex justify-between">
+              <span>Subtotal:</span>
+              <span>{formatCurrency(subtotal)}</span>
+            </div>
+            <div className="mb-2 flex justify-between">
+              <span>Discount:</span>
+              <span>-{formatCurrency(discount)}</span>
+            </div>
+            <div className="mb-2 flex justify-between">
+              <span>Tax:</span>
+              <span>{formatCurrency(tax)}</span>
+            </div>
+            <div className="flex justify-between border-t pt-2 text-lg font-bold">
+              <span>Total:</span>
+              <span>{formatCurrency(finalTotal)}</span>
+            </div>
           </div>
-          <div className="mb-2 flex justify-between">
-            <span>Discount:</span>
-            <span>-{formatCurrency(discount)}</span>
-          </div>
-          <div className="mb-2 flex justify-between">
-            <span>Tax:</span>
-            <span>{formatCurrency(tax)}</span>
-          </div>
-          <div className="flex justify-between border-t pt-2 text-lg font-bold">
-            <span>Total:</span>
-            <span>{formatCurrency(finalTotal)}</span>
+
+          <Select
+            label="Payment Method"
+            options={[
+              { value: "cash", label: "Cash" },
+              { value: "card", label: "Card" },
+              { value: "digital", label: "Digital" },
+            ]}
+            value={paymentMethod}
+            onChange={(e) =>
+              setPaymentMethod(e.target.value as "cash" | "card" | "digital")
+            }
+          />
+
+          <div className="flex justify-end space-x-2">
+            <Button variant="outline" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button onClick={handlePayment} disabled={isLoading}>
+              {isLoading ? "Processing..." : "Complete Payment"}
+            </Button>
           </div>
         </div>
+      </Modal>
 
-        <Select
-          label="Payment Method"
-          options={[
-            { value: "cash", label: "Cash" },
-            { value: "card", label: "Card" },
-            { value: "digital", label: "Digital" },
-          ]}
-          value={paymentMethod}
-          onChange={(e) =>
-            setPaymentMethod(e.target.value as "cash" | "card" | "digital")
-          }
-        />
-
-        <div className="flex justify-end space-x-2">
-          <Button variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button onClick={handlePayment} disabled={isLoading}>
-            {isLoading ? "Processing..." : "Complete Payment"}
-          </Button>
-        </div>
-      </div>
-    </Modal>
+      {/* Receipt Modal */}
+      {saleData && (
+        <Modal
+          isOpen={showReceipt}
+          onClose={handleReceiptClose}
+          title="Receipt"
+          size="md"
+        >
+          <div className="no-print">
+            <div className="mb-4 flex justify-end">
+              <Button onClick={() => window.print()}>Print Receipt</Button>
+            </div>
+          </div>
+          <Receipt sale={saleData.sale} items={saleData.items} />
+        </Modal>
+      )}
+    </>
   );
 }

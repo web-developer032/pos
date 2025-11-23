@@ -74,7 +74,10 @@ export const salesApi = apiSlice.injectEndpoints({
       query: (id) => `/sales/${id}`,
       providesTags: (result, error, id) => [{ type: "Sale", id }],
     }),
-    createSale: builder.mutation<{ sale: Sale }, CreateSaleRequest>({
+    createSale: builder.mutation<
+      { sale: Sale; items: SaleItem[] },
+      CreateSaleRequest
+    >({
       query: (body) => ({
         url: "/sales",
         method: "POST",
