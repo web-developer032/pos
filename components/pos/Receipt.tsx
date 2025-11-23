@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useRef, useImperativeHandle, forwardRef } from "react";
+import { useReactToPrint } from "react-to-print";
 import { format } from "date-fns";
 import { useCurrency } from "@/lib/hooks/useCurrency";
 import type { Sale, SaleItem } from "@/lib/api/salesApi";
@@ -10,56 +11,37 @@ interface ReceiptProps {
   items: SaleItem[];
 }
 
-export function Receipt({ sale, items }: ReceiptProps) {
-  const receiptRef = useRef<HTMLDivElement>(null);
-  const { format: formatCurrency } = useCurrency();
+export interface ReceiptRef {
+  print: () => void;
+}
 
-  useEffect(() => {
-    // Trigger print after component mounts
-    const timer = setTimeout(() => {
-      if (receiptRef.current) {
-        window.print();
-      }
-    }, 100);
+export const Receipt = forwardRef<ReceiptRef, ReceiptProps>(
+  ({ sale, items }, ref) => {
+    const receiptRef = useRef<HTMLDivElement>(null);
+    const { format: formatCurrency } = useCurrency();
 
-    return () => clearTimeout(timer);
-  }, []);
-
-  return (
-    <>
-      <style
-        dangerouslySetInnerHTML={{
-          __html: `
-        @media print {
-          body * {
-            visibility: hidden;
-          }
-          .receipt-container,
-          .receipt-container * {
-            visibility: visible;
-          }
-          .receipt-container {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 100%;
-          }
-          .no-print {
-            display: none !important;
-          }
+    const handlePrint = useReactToPrint({
+      contentRef: receiptRef,
+      documentTitle: `Receipt-${sale.sale_number}`,
+      pageStyle: `
+        @page {
+          size: 80mm auto;
+          margin: 0;
         }
-        @media screen {
-          .receipt-container {
-            padding: 20px;
-            background: white;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-            border-radius: 8px;
+        @media print {
+          body {
+            margin: 0;
+            padding: 0;
           }
         }
       `,
-        }}
-      />
+    });
 
+    useImperativeHandle(ref, () => ({
+      print: handlePrint,
+    }));
+
+    return (
       <div ref={receiptRef} className="receipt-container">
         <div className="mb-4 text-center">
           <h2 className="mb-1 text-2xl font-bold">RECEIPT</h2>
@@ -140,6 +122,8 @@ export function Receipt({ sale, items }: ReceiptProps) {
           </div>
         </div>
       </div>
-    </>
-  );
-}
+    );
+  }
+);
+
+Receipt.displayName = "Receipt";

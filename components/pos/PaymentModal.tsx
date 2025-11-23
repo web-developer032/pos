@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useAppSelector, useAppDispatch } from "@/lib/hooks";
 import { useCurrency } from "@/lib/hooks/useCurrency";
 import { useCreateSaleMutation } from "@/lib/api/salesApi";
@@ -9,7 +9,7 @@ import { clearCart } from "@/lib/slices/cartSlice";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { Select } from "@/components/ui/Select";
-import { Receipt } from "@/components/pos/Receipt";
+import { Receipt, type ReceiptRef } from "@/components/pos/Receipt";
 import toast from "react-hot-toast";
 
 interface PaymentModalProps {
@@ -36,6 +36,7 @@ export function PaymentModal({
     sale: Sale;
     items: SaleItem[];
   } | null>(null);
+  const receiptRef = useRef<ReceiptRef>(null);
   const { format: formatCurrency } = useCurrency();
 
   const subtotal = items.reduce(
@@ -147,10 +148,16 @@ export function PaymentModal({
         >
           <div className="no-print">
             <div className="mb-4 flex justify-end">
-              <Button onClick={() => window.print()}>Print Receipt</Button>
+              <Button onClick={() => receiptRef.current?.print()}>
+                Print Receipt
+              </Button>
             </div>
           </div>
-          <Receipt sale={saleData.sale} items={saleData.items} />
+          <Receipt
+            ref={receiptRef}
+            sale={saleData.sale}
+            items={saleData.items}
+          />
         </Modal>
       )}
     </>
