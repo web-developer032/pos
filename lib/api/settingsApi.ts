@@ -8,9 +8,7 @@ export const settingsApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
     getSettings: builder.query<{ settings: Settings }, void>({
       query: () => "/settings",
-      providesTags: ["Report"],
-      // Cache settings for 5 minutes
-      keepUnusedDataFor: 300,
+      providesTags: ["Settings"],
     }),
     updateSettings: builder.mutation<
       { message: string },
@@ -21,12 +19,7 @@ export const settingsApi = apiSlice.injectEndpoints({
         method: "PUT",
         body,
       }),
-      invalidatesTags: ["Report"],
-      // Refetch settings immediately after update
-      onQueryStarted: async (arg, { dispatch, queryFulfilled }) => {
-        await queryFulfilled;
-        dispatch(settingsApi.util.invalidateTags(["Report"]));
-      },
+      invalidatesTags: ["Settings"],
     }),
   }),
 });
