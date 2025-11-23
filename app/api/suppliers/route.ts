@@ -28,8 +28,43 @@ async function getHandler(req: NextRequest) {
       sql: "SELECT * FROM suppliers ORDER BY name LIMIT ? OFFSET ?",
       args: [limit, offset],
     });
+
+    // Calculate ledger summary for each supplier
+    const suppliersWithLedger = await Promise.all(
+      result.rows.map(async (supplier) => {
+        const supplierData = supplier as unknown as { id: number };
+        
+        // Get total purchases (only completed POs)
+        const purchasesResult = await client.execute({
+          sql: `SELECT COALESCE(SUM(total_amount), 0) as total_purchases
+                FROM purchase_orders
+                WHERE supplier_id = ? AND status = 'completed'`,
+          args: [supplierData.id],
+        });
+        const totalPurchases = (purchasesResult.rows[0] as unknown as { total_purchases: number }).total_purchases || 0;
+
+        // Get total payments
+        const paymentsResult = await client.execute({
+          sql: `SELECT COALESCE(SUM(amount), 0) as total_paid
+                FROM supplier_payments
+                WHERE supplier_id = ?`,
+          args: [supplierData.id],
+        });
+        const totalPaid = (paymentsResult.rows[0] as unknown as { total_paid: number }).total_paid || 0;
+
+        const balance = totalPurchases - totalPaid;
+
+        return {
+          ...supplier,
+          total_purchases: totalPurchases,
+          total_paid: totalPaid,
+          balance: balance,
+        };
+      })
+    );
+
     return NextResponse.json({
-      suppliers: result.rows,
+      suppliers: suppliersWithLedger,
       pagination: {
         page,
         limit,

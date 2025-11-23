@@ -10,6 +10,9 @@ export interface Supplier {
   phone?: string;
   address?: string;
   created_at?: string;
+  total_purchases?: number;
+  total_paid?: number;
+  balance?: number;
 }
 
 export interface CreateSupplierRequest {

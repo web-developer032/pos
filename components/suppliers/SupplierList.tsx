@@ -14,11 +14,17 @@ import { Modal } from "@/components/ui/Modal";
 import { Pagination } from "@/components/ui/Pagination";
 import { SupplierForm } from "./SupplierForm";
 import { ImportExport } from "@/components/common/ImportExport";
+import { useCurrency } from "@/lib/hooks/useCurrency";
 import toast from "react-hot-toast";
+
+type SortColumn = "total_purchases" | "total_paid" | "balance" | null;
+type SortDirection = "asc" | "desc";
 
 export function SupplierList() {
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(25);
+  const [sortColumn, setSortColumn] = useState<SortColumn>(null);
+  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const { data, isLoading, refetch } = useGetSuppliersQuery({ page, limit });
   const [deleteSupplier] = useDeleteSupplierMutation();
   const [deleteAllSuppliers] = useDeleteAllSuppliersMutation();
@@ -27,6 +33,18 @@ export function SupplierList() {
   const [editingSupplier, setEditingSupplier] = useState<number | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [isDeletingAll, setIsDeletingAll] = useState(false);
+  const { format: formatCurrency } = useCurrency();
+
+  const handleSort = (column: SortColumn) => {
+    if (sortColumn === column) {
+      // Toggle direction if clicking the same column
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+    } else {
+      // Set new column and default to ascending
+      setSortColumn(column);
+      setSortDirection("asc");
+    }
+  };
 
   const handleDelete = async (id: number) => {
     if (deletingId === id) return; // Prevent double click
@@ -139,6 +157,37 @@ export function SupplierList() {
     },
   ];
 
+  // Sort suppliers
+  const sortedSuppliers = [...(data?.suppliers || [])].sort((a, b) => {
+    if (!sortColumn) return 0;
+
+    let aValue: number;
+    let bValue: number;
+
+    switch (sortColumn) {
+      case "total_purchases":
+        aValue = a.total_purchases || 0;
+        bValue = b.total_purchases || 0;
+        break;
+      case "total_paid":
+        aValue = a.total_paid || 0;
+        bValue = b.total_paid || 0;
+        break;
+      case "balance":
+        aValue = a.balance || 0;
+        bValue = b.balance || 0;
+        break;
+      default:
+        return 0;
+    }
+
+    if (sortDirection === "asc") {
+      return aValue - bValue;
+    } else {
+      return bValue - aValue;
+    }
+  });
+
   return (
     <div>
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -180,13 +229,52 @@ export function SupplierList() {
               <th className="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 sm:px-6">
                 Phone
               </th>
+              <th
+                className="cursor-pointer px-3 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 transition-colors hover:bg-gray-100 sm:px-6"
+                onClick={() => handleSort("total_purchases")}
+              >
+                <div className="flex items-center justify-end gap-1">
+                  Total Purchases
+                  {sortColumn === "total_purchases" && (
+                    <span className="text-indigo-600">
+                      {sortDirection === "asc" ? "↑" : "↓"}
+                    </span>
+                  )}
+                </div>
+              </th>
+              <th
+                className="cursor-pointer px-3 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 transition-colors hover:bg-gray-100 sm:px-6"
+                onClick={() => handleSort("total_paid")}
+              >
+                <div className="flex items-center justify-end gap-1">
+                  Total Paid
+                  {sortColumn === "total_paid" && (
+                    <span className="text-indigo-600">
+                      {sortDirection === "asc" ? "↑" : "↓"}
+                    </span>
+                  )}
+                </div>
+              </th>
+              <th
+                className="cursor-pointer px-3 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 transition-colors hover:bg-gray-100 sm:px-6"
+                onClick={() => handleSort("balance")}
+              >
+                <div className="flex items-center justify-end gap-1">
+                  Balance
+                  {sortColumn === "balance" && (
+                    <span className="text-indigo-600">
+                      {sortDirection === "asc" ? "↑" : "↓"}
+                    </span>
+                  )}
+                </div>
+              </th>
               <th className="px-3 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 sm:px-6">
                 Actions
               </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200 bg-white">
-            {data?.suppliers.map((supplier) => (
+            {sortedSuppliers.map((supplier) => (
               <tr key={supplier.id}>
                 <td className="whitespace-nowrap px-3 py-4 text-sm font-medium sm:px-6">
                   {supplier.name}
@@ -199,6 +287,23 @@ export function SupplierList() {
                 </td>
                 <td className="px-3 py-4 text-sm text-gray-500 sm:px-6">
                   {supplier.phone || "-"}
+                </td>
+                <td className="whitespace-nowrap px-3 py-4 text-right text-sm text-gray-500 sm:px-6">
+                  {formatCurrency(supplier.total_purchases || 0)}
+                </td>
+                <td className="whitespace-nowrap px-3 py-4 text-right text-sm text-gray-500 sm:px-6">
+                  {formatCurrency(supplier.total_paid || 0)}
+                </td>
+                <td
+                  className={`whitespace-nowrap px-3 py-4 text-right text-sm font-medium sm:px-6 ${
+                    (supplier.balance || 0) > 0
+                      ? "text-red-600"
+                      : (supplier.balance || 0) < 0
+                        ? "text-green-600"
+                        : "text-gray-600"
+                  }`}
+                >
+                  {formatCurrency(supplier.balance || 0)}
                 </td>
                 <td className="whitespace-nowrap px-3 py-4 text-right text-sm font-medium sm:px-6">
                   <div className="flex flex-col gap-1 sm:flex-row sm:justify-end">
