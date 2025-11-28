@@ -27,6 +27,7 @@ export default function POSPage() {
   const [barcodeInput, setBarcodeInput] = useState("");
   const [barcodeToScan, setBarcodeToScan] = useState<string | null>(null);
   const barcodeInputRef = useRef<HTMLInputElement>(null);
+  const processedBarcodeRef = useRef<string | null>(null);
 
   // Query product by barcode when barcode is scanned
   const { data: barcodeProductData, error: barcodeError } =
@@ -36,8 +37,12 @@ export default function POSPage() {
 
   // Handle barcode scan result
   useEffect(() => {
-    if (barcodeProductData?.product) {
+    // Only process if we have a barcode to scan and haven't processed it yet
+    if (barcodeProductData?.product && barcodeToScan && processedBarcodeRef.current !== barcodeToScan) {
       const product = barcodeProductData.product;
+      // Mark this barcode as processed
+      processedBarcodeRef.current = barcodeToScan;
+      
       dispatch(
         addItem({
           product_id: product.id,
@@ -54,7 +59,9 @@ export default function POSPage() {
       setTimeout(() => {
         barcodeInputRef.current?.focus();
       }, 100);
-    } else if (barcodeError && barcodeToScan) {
+    } else if (barcodeError && barcodeToScan && processedBarcodeRef.current !== barcodeToScan) {
+      // Mark this barcode as processed even on error to prevent retry
+      processedBarcodeRef.current = barcodeToScan;
       toast.error("Product not found");
       setBarcodeInput("");
       setBarcodeToScan(null);
@@ -68,7 +75,10 @@ export default function POSPage() {
   const handleBarcodeKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" && barcodeInput.trim()) {
       e.preventDefault();
-      setBarcodeToScan(barcodeInput.trim());
+      const barcode = barcodeInput.trim();
+      // Reset processed ref when starting a new scan
+      processedBarcodeRef.current = null;
+      setBarcodeToScan(barcode);
     }
   };
 

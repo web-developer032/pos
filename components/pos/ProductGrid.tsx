@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import {
   useGetProductsQuery,
   useUpdateProductMutation,
+  useGetProductByBarcodeQuery,
 } from "@/lib/api/productsApi";
 import { useGetCategoriesQuery } from "@/lib/api/categoriesApi";
 import { useAppDispatch } from "@/lib/hooks";
@@ -26,6 +27,9 @@ export function ProductGrid() {
     selling_price: number;
   } | null>(null);
   const [newPrice, setNewPrice] = useState("");
+  const [barcodeToScan, setBarcodeToScan] = useState<string | null>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const processedBarcodeRef = useRef<string | null>(null);
   const debouncedSearch = useDebounce(search, 500);
   const { data, isLoading, refetch } = useGetProductsQuery({
     search: debouncedSearch || undefined,
@@ -36,6 +40,53 @@ export function ProductGrid() {
     useUpdateProductMutation();
   const dispatch = useAppDispatch();
   const { format: formatCurrency } = useCurrency();
+
+  // Query product by barcode when barcode is detected
+  const { data: barcodeProductData, error: barcodeError } =
+    useGetProductByBarcodeQuery(barcodeToScan || "", {
+      skip: !barcodeToScan,
+    });
+
+  // Handle barcode scan result
+  useEffect(() => {
+    if (
+      barcodeProductData?.product &&
+      barcodeToScan &&
+      processedBarcodeRef.current !== barcodeToScan
+    ) {
+      const product = barcodeProductData.product;
+      processedBarcodeRef.current = barcodeToScan;
+
+      dispatch(
+        addItem({
+          product_id: product.id,
+          name: product.name,
+          price: product.selling_price,
+          quantity: 1,
+          stock_quantity: product.stock_quantity,
+        })
+      );
+      toast.success(`${product.name} added to cart`);
+      setSearch("");
+      setBarcodeToScan(null);
+      // Clear processed ref after a delay
+      setTimeout(() => {
+        processedBarcodeRef.current = null;
+      }, 300);
+    } else if (
+      barcodeError &&
+      barcodeToScan &&
+      processedBarcodeRef.current !== barcodeToScan
+    ) {
+      processedBarcodeRef.current = barcodeToScan;
+      toast.error("Product not found");
+      setSearch("");
+      setBarcodeToScan(null);
+      setTimeout(() => {
+        processedBarcodeRef.current = null;
+      }, 300);
+    }
+  }, [barcodeProductData, barcodeError, barcodeToScan, dispatch]);
 
   const handleAddToCart = (product: {
     id: number;
@@ -95,7 +146,36 @@ export function ProductGrid() {
     }
   }, [editingProduct, newPrice, updateProduct, refetch]);
 
-  const handleSavePrice = useThrottledCallback(handleSavePriceInternal, 1000);
+  const handleSavePrice = useThrottledCallback(handleSavePriceInternal, 300);
+
+  // Detect barcode scan in search input
+  // Barcode scanners typically send all characters at once and end with Enter
+  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter" && search.trim()) {
+      const currentValue = search.trim();
+      // Check if this looks like a barcode scan
+      // Barcodes are typically:
+      // - At least 8 characters long (most barcodes are 8-13+ digits)
+      // - Alphanumeric with no spaces or special characters
+      // - Or numeric only (EAN, UPC codes)
+      const isLikelyBarcode =
+        (currentValue.length >= 8 && /^[0-9A-Za-z]+$/.test(currentValue)) || // Long alphanumeric (8+ chars, no spaces)
+        (currentValue.length >= 6 && /^[0-9]+$/.test(currentValue)); // Numeric barcode (6+ digits)
+
+      if (isLikelyBarcode) {
+        e.preventDefault();
+        // Reset processed ref when starting a new scan
+        processedBarcodeRef.current = null;
+        setBarcodeToScan(currentValue);
+        return;
+      }
+      // If not a barcode, allow normal search (don't prevent default)
+    }
+  };
+
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearch(e.target.value);
+  };
 
   if (isLoading) {
     return <div>Loading products...</div>;
@@ -105,9 +185,11 @@ export function ProductGrid() {
     <div>
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:gap-4">
         <Input
-          placeholder="Search products..."
+          ref={searchInputRef}
+          placeholder="Search products... (or scan barcode)"
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={handleSearchChange}
+          onKeyDown={handleSearchKeyDown}
           className="flex-1"
         />
         <Select
