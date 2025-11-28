@@ -1,16 +1,16 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef } from "react";
 import {
   useGetProductsQuery,
   useUpdateProductMutation,
-  useGetProductByBarcodeQuery,
 } from "@/lib/api/productsApi";
 import { useGetCategoriesQuery } from "@/lib/api/categoriesApi";
 import { useAppDispatch } from "@/lib/hooks";
 import { useCurrency } from "@/lib/hooks/useCurrency";
 import { useDebounce } from "@/lib/hooks/useDebounce";
 import { useThrottledCallback } from "@/lib/hooks/useThrottledCallback";
+import { useBarcodeScanner } from "@/lib/hooks/useBarcodeScanner";
 import { addItem } from "@/lib/slices/cartSlice";
 import { Select } from "@/components/ui/Select";
 import { Input } from "@/components/ui/Input";
@@ -27,9 +27,7 @@ export function ProductGrid() {
     selling_price: number;
   } | null>(null);
   const [newPrice, setNewPrice] = useState("");
-  const [barcodeToScan, setBarcodeToScan] = useState<string | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
-  const processedBarcodeRef = useRef<string | null>(null);
   const debouncedSearch = useDebounce(search, 500);
   const { data, isLoading, refetch } = useGetProductsQuery({
     search: debouncedSearch || undefined,
@@ -41,52 +39,12 @@ export function ProductGrid() {
   const dispatch = useAppDispatch();
   const { format: formatCurrency } = useCurrency();
 
-  // Query product by barcode when barcode is detected
-  const { data: barcodeProductData, error: barcodeError } =
-    useGetProductByBarcodeQuery(barcodeToScan || "", {
-      skip: !barcodeToScan,
-    });
-
-  // Handle barcode scan result
-  useEffect(() => {
-    if (
-      barcodeProductData?.product &&
-      barcodeToScan &&
-      processedBarcodeRef.current !== barcodeToScan
-    ) {
-      const product = barcodeProductData.product;
-      processedBarcodeRef.current = barcodeToScan;
-
-      dispatch(
-        addItem({
-          product_id: product.id,
-          name: product.name,
-          price: product.selling_price,
-          quantity: 1,
-          stock_quantity: product.stock_quantity,
-        })
-      );
-      toast.success(`${product.name} added to cart`);
+  // Use optimized barcode scanner hook
+  const { scanBarcode, isBarcodePattern } = useBarcodeScanner({
+    onScanComplete: () => {
       setSearch("");
-      setBarcodeToScan(null);
-      // Clear processed ref after a delay
-      setTimeout(() => {
-        processedBarcodeRef.current = null;
-      }, 300);
-    } else if (
-      barcodeError &&
-      barcodeToScan &&
-      processedBarcodeRef.current !== barcodeToScan
-    ) {
-      processedBarcodeRef.current = barcodeToScan;
-      toast.error("Product not found");
-      setSearch("");
-      setBarcodeToScan(null);
-      setTimeout(() => {
-        processedBarcodeRef.current = null;
-      }, 300);
-    }
-  }, [barcodeProductData, barcodeError, barcodeToScan, dispatch]);
+    },
+  });
 
   const handleAddToCart = (product: {
     id: number;
@@ -148,28 +106,16 @@ export function ProductGrid() {
 
   const handleSavePrice = useThrottledCallback(handleSavePriceInternal, 300);
 
-  // Detect barcode scan in search input
-  // Barcode scanners typically send all characters at once and end with Enter
+  // Handle search input - detect barcode scans
   const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" && search.trim()) {
       const currentValue = search.trim();
-      // Check if this looks like a barcode scan
-      // Barcodes are typically:
-      // - At least 8 characters long (most barcodes are 8-13+ digits)
-      // - Alphanumeric with no spaces or special characters
-      // - Or numeric only (EAN, UPC codes)
-      const isLikelyBarcode =
-        (currentValue.length >= 8 && /^[0-9A-Za-z]+$/.test(currentValue)) || // Long alphanumeric (8+ chars, no spaces)
-        (currentValue.length >= 6 && /^[0-9]+$/.test(currentValue)); // Numeric barcode (6+ digits)
-
-      if (isLikelyBarcode) {
+      // If it looks like a barcode, scan it instead of searching
+      if (isBarcodePattern(currentValue)) {
         e.preventDefault();
-        // Reset processed ref when starting a new scan
-        processedBarcodeRef.current = null;
-        setBarcodeToScan(currentValue);
-        return;
+        scanBarcode(currentValue);
       }
-      // If not a barcode, allow normal search (don't prevent default)
+      // Otherwise allow normal search behavior
     }
   };
 

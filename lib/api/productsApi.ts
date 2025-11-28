@@ -58,7 +58,12 @@ export const productsApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
     getProducts: builder.query<
       { products: Product[]; pagination: PaginationInfo },
-      { categoryId?: number; search?: string; page?: number; limit?: number } | void
+      {
+        categoryId?: number;
+        search?: string;
+        page?: number;
+        limit?: number;
+      } | void
     >({
       query: (params) => {
         const searchParams = new URLSearchParams();
@@ -85,16 +90,23 @@ export const productsApi = apiSlice.injectEndpoints({
     }),
     getProductByBarcode: builder.query<{ product: Product }, string>({
       query: (barcode) => `/products/barcode/${barcode}`,
-      providesTags: ["Product"],
+      providesTags: (result) => [
+        { type: "Product", id: result?.product?.id },
+        "Product",
+      ],
+      // Optimize caching for fast lookups
+      keepUnusedDataFor: 60, // Keep in cache for 60 seconds
     }),
-    createProduct: builder.mutation<{ product: Product }, CreateProductRequest>({
-      query: (body) => ({
-        url: "/products",
-        method: "POST",
-        body,
-      }),
-      invalidatesTags: ["Product", "Inventory"],
-    }),
+    createProduct: builder.mutation<{ product: Product }, CreateProductRequest>(
+      {
+        query: (body) => ({
+          url: "/products",
+          method: "POST",
+          body,
+        }),
+        invalidatesTags: ["Product", "Inventory"],
+      }
+    ),
     updateProduct: builder.mutation<
       { product: Product },
       { id: number; data: UpdateProductRequest }
@@ -147,4 +159,3 @@ export const {
   useImportProductsMutation,
   useDeleteAllProductsMutation,
 } = productsApi;
-

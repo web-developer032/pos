@@ -7,17 +7,11 @@ import { ProductGrid } from "@/components/pos/ProductGrid";
 import { Cart } from "@/components/pos/Cart";
 import { PaymentModal } from "@/components/pos/PaymentModal";
 import { useAppSelector, useAppDispatch } from "@/lib/hooks";
-import {
-  setCustomer,
-  setDiscount,
-  setTax,
-  addItem,
-} from "@/lib/slices/cartSlice";
+import { setCustomer, setDiscount, setTax } from "@/lib/slices/cartSlice";
 import { useGetCustomersQuery } from "@/lib/api/customersApi";
-import { useGetProductByBarcodeQuery } from "@/lib/api/productsApi";
+import { useBarcodeScanner } from "@/lib/hooks/useBarcodeScanner";
 import { Select } from "@/components/ui/Select";
 import { Input } from "@/components/ui/Input";
-import toast from "react-hot-toast";
 
 export default function POSPage() {
   const dispatch = useAppDispatch();
@@ -25,69 +19,33 @@ export default function POSPage() {
   const { data: customersData } = useGetCustomersQuery();
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [barcodeInput, setBarcodeInput] = useState("");
-  const [barcodeToScan, setBarcodeToScan] = useState<string | null>(null);
   const barcodeInputRef = useRef<HTMLInputElement>(null);
-  const processedBarcodeRef = useRef<string | null>(null);
 
-  // Query product by barcode when barcode is scanned
-  const { data: barcodeProductData, error: barcodeError } =
-    useGetProductByBarcodeQuery(barcodeToScan || "", {
-      skip: !barcodeToScan,
-    });
-
-  // Handle barcode scan result
-  useEffect(() => {
-    // Only process if we have a barcode to scan and haven't processed it yet
-    if (barcodeProductData?.product && barcodeToScan && processedBarcodeRef.current !== barcodeToScan) {
-      const product = barcodeProductData.product;
-      // Mark this barcode as processed
-      processedBarcodeRef.current = barcodeToScan;
-      
-      dispatch(
-        addItem({
-          product_id: product.id,
-          name: product.name,
-          price: product.selling_price,
-          quantity: 1,
-          stock_quantity: product.stock_quantity,
-        })
-      );
-      toast.success(`${product.name} added to cart`);
+  // Use optimized barcode scanner hook
+  const { scanBarcode } = useBarcodeScanner({
+    onScanComplete: () => {
       setBarcodeInput("");
-      setBarcodeToScan(null);
-      // Refocus barcode input for next scan
-      setTimeout(() => {
+      // Refocus immediately for next scan
+      requestAnimationFrame(() => {
         barcodeInputRef.current?.focus();
-      }, 100);
-    } else if (barcodeError && barcodeToScan && processedBarcodeRef.current !== barcodeToScan) {
-      // Mark this barcode as processed even on error to prevent retry
-      processedBarcodeRef.current = barcodeToScan;
-      toast.error("Product not found");
-      setBarcodeInput("");
-      setBarcodeToScan(null);
-      setTimeout(() => {
-        barcodeInputRef.current?.focus();
-      }, 100);
-    }
-  }, [barcodeProductData, barcodeError, barcodeToScan, dispatch]);
+      });
+    },
+  });
 
-  // Handle barcode input (most scanners send Enter after barcode)
+  // Handle barcode input (scanners send Enter after barcode)
   const handleBarcodeKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" && barcodeInput.trim()) {
       e.preventDefault();
-      const barcode = barcodeInput.trim();
-      // Reset processed ref when starting a new scan
-      processedBarcodeRef.current = null;
-      setBarcodeToScan(barcode);
+      scanBarcode(barcodeInput);
     }
   };
 
-  // Auto-focus barcode input on mount and when modal closes
+  // Auto-focus barcode input when modal closes
   useEffect(() => {
     if (!isPaymentModalOpen) {
-      setTimeout(() => {
+      requestAnimationFrame(() => {
         barcodeInputRef.current?.focus();
-      }, 100);
+      });
     }
   }, [isPaymentModalOpen]);
 
