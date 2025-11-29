@@ -21,6 +21,13 @@ import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
+import { useFormSubmission } from "@/lib/hooks/useFormSubmission";
+import {
+  toFloat,
+  toInt,
+  toOptionalId,
+  validateNonNegative,
+} from "@/lib/utils/formHelpers";
 import toast from "react-hot-toast";
 
 // Inline Category Form Component
@@ -29,7 +36,6 @@ function InlineCategoryForm({
 }: {
   onSuccess: (categoryId: number) => void;
 }) {
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const {
     register,
     handleSubmit,
@@ -39,25 +45,23 @@ function InlineCategoryForm({
   });
   const [createCategory] = useCreateCategoryMutation();
 
-  const onSubmit = async (data: { name: string; description?: string }) => {
-    if (isSubmitting) return; // Prevent double submission
-    setIsSubmitting(true);
-    try {
+  const { handleSubmit: handleFormSubmit, isSubmitting } = useFormSubmission({
+    onSubmit: async (data: { name: string; description?: string }) => {
       const result = await createCategory({
         name: data.name,
         description: data.description || undefined,
       }).unwrap();
+      return result;
+    },
+    onSuccess: (result: any) => {
       onSuccess(result.category.id);
-    } catch (error: unknown) {
-      const err = error as { data?: { error?: string } };
-      toast.error(err.data?.error || "Failed to create category");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+    },
+    successMessage: "Category created successfully",
+    errorMessage: "Failed to create category",
+  });
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+    <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4">
       <Input
         label="Name *"
         {...register("name", { required: "Name is required" })}
@@ -83,7 +87,6 @@ function InlineSupplierForm({
 }: {
   onSuccess: (supplierId: number) => void;
 }) {
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const {
     register,
     handleSubmit,
@@ -99,16 +102,14 @@ function InlineSupplierForm({
   });
   const [createSupplier] = useCreateSupplierMutation();
 
-  const onSubmit = async (data: {
-    name: string;
-    contact_person?: string;
-    email?: string;
-    phone?: string;
-    address?: string;
-  }) => {
-    if (isSubmitting) return; // Prevent double submission
-    setIsSubmitting(true);
-    try {
+  const { handleSubmit: handleFormSubmit, isSubmitting } = useFormSubmission({
+    onSubmit: async (data: {
+      name: string;
+      contact_person?: string;
+      email?: string;
+      phone?: string;
+      address?: string;
+    }) => {
       const result = await createSupplier({
         name: data.name,
         contact_person: data.contact_person || undefined,
@@ -116,17 +117,17 @@ function InlineSupplierForm({
         phone: data.phone || undefined,
         address: data.address || undefined,
       }).unwrap();
+      return result;
+    },
+    onSuccess: (result: any) => {
       onSuccess(result.supplier.id);
-    } catch (error: unknown) {
-      const err = error as { data?: { error?: string } };
-      toast.error(err.data?.error || "Failed to create supplier");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+    },
+    successMessage: "Supplier created successfully",
+    errorMessage: "Failed to create supplier",
+  });
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+    <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4">
       <Input
         label="Name *"
         {...register("name", { required: "Name is required" })}
@@ -154,7 +155,9 @@ function InlineSupplierForm({
         error={errors.address?.message as string}
       />
       <div className="flex justify-end space-x-2">
-        <Button type="submit">Create</Button>
+        <Button type="submit" disabled={isSubmitting}>
+          {isSubmitting ? "Creating..." : "Create"}
+        </Button>
       </div>
     </form>
   );
@@ -207,7 +210,6 @@ interface ProductFormProps {
 export function ProductForm({ productId, onSuccess }: ProductFormProps) {
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [showSupplierModal, setShowSupplierModal] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const { data: productData } = useGetProductQuery(productId!, {
     skip: !productId,
@@ -261,82 +263,83 @@ export function ProductForm({ productId, onSuccess }: ProductFormProps) {
     }
   }, [productData, reset]);
 
-  const onSubmit = async (data: ProductFormDataRaw) => {
-    if (isSubmitting) return; // Prevent double submission
-    setIsSubmitting(true);
-
-    try {
-      // Convert string numbers to actual numbers
-      const costPrice = Number(data.cost_price);
-      const sellingPrice = Number(data.selling_price);
-      const stockQuantity = Number(data.stock_quantity);
-      const minStockLevel = Number(data.min_stock_level);
+  const { handleSubmit: handleFormSubmit, isSubmitting } = useFormSubmission({
+    onSubmit: async (data: ProductFormDataRaw) => {
+      // Convert and validate number fields using formHelpers
+      const costPrice = toFloat(data.cost_price);
+      const sellingPrice = toFloat(data.selling_price);
+      const stockQuantity = toInt(data.stock_quantity);
+      const minStockLevel = toInt(data.min_stock_level);
 
       // Validate required number fields
-      if (isNaN(costPrice) || costPrice < 0) {
-        toast.error("Cost price is required and must be >= 0");
-        setIsSubmitting(false);
-        return;
-      }
-      if (isNaN(sellingPrice) || sellingPrice < 0) {
-        toast.error("Selling price is required and must be >= 0");
-        setIsSubmitting(false);
-        return;
-      }
-      if (isNaN(stockQuantity) || stockQuantity < 0) {
-        toast.error("Stock quantity is required and must be >= 0");
-        setIsSubmitting(false);
-        return;
-      }
-      if (isNaN(minStockLevel) || minStockLevel < 0) {
-        toast.error("Min stock level is required and must be >= 0");
-        setIsSubmitting(false);
-        return;
+      const costPriceValidation = validateNonNegative(costPrice, "Cost price");
+      if (!costPriceValidation.valid) {
+        throw new Error(costPriceValidation.error);
       }
 
-      // Convert category_id and supplier_id
-      const categoryId =
-        data.category_id === "" || data.category_id === undefined
-          ? undefined
-          : Number(data.category_id);
-      const supplierId =
-        data.supplier_id === "" || data.supplier_id === undefined
-          ? undefined
-          : Number(data.supplier_id);
+      const sellingPriceValidation = validateNonNegative(
+        sellingPrice,
+        "Selling price"
+      );
+      if (!sellingPriceValidation.valid) {
+        throw new Error(sellingPriceValidation.error);
+      }
+
+      const stockQuantityValidation = validateNonNegative(
+        stockQuantity,
+        "Stock quantity"
+      );
+      if (!stockQuantityValidation.valid) {
+        throw new Error(stockQuantityValidation.error);
+      }
+
+      const minStockLevelValidation = validateNonNegative(
+        minStockLevel,
+        "Min stock level"
+      );
+      if (!minStockLevelValidation.valid) {
+        throw new Error(minStockLevelValidation.error);
+      }
+
+      // Convert category_id and supplier_id using formHelpers
+      const categoryId = toOptionalId(data.category_id);
+      const supplierId = toOptionalId(data.supplier_id);
 
       const submitData: ProductFormData = {
         name: data.name,
         barcode: data.barcode || undefined,
         sku: data.sku || undefined,
         description: data.description || undefined,
-        category_id: isNaN(Number(categoryId)) ? undefined : Number(categoryId),
-        supplier_id: isNaN(Number(supplierId)) ? undefined : Number(supplierId),
+        category_id: categoryId,
+        supplier_id: supplierId,
         cost_price: costPrice,
         selling_price: sellingPrice,
-        stock_quantity: Math.floor(stockQuantity),
-        min_stock_level: Math.floor(minStockLevel),
+        stock_quantity: stockQuantity,
+        min_stock_level: minStockLevel,
         image_url: data.image_url || undefined,
       };
 
       if (productId) {
-        await updateProduct({ id: productId, data: submitData }).unwrap();
-        toast.success("Product updated successfully");
+        return await updateProduct({
+          id: productId,
+          data: submitData,
+        }).unwrap();
       } else {
-        await createProduct(submitData).unwrap();
-        toast.success("Product created successfully");
+        return await createProduct(submitData).unwrap();
       }
+    },
+    onSuccess: () => {
       onSuccess?.();
-    } catch (error: unknown) {
-      const err = error as { data?: { error?: string } };
-      toast.error(err.data?.error || "Failed to save product");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+    },
+    successMessage: productId
+      ? "Product updated successfully"
+      : "Product created successfully",
+    errorMessage: "Failed to save product",
+  });
 
   return (
     <>
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+      <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4">
         <div className="grid grid-cols-2 gap-4">
           <Input
             label="Name *"

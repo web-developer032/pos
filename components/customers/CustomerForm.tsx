@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -11,7 +11,7 @@ import {
 } from "@/lib/api/customersApi";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
-import toast from "react-hot-toast";
+import { useFormSubmission } from "@/lib/hooks/useFormSubmission";
 
 const customerSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -29,7 +29,6 @@ interface CustomerFormProps {
 }
 
 export function CustomerForm({ customerId, onSuccess }: CustomerFormProps) {
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const { data: customerData } = useGetCustomerQuery(customerId!, {
     skip: !customerId,
   });
@@ -64,11 +63,8 @@ export function CustomerForm({ customerId, onSuccess }: CustomerFormProps) {
     }
   }, [customerData, reset]);
 
-  const onSubmit = async (data: CustomerFormData) => {
-    if (isSubmitting) return; // Prevent double submission
-    setIsSubmitting(true);
-
-    try {
+  const { handleSubmit: handleFormSubmit, isSubmitting } = useFormSubmission({
+    onSubmit: async (data: CustomerFormData) => {
       const submitData = {
         name: data.name,
         email: data.email || undefined,
@@ -78,25 +74,25 @@ export function CustomerForm({ customerId, onSuccess }: CustomerFormProps) {
       };
 
       if (customerId) {
-        await updateCustomer({ id: customerId, data: submitData }).unwrap();
-        toast.success("Customer updated successfully");
+        return await updateCustomer({
+          id: customerId,
+          data: submitData,
+        }).unwrap();
       } else {
-        await createCustomer(submitData).unwrap();
-        toast.success("Customer created successfully");
+        return await createCustomer(submitData).unwrap();
       }
+    },
+    onSuccess: () => {
       onSuccess?.();
-    } catch (error) {
-      const errorMessage =
-        (error as { data?: { error?: string } })?.data?.error ||
-        "Failed to save customer";
-      toast.error(errorMessage);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+    },
+    successMessage: customerId
+      ? "Customer updated successfully"
+      : "Customer created successfully",
+    errorMessage: "Failed to save customer",
+  });
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+    <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4">
       <Input
         label="Name *"
         {...register("name")}
