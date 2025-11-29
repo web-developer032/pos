@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAuth, AuthRequest } from "@/lib/middleware/auth";
 import client from "@/lib/db";
 import { z } from "zod";
+import {
+  getPaginationParams,
+  executePaginatedQuery,
+  handleApiError,
+  handleValidationError,
+} from "@/lib/utils/apiHelpers";
 
 const saleSchema = z.object({
   customer_id: z.number().optional(),
@@ -23,6 +29,7 @@ async function getHandler(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const startDate = searchParams.get("start_date");
     const endDate = searchParams.get("end_date");
+    const { page, limit, offset } = getPaginationParams(req);
 
     let sql = `
       SELECT s.*, u.username as user_name, c.name as customer_name
@@ -42,37 +49,21 @@ async function getHandler(req: NextRequest) {
       args.push(endDate);
     }
 
-    // Get total count
-    const countSql = sql.replace(
-      /SELECT s\.\*, u\.username as user_name, c\.name as customer_name/,
-      "SELECT COUNT(*) as total"
-    );
-    const countResult = await client.execute({ sql: countSql, args });
-    const total = (countResult.rows[0] as unknown as { total: number }).total;
+    const result = await executePaginatedQuery({
+      baseSql: sql,
+      baseArgs: args,
+      orderBy: "s.created_at DESC",
+      page,
+      limit,
+      offset,
+    });
 
-    const page = parseInt(searchParams.get("page") || "1");
-    const limit = parseInt(searchParams.get("limit") || "25");
-    const offset = (page - 1) * limit;
-
-    sql += " ORDER BY s.created_at DESC LIMIT ? OFFSET ?";
-    args.push(limit, offset);
-
-    const result = await client.execute({ sql, args });
     return NextResponse.json({
-      sales: result.rows,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-      },
+      sales: result.data,
+      pagination: result.pagination,
     });
   } catch (error) {
-    console.error("Error fetching sales:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch sales" },
-      { status: 500 }
-    );
+    return handleApiError(error, "fetching sales");
   }
 }
 
@@ -181,17 +172,9 @@ async function postHandler(req: AuthRequest) {
       { status: 201 }
     );
   } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { error: "Invalid input", details: error.issues },
-        { status: 400 }
-      );
-    }
-    console.error("Error creating sale:", error);
-    return NextResponse.json(
-      { error: "Failed to create sale" },
-      { status: 500 }
-    );
+    const validationError = handleValidationError(error);
+    if (validationError) return validationError;
+    return handleApiError(error, "creating sale");
   }
 }
 
@@ -207,11 +190,7 @@ async function deleteHandler(req: NextRequest) {
 
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   } catch (error) {
-    console.error("Error deleting sales:", error);
-    return NextResponse.json(
-      { error: "Failed to delete sales" },
-      { status: 500 }
-    );
+    return handleApiError(error, "deleting sales");
   }
 }
 

@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/middleware/auth";
-import client from "@/lib/db";
 import { z } from "zod";
+import client from "@/lib/db";
+import {
+  getPaginationParams,
+  executePaginatedQuery,
+  handleApiError,
+  handleValidationError,
+} from "@/lib/utils/apiHelpers";
 
 const categorySchema = z.object({
   name: z.string().min(1),
@@ -10,36 +16,23 @@ const categorySchema = z.object({
 
 async function getHandler(req: NextRequest) {
   try {
-    const { searchParams } = new URL(req.url);
-    const page = parseInt(searchParams.get("page") || "1");
-    const limit = parseInt(searchParams.get("limit") || "25");
-    const offset = (page - 1) * limit;
+    const { page, limit, offset } = getPaginationParams(req);
 
-    // Get total count
-    const countResult = await client.execute(
-      "SELECT COUNT(*) as total FROM categories"
-    );
-    const total = (countResult.rows[0] as unknown as { total: number }).total;
-
-    const result = await client.execute({
-      sql: "SELECT * FROM categories ORDER BY name LIMIT ? OFFSET ?",
-      args: [limit, offset],
+    const result = await executePaginatedQuery({
+      baseSql: "SELECT * FROM categories WHERE 1=1",
+      baseArgs: [],
+      orderBy: "name",
+      page,
+      limit,
+      offset,
     });
+
     return NextResponse.json({
-      categories: result.rows,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-      },
+      categories: result.data,
+      pagination: result.pagination,
     });
   } catch (error) {
-    console.error("Error fetching categories:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch categories" },
-      { status: 500 }
-    );
+    return handleApiError(error, "fetching categories");
   }
 }
 
@@ -55,17 +48,9 @@ async function postHandler(req: NextRequest) {
 
     return NextResponse.json({ category: result.rows[0] }, { status: 201 });
   } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { error: "Invalid input", details: error.issues },
-        { status: 400 }
-      );
-    }
-    console.error("Error creating category:", error);
-    return NextResponse.json(
-      { error: "Failed to create category" },
-      { status: 500 }
-    );
+    const validationError = handleValidationError(error);
+    if (validationError) return validationError;
+    return handleApiError(error, "creating category");
   }
 }
 
@@ -83,11 +68,7 @@ async function deleteHandler(req: NextRequest) {
 
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   } catch (error) {
-    console.error("Error deleting categories:", error);
-    return NextResponse.json(
-      { error: "Failed to delete categories" },
-      { status: 500 }
-    );
+    return handleApiError(error, "deleting categories");
   }
 }
 

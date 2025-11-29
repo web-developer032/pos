@@ -10,7 +10,7 @@ import {
 } from "@/lib/api/productsApi";
 import { useGetCategoriesQuery } from "@/lib/api/categoriesApi";
 import { useCurrency } from "@/lib/hooks/useCurrency";
-import { useDebounce } from "@/lib/hooks/useDebounce";
+import { useListManagement } from "@/lib/hooks/useListManagement";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
@@ -21,16 +21,31 @@ import { ImportExport } from "@/components/common/ImportExport";
 import toast from "react-hot-toast";
 
 export function ProductList() {
-  const [search, setSearch] = useState("");
   const [categoryId, setCategoryId] = useState<number | undefined>();
-  const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(25);
-  const debouncedSearch = useDebounce(search, 500);
+  const [isDeletingAll, setIsDeletingAll] = useState(false);
+  
+  // Use list management hook for common state
+  const {
+    search,
+    debouncedSearch,
+    setSearch,
+    page,
+    limit,
+    setPage,
+    setLimit,
+    isModalOpen,
+    editingId,
+    deletingId,
+    openCreateModal,
+    openEditModal,
+    closeModal,
+    setDeleting,
+  } = useListManagement({ resetPageOnSearch: true });
 
-  // Reset to page 1 when search or category changes
+  // Reset page when category changes
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, categoryId]);
+  }, [categoryId, setPage]);
 
   const { data, isLoading, refetch } = useGetProductsQuery({
     search: debouncedSearch || undefined,
@@ -42,16 +57,12 @@ export function ProductList() {
   const [deleteProduct] = useDeleteProductMutation();
   const [deleteAllProducts] = useDeleteAllProductsMutation();
   const [importProducts] = useImportProductsMutation();
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingProduct, setEditingProduct] = useState<number | null>(null);
-  const [deletingId, setDeletingId] = useState<number | null>(null);
-  const [isDeletingAll, setIsDeletingAll] = useState(false);
   const { format: formatCurrency } = useCurrency();
 
   const handleDelete = async (id: number) => {
     if (deletingId === id) return; // Prevent double click
     if (confirm("Are you sure you want to delete this product?")) {
-      setDeletingId(id);
+      setDeleting(id);
       try {
         await deleteProduct(id).unwrap();
         toast.success("Product deleted successfully");
@@ -62,7 +73,7 @@ export function ProductList() {
           "Failed to delete product";
         toast.error(errorMessage);
       } finally {
-        setDeletingId(null);
+        setDeleting(null);
       }
     }
   };
@@ -88,16 +99,6 @@ export function ProductList() {
     } finally {
       setIsDeletingAll(false);
     }
-  };
-
-  const handleEdit = (id: number) => {
-    setEditingProduct(id);
-    setIsModalOpen(true);
-  };
-
-  const handleClose = () => {
-    setIsModalOpen(false);
-    setEditingProduct(null);
   };
 
   const handleImport = async (
@@ -312,7 +313,7 @@ export function ProductList() {
           >
             {isDeletingAll ? "Deleting..." : "Delete All"}
           </Button>
-          <Button onClick={() => setIsModalOpen(true)}>Add Product</Button>
+          <Button onClick={openCreateModal}>Add Product</Button>
         </div>
       </div>
 
@@ -392,7 +393,7 @@ export function ProductList() {
                 <td className="whitespace-nowrap px-3 py-4 text-right text-sm font-medium sm:px-6">
                   <div className="flex flex-col gap-1 sm:flex-row sm:justify-end">
                     <button
-                      onClick={() => handleEdit(product.id)}
+                      onClick={() => openEditModal(product.id)}
                       className="text-indigo-600 hover:text-indigo-900"
                     >
                       Edit
@@ -419,28 +420,22 @@ export function ProductList() {
             totalPages={data.pagination.totalPages}
             totalItems={data.pagination.total}
             itemsPerPage={data.pagination.limit}
-            onPageChange={(newPage) => {
-              setPage(newPage);
-              window.scrollTo({ top: 0, behavior: "smooth" });
-            }}
-            onItemsPerPageChange={(newLimit) => {
-              setLimit(newLimit);
-              setPage(1);
-            }}
+            onPageChange={setPage}
+            onItemsPerPageChange={setLimit}
           />
         </div>
       )}
 
       <Modal
         isOpen={isModalOpen}
-        onClose={handleClose}
-        title={editingProduct ? "Edit Product" : "Add Product"}
+        onClose={closeModal}
+        title={editingId ? "Edit Product" : "Add Product"}
         size="lg"
       >
         <ProductForm
-          productId={editingProduct}
+          productId={editingId || undefined}
           onSuccess={() => {
-            handleClose();
+            closeModal();
             refetch();
           }}
         />

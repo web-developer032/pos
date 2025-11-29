@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/middleware/auth";
 import client from "@/lib/db";
 import { z } from "zod";
+import {
+  getPaginationParams,
+  executePaginatedQuery,
+  buildSearchCondition,
+  handleApiError,
+  handleValidationError,
+} from "@/lib/utils/apiHelpers";
 
 const productSchema = z.object({
   name: z.string().min(1),
@@ -22,9 +29,7 @@ async function getHandler(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const categoryId = searchParams.get("category_id");
     const search = searchParams.get("search");
-    const page = parseInt(searchParams.get("page") || "1");
-    const limit = parseInt(searchParams.get("limit") || "25");
-    const offset = (page - 1) * limit;
+    const { page, limit, offset } = getPaginationParams(req);
 
     let sql = `
       SELECT p.*, c.name as category_name, s.name as supplier_name
@@ -40,39 +45,26 @@ async function getHandler(req: NextRequest) {
       args.push(categoryId);
     }
 
-    if (search) {
-      sql += " AND (p.name LIKE ? OR p.barcode LIKE ? OR p.sku LIKE ?)";
-      const searchTerm = `%${search}%`;
-      args.push(searchTerm, searchTerm, searchTerm);
-    }
+    // Add search condition
+    const searchCondition = buildSearchCondition(search, ["name", "barcode", "sku"], "p");
+    sql += searchCondition.sql;
+    args.push(...searchCondition.args);
 
-    // Get total count
-    const countSql = sql.replace(
-      /SELECT p\.\*, c\.name as category_name, s\.name as supplier_name/,
-      "SELECT COUNT(*) as total"
-    );
-    const countResult = await client.execute({ sql: countSql, args });
-    const total = (countResult.rows[0] as unknown as { total: number }).total;
+    const result = await executePaginatedQuery({
+      baseSql: sql,
+      baseArgs: args,
+      orderBy: "p.name",
+      page,
+      limit,
+      offset,
+    });
 
-    sql += " ORDER BY p.name LIMIT ? OFFSET ?";
-    args.push(limit, offset);
-
-    const result = await client.execute({ sql, args });
     return NextResponse.json({
-      products: result.rows,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-      },
+      products: result.data,
+      pagination: result.pagination,
     });
   } catch (error) {
-    console.error("Error fetching products:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch products" },
-      { status: 500 }
-    );
+    return handleApiError(error, "fetching products");
   }
 }
 
@@ -102,17 +94,9 @@ async function postHandler(req: NextRequest) {
 
     return NextResponse.json({ product: result.rows[0] }, { status: 201 });
   } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { error: "Invalid input", details: error.issues },
-        { status: 400 }
-      );
-    }
-    console.error("Error creating product:", error);
-    return NextResponse.json(
-      { error: "Failed to create product" },
-      { status: 500 }
-    );
+    const validationError = handleValidationError(error);
+    if (validationError) return validationError;
+    return handleApiError(error, "creating product");
   }
 }
 
@@ -138,11 +122,7 @@ async function deleteHandler(req: NextRequest) {
 
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   } catch (error) {
-    console.error("Error deleting products:", error);
-    return NextResponse.json(
-      { error: "Failed to delete products" },
-      { status: 500 }
-    );
+    return handleApiError(error, "deleting products");
   }
 }
 

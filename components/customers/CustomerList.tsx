@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import {
   useGetCustomersQuery,
   useDeleteCustomerMutation,
@@ -8,7 +8,7 @@ import {
   useImportCustomersMutation,
   CreateCustomerRequest,
 } from "@/lib/api/customersApi";
-import { useDebounce } from "@/lib/hooks/useDebounce";
+import { useListManagement } from "@/lib/hooks/useListManagement";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
@@ -18,14 +18,25 @@ import { ImportExport } from "@/components/common/ImportExport";
 import toast from "react-hot-toast";
 
 export function CustomerList() {
-  const [search, setSearch] = useState("");
-  const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(25);
-  const debouncedSearch = useDebounce(search, 500);
-
-  useEffect(() => {
-    setPage(1);
-  }, [debouncedSearch]);
+  const [isDeletingAll, setIsDeletingAll] = useState(false);
+  
+  // Use list management hook
+  const {
+    search,
+    debouncedSearch,
+    setSearch,
+    page,
+    limit,
+    setPage,
+    setLimit,
+    isModalOpen,
+    editingId,
+    deletingId,
+    openCreateModal,
+    openEditModal,
+    closeModal,
+    setDeleting,
+  } = useListManagement();
 
   const { data, isLoading, refetch } = useGetCustomersQuery({
     search: debouncedSearch || undefined,
@@ -35,15 +46,11 @@ export function CustomerList() {
   const [deleteCustomer] = useDeleteCustomerMutation();
   const [deleteAllCustomers] = useDeleteAllCustomersMutation();
   const [importCustomers] = useImportCustomersMutation();
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingCustomer, setEditingCustomer] = useState<number | null>(null);
-  const [deletingId, setDeletingId] = useState<number | null>(null);
-  const [isDeletingAll, setIsDeletingAll] = useState(false);
 
   const handleDelete = async (id: number) => {
     if (deletingId === id) return; // Prevent double click
     if (confirm("Are you sure you want to delete this customer?")) {
-      setDeletingId(id);
+      setDeleting(id);
       try {
         await deleteCustomer(id).unwrap();
         toast.success("Customer deleted successfully");
@@ -54,19 +61,9 @@ export function CustomerList() {
           "Failed to delete customer";
         toast.error(errorMessage);
       } finally {
-        setDeletingId(null);
+        setDeleting(null);
       }
     }
-  };
-
-  const handleEdit = (id: number) => {
-    setEditingCustomer(id);
-    setIsModalOpen(true);
-  };
-
-  const handleClose = () => {
-    setIsModalOpen(false);
-    setEditingCustomer(null);
   };
 
   const handleDeleteAll = async () => {
@@ -172,7 +169,7 @@ export function CustomerList() {
           >
             {isDeletingAll ? "Deleting..." : "Delete All"}
           </Button>
-          <Button onClick={() => setIsModalOpen(true)}>Add Customer</Button>
+          <Button onClick={openCreateModal}>Add Customer</Button>
         </div>
       </div>
 
@@ -223,7 +220,7 @@ export function CustomerList() {
                 <td className="whitespace-nowrap px-3 py-4 text-right text-sm font-medium sm:px-6">
                   <div className="flex flex-col gap-1 sm:flex-row sm:justify-end">
                     <button
-                      onClick={() => handleEdit(customer.id)}
+                      onClick={() => openEditModal(customer.id)}
                       className="text-indigo-600 hover:text-indigo-900"
                     >
                       Edit
@@ -250,27 +247,21 @@ export function CustomerList() {
             totalPages={data.pagination.totalPages}
             totalItems={data.pagination.total}
             itemsPerPage={data.pagination.limit}
-            onPageChange={(newPage) => {
-              setPage(newPage);
-              window.scrollTo({ top: 0, behavior: "smooth" });
-            }}
-            onItemsPerPageChange={(newLimit) => {
-              setLimit(newLimit);
-              setPage(1);
-            }}
+            onPageChange={setPage}
+            onItemsPerPageChange={setLimit}
           />
         </div>
       )}
 
       <Modal
         isOpen={isModalOpen}
-        onClose={handleClose}
-        title={editingCustomer ? "Edit Customer" : "Add Customer"}
+        onClose={closeModal}
+        title={editingId ? "Edit Customer" : "Add Customer"}
       >
         <CustomerForm
-          customerId={editingCustomer}
+          customerId={editingId || undefined}
           onSuccess={() => {
-            handleClose();
+            closeModal();
             refetch();
           }}
         />

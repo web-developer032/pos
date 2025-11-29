@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAuth, AuthRequest } from "@/lib/middleware/auth";
 import client from "@/lib/db";
 import { z } from "zod";
+import {
+  getPaginationParams,
+  executePaginatedQuery,
+  handleApiError,
+  handleValidationError,
+} from "@/lib/utils/apiHelpers";
 
 const poSchema = z.object({
   supplier_id: z.number(),
@@ -17,11 +23,9 @@ const poSchema = z.object({
 async function getHandler(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-    const page = parseInt(searchParams.get("page") || "1");
-    const limit = parseInt(searchParams.get("limit") || "25");
-    const search = searchParams.get("search") || "";
-    const status = searchParams.get("status") || "";
-    const offset = (page - 1) * limit;
+    const search = searchParams.get("search");
+    const status = searchParams.get("status");
+    const { page, limit, offset } = getPaginationParams(req);
 
     let sql = `
       SELECT po.*, s.name as supplier_name, u.username as user_name
@@ -32,6 +36,7 @@ async function getHandler(req: NextRequest) {
     `;
     const args: (string | number)[] = [];
 
+    // Add search condition
     if (search) {
       sql += ` AND (po.po_number LIKE ? OR s.name LIKE ? OR u.username LIKE ?)`;
       const searchPattern = `%${search}%`;
@@ -43,33 +48,21 @@ async function getHandler(req: NextRequest) {
       args.push(status);
     }
 
-    // Get total count
-    const countSql = sql.replace(
-      /SELECT po\.\*, s\.name as supplier_name, u\.username as user_name/,
-      "SELECT COUNT(*) as total"
-    );
-    const countResult = await client.execute({ sql: countSql, args });
-    const total = (countResult.rows[0] as unknown as { total: number }).total;
+    const result = await executePaginatedQuery({
+      baseSql: sql,
+      baseArgs: args,
+      orderBy: "po.created_at DESC",
+      page,
+      limit,
+      offset,
+    });
 
-    sql += " ORDER BY po.created_at DESC LIMIT ? OFFSET ?";
-    args.push(limit, offset);
-
-    const result = await client.execute({ sql, args });
     return NextResponse.json({
-      purchase_orders: result.rows,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-      },
+      purchase_orders: result.data,
+      pagination: result.pagination,
     });
   } catch (error) {
-    console.error("Error fetching purchase orders:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch purchase orders" },
-      { status: 500 }
-    );
+    return handleApiError(error, "fetching purchase orders");
   }
 }
 
@@ -115,17 +108,9 @@ async function postHandler(req: AuthRequest) {
       { status: 201 }
     );
   } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { error: "Invalid input", details: error.issues },
-        { status: 400 }
-      );
-    }
-    console.error("Error creating purchase order:", error);
-    return NextResponse.json(
-      { error: "Failed to create purchase order" },
-      { status: 500 }
-    );
+    const validationError = handleValidationError(error);
+    if (validationError) return validationError;
+    return handleApiError(error, "creating purchase order");
   }
 }
 
@@ -143,11 +128,7 @@ async function deleteHandler(req: NextRequest) {
 
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   } catch (error) {
-    console.error("Error deleting purchase orders:", error);
-    return NextResponse.json(
-      { error: "Failed to delete purchase orders" },
-      { status: 500 }
-    );
+    return handleApiError(error, "deleting purchase orders");
   }
 }
 
