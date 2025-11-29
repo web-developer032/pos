@@ -85,13 +85,23 @@ body {
   border-radius: 8px;
   max-width: 400px;
   margin: 0 auto;
-  font-family: "Courier New", monospace;
+  font-family: Arial, "Helvetica Neue", Helvetica, sans-serif;
 }
 
 @media print {
   @page {
     size: 80mm auto;
     margin: 0;
+  }
+
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+
+  body {
+    background: white !important;
   }
 
   .receipt-container {
@@ -101,5 +111,49 @@ body {
     padding: 10mm 5mm;
     box-shadow: none;
     border-radius: 0;
+    background: white !important;
+    font-family: Arial, "Helvetica Neue", Helvetica, sans-serif !important;
+    font-weight: 600 !important;
+    color: #000000 !important;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  .receipt-container * {
+    color: #000000 !important;
+    font-weight: 600 !important;
+  }
+
+  .receipt-container h2 {
+    font-weight: 900 !important;
+    font-size: 24pt !important;
+    letter-spacing: 1px;
+  }
+
+  .receipt-container .text-sm {
+    font-size: 11pt !important;
+    font-weight: 600 !important;
+  }
+
+  .receipt-container .text-xs {
+    font-size: 9pt !important;
+    font-weight: 600 !important;
+  }
+
+  .receipt-container .text-lg {
+    font-size: 14pt !important;
+    font-weight: 900 !important;
+  }
+
+  .receipt-container .font-bold {
+    font-weight: 900 !important;
+  }
+
+  .receipt-container .font-semibold {
+    font-weight: 700 !important;
+  }
+
+  .receipt-container .font-medium {
+    font-weight: 700 !important;
   }
 }
