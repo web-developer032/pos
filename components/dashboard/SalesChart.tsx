@@ -1,7 +1,8 @@
 "use client";
 
 import { useGetSalesQuery } from "@/lib/api/salesApi";
-import { format, subDays } from "date-fns";
+import { format } from "date-fns";
+import type { DateRange } from "@/components/common/DateRangeSelector";
 import {
   LineChart,
   Line,
@@ -12,19 +13,34 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
-export function SalesChart() {
-  const startDate = format(subDays(new Date(), 7), "yyyy-MM-dd");
+interface SalesChartProps {
+  dateRange?: DateRange;
+}
+
+export function SalesChart({ dateRange }: SalesChartProps) {
   const { data, isLoading } = useGetSalesQuery({
-    startDate,
-    endDate: format(new Date(), "yyyy-MM-dd"),
+    startDate: dateRange?.startDate,
+    endDate: dateRange?.endDate,
   });
+
+  const getTitle = () => {
+    if (!dateRange) return "Sales Trend (Last 7 Days)";
+    switch (dateRange.type) {
+      case "week":
+        return "Sales Trend (This Week)";
+      case "month":
+        return "Sales Trend (This Month)";
+      case "custom":
+        return "Sales Trend (Selected Period)";
+      default:
+        return "Sales Trend";
+    }
+  };
 
   if (isLoading) {
     return (
       <div className="rounded-lg bg-white p-6 shadow">
-        <h3 className="mb-4 text-lg font-semibold">
-          Sales Trend (Last 7 Days)
-        </h3>
+        <h3 className="mb-4 text-lg font-semibold">{getTitle()}</h3>
         <div>Loading...</div>
       </div>
     );
@@ -45,7 +61,7 @@ export function SalesChart() {
 
   return (
     <div className="rounded-lg bg-white p-6 shadow">
-      <h3 className="mb-4 text-lg font-semibold">Sales Trend (Last 7 Days)</h3>
+      <h3 className="mb-4 text-lg font-semibold">{getTitle()}</h3>
       <ResponsiveContainer width="100%" height={300}>
         <LineChart data={chartData}>
           <CartesianGrid strokeDasharray="3 3" />

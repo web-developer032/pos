@@ -1,10 +1,12 @@
 "use client";
 
+import { useState } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { useGetSalesQuery } from "@/lib/api/salesApi";
 import { useCurrency } from "@/lib/hooks/useCurrency";
-import { format, subDays } from "date-fns";
+import { DateRangeSelector, type DateRange } from "@/components/common/DateRangeSelector";
+import { format } from "date-fns";
 import {
   BarChart,
   Bar,
@@ -16,10 +18,15 @@ import {
 } from "recharts";
 
 export default function ReportsPage() {
-  const startDate = format(subDays(new Date(), 30), "yyyy-MM-dd");
+  const [dateRange, setDateRange] = useState<DateRange>({
+    startDate: "",
+    endDate: "",
+    type: "month",
+  });
+
   const { data, isLoading } = useGetSalesQuery({
-    startDate,
-    endDate: format(new Date(), "yyyy-MM-dd"),
+    startDate: dateRange.startDate,
+    endDate: dateRange.endDate,
   });
   const { format: formatCurrency } = useCurrency();
 
@@ -50,6 +57,19 @@ export default function ReportsPage() {
     data?.sales.reduce((sum, sale) => sum + sale.final_amount, 0) || 0;
   const totalSales = data?.sales.length || 0;
 
+  const getDateRangeLabel = () => {
+    switch (dateRange.type) {
+      case "week":
+        return "This Week";
+      case "month":
+        return "This Month";
+      case "custom":
+        return `${format(new Date(dateRange.startDate), "MMM dd")} - ${format(new Date(dateRange.endDate), "MMM dd")}`;
+      default:
+        return "Selected Period";
+    }
+  };
+
   return (
     <ProtectedRoute>
       <DashboardLayout>
@@ -57,10 +77,14 @@ export default function ReportsPage() {
           <h1 className="text-3xl font-bold">Reports</h1>
         </div>
 
+        <div className="mb-6">
+          <DateRangeSelector value={dateRange} onChange={setDateRange} />
+        </div>
+
         <div className="mb-6 grid grid-cols-1 gap-6 md:grid-cols-3">
           <div className="rounded-lg bg-white p-6 shadow">
             <h3 className="text-sm font-medium text-gray-500">
-              Total Revenue (30 days)
+              Total Revenue ({getDateRangeLabel()})
             </h3>
             <p className="mt-2 text-3xl font-bold">
               {formatCurrency(totalRevenue)}
@@ -68,7 +92,7 @@ export default function ReportsPage() {
           </div>
           <div className="rounded-lg bg-white p-6 shadow">
             <h3 className="text-sm font-medium text-gray-500">
-              Total Sales (30 days)
+              Total Sales ({getDateRangeLabel()})
             </h3>
             <p className="mt-2 text-3xl font-bold">{totalSales}</p>
           </div>
@@ -84,7 +108,7 @@ export default function ReportsPage() {
 
         <div className="rounded-lg bg-white p-6 shadow">
           <h3 className="mb-4 text-lg font-semibold">
-            Revenue Trend (Last 30 Days)
+            Revenue Trend ({getDateRangeLabel()})
           </h3>
           <ResponsiveContainer width="100%" height={400}>
             <BarChart data={chartData}>

@@ -3,12 +3,16 @@
 import { useGetSalesQuery } from "@/lib/api/salesApi";
 import { useCurrency } from "@/lib/hooks/useCurrency";
 import { format } from "date-fns";
+import type { DateRange } from "@/components/common/DateRangeSelector";
 
-export function StatsCards() {
-  const today = format(new Date(), "yyyy-MM-dd");
+interface StatsCardsProps {
+  dateRange?: DateRange;
+}
+
+export function StatsCards({ dateRange }: StatsCardsProps) {
   const { data, isLoading } = useGetSalesQuery({
-    startDate: today,
-    endDate: today,
+    startDate: dateRange?.startDate,
+    endDate: dateRange?.endDate,
   });
   const { format: formatCurrency } = useCurrency();
 
@@ -16,33 +20,47 @@ export function StatsCards() {
     return <div>Loading stats...</div>;
   }
 
-  const todaySales = data?.sales || [];
-  const todayRevenue = todaySales.reduce(
+  const sales = data?.sales || [];
+  const revenue = sales.reduce(
     (sum, sale) => sum + (sale.final_amount || 0),
     0
   );
-  const todayOrders = todaySales.length;
+  const orders = sales.length;
+
+  const getLabel = () => {
+    if (!dateRange) return "Today's";
+    switch (dateRange.type) {
+      case "week":
+        return "This Week's";
+      case "month":
+        return "This Month's";
+      case "custom":
+        return "Selected Period's";
+      default:
+        return "Today's";
+    }
+  };
 
   return (
     <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
       <div className="rounded-lg bg-white p-6 shadow">
         <h3 className="text-sm font-medium text-gray-500">
-          Today&apos;s Revenue
+          {getLabel()} Revenue
         </h3>
         <p className="mt-2 text-3xl font-bold ">
-          {formatCurrency(todayRevenue)}
+          {formatCurrency(revenue)}
         </p>
       </div>
       <div className="rounded-lg bg-white p-6 shadow">
         <h3 className="text-sm font-medium text-gray-500">
-          Today&apos;s Orders
+          {getLabel()} Orders
         </h3>
-        <p className="mt-2 text-3xl font-bold ">{todayOrders}</p>
+        <p className="mt-2 text-3xl font-bold ">{orders}</p>
       </div>
       <div className="rounded-lg bg-white p-6 shadow">
         <h3 className="text-sm font-medium text-gray-500">Average Order</h3>
         <p className="mt-2 text-3xl font-bold ">
-          {formatCurrency(todayOrders > 0 ? todayRevenue / todayOrders : 0)}
+          {formatCurrency(orders > 0 ? revenue / orders : 0)}
         </p>
       </div>
     </div>
