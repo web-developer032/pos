@@ -1,0 +1,49 @@
+services:
+  pos-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: pos-application
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - NEXT_TELEMETRY_DISABLED=1
+      # JWT Secret (change this in production!)
+      - JWT_SECRET=${JWT_SECRET:-your-secret-key-change-in-production}
+      # Database configuration (uncomment if using Turso)
+      # - TURSO_DATABASE_URL=${TURSO_DATABASE_URL}
+      # - TURSO_AUTH_TOKEN=${TURSO_AUTH_TOKEN}
+      # Or use local file database (default)
+      - DATABASE_URL=file:///app/data/db/local.db
+    volumes:
+      # Persist database data
+      - pos-db-data:/app/data/db
+      # Optional: Mount .env.local if you have one
+      # - ./.env.local:/app/.env.local:ro
+    networks:
+      - pos-network
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--quiet",
+          "--tries=1",
+          "--spider",
+          "http://localhost:3000/api/health",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  pos-db-data:
+    driver: local
+    name: pos-database
+
+networks:
+  pos-network:
+    driver: bridge
