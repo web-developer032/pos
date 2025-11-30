@@ -1,5 +1,5 @@
 services:
-  pos-app:
+  pos:
     build:
       context: .
       dockerfile: Dockerfile

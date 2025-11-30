@@ -8,6 +8,7 @@ import {
   parseCSV,
   readFileAsText,
 } from "@/lib/utils/csv";
+import { parseExcel } from "@/lib/utils/excel";
 import toast from "react-hot-toast";
 
 interface ImportExportProps<T> {
@@ -68,22 +69,36 @@ export function ImportExport<T extends Record<string, unknown>>({
 
     setIsImporting(true);
     try {
-      const text = await readFileAsText(file);
-      const parsed = parseCSV(text);
+      let parsed: Record<string, string>[];
+
+      // Check file type
+      const fileExtension = file.name.split(".").pop()?.toLowerCase();
+      if (fileExtension === "xlsx" || fileExtension === "xls") {
+        // Parse Excel file
+        parsed = await parseExcel(file);
+      } else {
+        // Parse CSV file
+        const text = await readFileAsText(file);
+        parsed = parseCSV(text);
+      }
 
       if (parsed.length === 0) {
-        toast.error("CSV file is empty");
+        toast.error("File is empty");
         return;
       }
 
       // Validate headers (case-insensitive check)
-      const csvHeaders = Object.keys(parsed[0] || {});
-      const csvHeadersLower = csvHeaders.map((h) => h.toLowerCase());
-      const missingHeaders = headers.filter(
-        (h) => !csvHeadersLower.includes(h.toLowerCase())
+      // Only require "name" as mandatory, others are optional
+      const fileHeaders = Object.keys(parsed[0] || {});
+      const fileHeadersLower = fileHeaders.map((h) => h.toLowerCase());
+      const requiredHeaders = ["name"]; // Only name is required
+      const missingRequiredHeaders = requiredHeaders.filter(
+        (h) => !fileHeadersLower.includes(h.toLowerCase())
       );
-      if (missingHeaders.length > 0) {
-        toast.error(`Missing required columns: ${missingHeaders.join(", ")}`);
+      if (missingRequiredHeaders.length > 0) {
+        toast.error(
+          `Missing required columns: ${missingRequiredHeaders.join(", ")}`
+        );
         return;
       }
 
@@ -129,7 +144,7 @@ export function ImportExport<T extends Record<string, unknown>>({
         <input
           ref={fileInputRef}
           type="file"
-          accept=".csv"
+          accept=".csv,.xlsx,.xls"
           onChange={handleImport}
           className="hidden"
           disabled={isImporting}

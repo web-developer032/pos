@@ -17,8 +17,9 @@ export async function seedDatabase() {
     });
   }
 
-  // Seed default categories
+  // Seed default categories (including "Other" as default)
   const categories = [
+    { name: "Other", description: "Default category for uncategorized items" },
     { name: "Electronics", description: "Electronic items" },
     { name: "Food & Beverages", description: "Food and drink items" },
     { name: "Clothing", description: "Clothing and apparel" },
@@ -38,6 +39,19 @@ export async function seedDatabase() {
         args: [category.name, category.description],
       });
     }
+  }
+
+  // Seed default supplier "Other"
+  const existingOtherSupplier = await client.execute({
+    sql: "SELECT id FROM suppliers WHERE name = ?",
+    args: ["Other"],
+  });
+
+  if (existingOtherSupplier.rows.length === 0) {
+    await client.execute({
+      sql: "INSERT INTO suppliers (name, contact_person, email) VALUES (?, ?, ?)",
+      args: ["Other", "Default Supplier", "other@pos.com"],
+    });
   }
 
   // Seed default settings

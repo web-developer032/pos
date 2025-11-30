@@ -38,12 +38,24 @@ const productSchema = z.object({
   stock_quantity: z.preprocess(
     (val) =>
       val === "" || val === null || val === undefined ? 0 : Number(val),
-    z.number().int().min(0)
+    z.number().min(0).optional().default(0)
   ),
   min_stock_level: z.preprocess(
     (val) =>
       val === "" || val === null || val === undefined ? 0 : Number(val),
-    z.number().int().min(0)
+    z.number().min(0).optional().default(0)
+  ),
+  unit: z.preprocess(
+    (val) => {
+      const str = String(val || "")
+        .trim()
+        .toLowerCase();
+      const validUnits = ["piece", "gram", "kilogram", "liter", "milliliter"];
+      return validUnits.includes(str) ? str : "piece";
+    },
+    z
+      .enum(["piece", "gram", "kilogram", "liter", "milliliter"])
+      .default("piece")
   ),
   image_url: z.preprocess(normalizeEmptyString, z.string().optional()),
 });
@@ -56,6 +68,54 @@ async function postHandler(req: NextRequest) {
   try {
     const body = await req.json();
     const validated = importSchema.parse(body);
+
+    // Get "Other" category and supplier IDs (create if they don't exist)
+    let otherCategoryId: number | null = null;
+    let otherSupplierId: number | null = null;
+
+    try {
+      // Get or create "Other" category
+      const categoryResult = await client.execute({
+        sql: "SELECT id FROM categories WHERE name = ?",
+        args: ["Other"],
+      });
+      if (categoryResult.rows.length > 0) {
+        otherCategoryId = categoryResult.rows[0].id as number;
+      } else {
+        await client.execute({
+          sql: "INSERT INTO categories (name, description) VALUES (?, ?)",
+          args: ["Other", "Default category for uncategorized items"],
+        });
+        // Get the inserted ID
+        const newCategoryResult = await client.execute({
+          sql: "SELECT id FROM categories WHERE name = ?",
+          args: ["Other"],
+        });
+        otherCategoryId = newCategoryResult.rows[0]?.id as number;
+      }
+
+      // Get or create "Other" supplier
+      const supplierResult = await client.execute({
+        sql: "SELECT id FROM suppliers WHERE name = ?",
+        args: ["Other"],
+      });
+      if (supplierResult.rows.length > 0) {
+        otherSupplierId = supplierResult.rows[0].id as number;
+      } else {
+        await client.execute({
+          sql: "INSERT INTO suppliers (name, contact_person, email) VALUES (?, ?, ?)",
+          args: ["Other", "Default Supplier", "other@pos.com"],
+        });
+        // Get the inserted ID
+        const newSupplierResult = await client.execute({
+          sql: "SELECT id FROM suppliers WHERE name = ?",
+          args: ["Other"],
+        });
+        otherSupplierId = newSupplierResult.rows[0]?.id as number;
+      }
+    } catch (error) {
+      console.warn("Error getting/creating Other category/supplier:", error);
+    }
 
     // Clean up any existing products with empty string barcodes/skus (convert to NULL)
     // This must run before importing to prevent UNIQUE constraint violations
@@ -96,21 +156,52 @@ async function postHandler(req: NextRequest) {
             ? product.image_url.trim()
             : null;
 
+        // Use "Other" category/supplier if not provided
+        let categoryId = product.category_id || null;
+        let supplierId = product.supplier_id || null;
+
+        // If category_id is provided, verify it exists, otherwise use "Other"
+        if (categoryId) {
+          const categoryCheck = await client.execute({
+            sql: "SELECT id FROM categories WHERE id = ?",
+            args: [categoryId],
+          });
+          if (categoryCheck.rows.length === 0) {
+            categoryId = otherCategoryId;
+          }
+        } else {
+          categoryId = otherCategoryId;
+        }
+
+        // If supplier_id is provided, verify it exists, otherwise use "Other"
+        if (supplierId) {
+          const supplierCheck = await client.execute({
+            sql: "SELECT id FROM suppliers WHERE id = ?",
+            args: [supplierId],
+          });
+          if (supplierCheck.rows.length === 0) {
+            supplierId = otherSupplierId;
+          }
+        } else {
+          supplierId = otherSupplierId;
+        }
+
         await client.execute({
           sql: `INSERT INTO products (name, barcode, sku, description, category_id, supplier_id, 
-                cost_price, selling_price, stock_quantity, min_stock_level, image_url) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                cost_price, selling_price, stock_quantity, min_stock_level, unit, image_url) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           args: [
             product.name.trim(),
             barcode,
             sku,
             description,
-            product.category_id || null,
-            product.supplier_id || null,
+            categoryId,
+            supplierId,
             product.cost_price,
             product.selling_price,
-            product.stock_quantity,
-            product.min_stock_level,
+            product.stock_quantity || 0,
+            product.min_stock_level || 0,
+            product.unit || "piece",
             imageUrl,
           ],
         });

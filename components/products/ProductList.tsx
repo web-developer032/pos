@@ -274,6 +274,7 @@ export function ProductList() {
     selling_price: p.selling_price,
     stock_quantity: p.stock_quantity,
     min_stock_level: p.min_stock_level,
+    unit: p.unit || "piece",
     image_url: p.image_url || "",
   }));
 
@@ -288,6 +289,7 @@ export function ProductList() {
     "selling_price",
     "stock_quantity",
     "min_stock_level",
+    "unit",
     "image_url",
   ];
 
@@ -304,6 +306,7 @@ export function ProductList() {
       selling_price: "15.00",
       stock_quantity: "100",
       min_stock_level: "10",
+      unit: "piece",
       image_url: "https://example.com/image.jpg",
     },
   ];
