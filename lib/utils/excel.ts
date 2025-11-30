@@ -7,9 +7,7 @@ import * as XLSX from "xlsx";
 /**
  * Parse Excel file to array of objects
  */
-export function parseExcel(
-  file: File
-): Promise<Record<string, string>[]> {
+export function parseExcel(file: File): Promise<Record<string, string>[]> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -32,15 +30,12 @@ export function parseExcel(
 
         const worksheet = workbook.Sheets[firstSheetName];
 
-        // Convert to JSON (array of objects)
-        const jsonData = XLSX.utils.sheet_to_json<Record<string, unknown>>(
-          worksheet,
-          {
-            header: 1, // Use first row as headers
-            defval: "", // Default value for empty cells
-            raw: false, // Convert all values to strings
-          }
-        );
+        // Convert to JSON (array of arrays when header: 1)
+        const jsonData = XLSX.utils.sheet_to_json(worksheet, {
+          header: 1, // Use first row as headers, returns array of arrays
+          defval: "", // Default value for empty cells
+          raw: false, // Convert all values to strings
+        }) as unknown[][];
 
         if (jsonData.length === 0) {
           resolve([]);
@@ -48,15 +43,13 @@ export function parseExcel(
         }
 
         // First row is headers
-        const headers = (jsonData[0] as unknown[]) as string[];
-        const normalizedHeaders = headers.map((h) =>
-          String(h || "").trim()
-        );
+        const headers = (jsonData[0] || []) as unknown[];
+        const normalizedHeaders = headers.map((h) => String(h || "").trim());
 
         // Convert to array of objects
         const result: Record<string, string>[] = [];
         for (let i = 1; i < jsonData.length; i++) {
-          const row = jsonData[i] as unknown[];
+          const row = (jsonData[i] || []) as unknown[];
           const obj: Record<string, string> = {};
           normalizedHeaders.forEach((header, index) => {
             if (header) {
@@ -112,4 +105,3 @@ export function downloadExcel<T extends Record<string, unknown>>(
   // Generate Excel file and download
   XLSX.writeFile(workbook, filename);
 }
-
