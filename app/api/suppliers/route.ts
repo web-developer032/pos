@@ -33,7 +33,7 @@ async function getHandler(req: NextRequest) {
     const suppliersWithLedger = await Promise.all(
       result.rows.map(async (supplier) => {
         const supplierData = supplier as unknown as { id: number };
-        
+
         // Get total purchases (only completed POs)
         const purchasesResult = await client.execute({
           sql: `SELECT COALESCE(SUM(total_amount), 0) as total_purchases
@@ -41,7 +41,9 @@ async function getHandler(req: NextRequest) {
                 WHERE supplier_id = ? AND status = 'completed'`,
           args: [supplierData.id],
         });
-        const totalPurchases = (purchasesResult.rows[0] as unknown as { total_purchases: number }).total_purchases || 0;
+        const totalPurchases =
+          (purchasesResult.rows[0] as unknown as { total_purchases: number })
+            .total_purchases || 0;
 
         // Get total payments
         const paymentsResult = await client.execute({
@@ -50,7 +52,9 @@ async function getHandler(req: NextRequest) {
                 WHERE supplier_id = ?`,
           args: [supplierData.id],
         });
-        const totalPaid = (paymentsResult.rows[0] as unknown as { total_paid: number }).total_paid || 0;
+        const totalPaid =
+          (paymentsResult.rows[0] as unknown as { total_paid: number })
+            .total_paid || 0;
 
         const balance = totalPurchases - totalPaid;
 

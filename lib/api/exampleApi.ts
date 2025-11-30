@@ -10,13 +10,12 @@ export const exampleApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
     getExamples: builder.query<ExampleItem[], void>({
       query: () => "/example",
-      transformResponse: (response: { success: boolean; data: ExampleItem[] }) =>
-        response.data,
+      transformResponse: (response: {
+        success: boolean;
+        data: ExampleItem[];
+      }) => response.data,
     }),
-    createExample: builder.mutation<
-      ExampleItem,
-      { name: string }
-    >({
+    createExample: builder.mutation<ExampleItem, { name: string }>({
       query: (body) => ({
         url: "/example",
         method: "POST",
@@ -29,4 +28,3 @@ export const exampleApi = apiSlice.injectEndpoints({
 });
 
 export const { useGetExamplesQuery, useCreateExampleMutation } = exampleApi;
-

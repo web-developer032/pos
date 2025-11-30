@@ -47,19 +47,17 @@ export function StatsCards({ dateRange }: StatsCardsProps) {
         <h3 className="text-sm font-medium text-gray-500">
           {getLabel()} Revenue
         </h3>
-        <p className="mt-2 text-3xl font-bold ">
-          {formatCurrency(revenue)}
-        </p>
+        <p className="mt-2 text-3xl font-bold">{formatCurrency(revenue)}</p>
       </div>
       <div className="rounded-lg bg-white p-6 shadow">
         <h3 className="text-sm font-medium text-gray-500">
           {getLabel()} Orders
         </h3>
-        <p className="mt-2 text-3xl font-bold ">{orders}</p>
+        <p className="mt-2 text-3xl font-bold">{orders}</p>
       </div>
       <div className="rounded-lg bg-white p-6 shadow">
         <h3 className="text-sm font-medium text-gray-500">Average Order</h3>
-        <p className="mt-2 text-3xl font-bold ">
+        <p className="mt-2 text-3xl font-bold">
           {formatCurrency(orders > 0 ? revenue / orders : 0)}
         </p>
       </div>

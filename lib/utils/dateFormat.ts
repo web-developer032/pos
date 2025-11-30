@@ -10,7 +10,7 @@ export function formatSystemDate(
   options?: Intl.DateTimeFormatOptions
 ): string {
   let dateObj: Date;
-  
+
   if (typeof date === "string") {
     // If the string doesn't have timezone info, treat it as UTC
     // Database stores times in UTC, so we need to parse them as UTC
@@ -23,7 +23,7 @@ export function formatSystemDate(
   } else {
     dateObj = date;
   }
-  
+
   const defaultOptions: Intl.DateTimeFormatOptions = {
     year: "numeric",
     month: "short",
@@ -50,7 +50,7 @@ export function formatSystemDateOnly(
   options?: Intl.DateTimeFormatOptions
 ): string {
   const dateObj = typeof date === "string" ? new Date(date) : date;
-  
+
   const defaultOptions: Intl.DateTimeFormatOptions = {
     year: "numeric",
     month: "short",
@@ -64,4 +64,3 @@ export function formatSystemDateOnly(
 
   return formatter.format(dateObj);
 }
-

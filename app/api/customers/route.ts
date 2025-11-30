@@ -28,7 +28,11 @@ async function getHandler(req: NextRequest) {
     const args: (string | number)[] = [];
 
     // Add search condition
-    const searchCondition = buildSearchCondition(search, ["name", "email", "phone"]);
+    const searchCondition = buildSearchCondition(search, [
+      "name",
+      "email",
+      "phone",
+    ]);
     sql += searchCondition.sql;
     args.push(...searchCondition.args);
 

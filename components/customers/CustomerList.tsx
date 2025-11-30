@@ -19,7 +19,7 @@ import toast from "react-hot-toast";
 
 export function CustomerList() {
   const [isDeletingAll, setIsDeletingAll] = useState(false);
-  
+
   // Use list management hook
   const {
     search,

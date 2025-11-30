@@ -46,7 +46,12 @@ export const salesApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
     getSales: builder.query<
       { sales: Sale[]; pagination: PaginationInfo },
-      { startDate?: string; endDate?: string; page?: number; limit?: number } | void
+      {
+        startDate?: string;
+        endDate?: string;
+        page?: number;
+        limit?: number;
+      } | void
     >({
       query: (params) => {
         const searchParams = new URLSearchParams();
@@ -67,10 +72,7 @@ export const salesApi = apiSlice.injectEndpoints({
       },
       providesTags: ["Sale"],
     }),
-    getSale: builder.query<
-      { sale: Sale; items: SaleItem[] },
-      number
-    >({
+    getSale: builder.query<{ sale: Sale; items: SaleItem[] }, number>({
       query: (id) => `/sales/${id}`,
       providesTags: (result, error, id) => [{ type: "Sale", id }],
     }),
@@ -101,4 +103,3 @@ export const {
   useCreateSaleMutation,
   useDeleteAllSalesMutation,
 } = salesApi;
-

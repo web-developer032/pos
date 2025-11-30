@@ -32,19 +32,17 @@ async function getHandler(req: NextRequest, context?: RouteContext) {
     });
 
     // Calculate totals (only count completed purchase orders)
-    const totalPurchases = purchaseOrdersResult.rows.reduce(
-      (sum, po) => {
-        const poData = po as unknown as { total_amount: number; status: string };
-        if (poData.status === "completed") {
-          return sum + (poData.total_amount || 0);
-        }
-        return sum;
-      },
-      0
-    );
+    const totalPurchases = purchaseOrdersResult.rows.reduce((sum, po) => {
+      const poData = po as unknown as { total_amount: number; status: string };
+      if (poData.status === "completed") {
+        return sum + (poData.total_amount || 0);
+      }
+      return sum;
+    }, 0);
 
     const totalPaid = paymentsResult.rows.reduce(
-      (sum, payment) => sum + ((payment as unknown as { amount: number }).amount || 0),
+      (sum, payment) =>
+        sum + ((payment as unknown as { amount: number }).amount || 0),
       0
     );
 
@@ -69,4 +67,3 @@ async function getHandler(req: NextRequest, context?: RouteContext) {
 }
 
 export const GET = requireAuth(getHandler);
-

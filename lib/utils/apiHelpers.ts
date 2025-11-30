@@ -154,4 +154,3 @@ export async function executePaginatedQuery<T>(
     pagination: buildPaginationResponse(total, page, limit),
   };
 }
-

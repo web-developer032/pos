@@ -14,16 +14,15 @@ export function Table({ headers, children }: TableProps) {
             {headers.map((header, index) => (
               <th
                 key={index}
-                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
               >
                 {header}
               </th>
             ))}
           </tr>
         </thead>
-        <tbody className="bg-white divide-y divide-gray-200">{children}</tbody>
+        <tbody className="divide-y divide-gray-200 bg-white">{children}</tbody>
       </table>
     </div>
   );
 }
-

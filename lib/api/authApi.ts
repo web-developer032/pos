@@ -38,4 +38,3 @@ export const authApi = apiSlice.injectEndpoints({
 });
 
 export const { useLoginMutation, useGetMeQuery } = authApi;
-

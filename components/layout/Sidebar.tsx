@@ -90,21 +90,21 @@ export function Sidebar() {
       }`}
     >
       {/* Header with toggle button */}
-      <div className="flex items-center justify-between p-3 sm:p-4 lg:p-6 border-b border-gray-800">
+      <div className="flex items-center justify-between border-b border-gray-800 p-3 sm:p-4 lg:p-6">
         {!isCollapsed && (
-          <h1 className="text-lg font-bold sm:text-xl lg:text-2xl whitespace-nowrap">
+          <h1 className="whitespace-nowrap text-lg font-bold sm:text-xl lg:text-2xl">
             POS System
           </h1>
         )}
         <button
           onClick={toggleSidebar}
-          className={`p-2 rounded-md hover:bg-gray-800 transition-colors flex-shrink-0 ${
+          className={`flex-shrink-0 rounded-md p-2 transition-colors hover:bg-gray-800 ${
             isCollapsed ? "mx-auto" : "ml-auto"
           }`}
           aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
           <svg
-            className="w-5 h-5 transition-transform duration-300"
+            className="h-5 w-5 transition-transform duration-300"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -129,7 +129,7 @@ export function Sidebar() {
       </div>
 
       {/* Navigation with custom scrollbar */}
-      <nav className="flex-1 overflow-y-auto pb-20 sidebar-scrollbar">
+      <nav className="sidebar-scrollbar flex-1 overflow-y-auto pb-20">
         {filteredMenuItems.map((item) => {
           const isActive = pathname === item.href;
           return (
@@ -140,7 +140,7 @@ export function Sidebar() {
                 isCollapsed
                   ? "justify-center px-2 py-3"
                   : "px-3 py-2 sm:px-4 sm:py-3 lg:px-6"
-              } text-xs hover:bg-gray-800 sm:text-sm lg:text-base transition-colors group relative ${
+              } group relative text-xs transition-colors hover:bg-gray-800 sm:text-sm lg:text-base ${
                 isActive ? "border-r-4 border-indigo-500 bg-gray-800" : ""
               }`}
               title={isCollapsed ? item.name : undefined}
@@ -153,7 +153,7 @@ export function Sidebar() {
               )}
               {/* Tooltip for collapsed state */}
               {isCollapsed && (
-                <span className="absolute left-full ml-2 px-3 py-2 bg-gray-800 text-white text-sm rounded-md opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-50 transition-opacity shadow-lg border border-gray-700">
+                <span className="pointer-events-none absolute left-full z-50 ml-2 whitespace-nowrap rounded-md border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
                   {item.name}
                   {/* Tooltip arrow */}
                   <span className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-gray-800"></span>
@@ -169,7 +169,7 @@ export function Sidebar() {
         {isCollapsed ? (
           <button
             onClick={handleLogout}
-            className="w-full rounded-md bg-red-600 p-2 hover:bg-red-700 transition-colors flex items-center justify-center"
+            className="flex w-full items-center justify-center rounded-md bg-red-600 p-2 transition-colors hover:bg-red-700"
             title="Logout"
             aria-label="Logout"
           >
@@ -178,13 +178,12 @@ export function Sidebar() {
         ) : (
           <button
             onClick={handleLogout}
-            className="w-full rounded-md bg-red-600 px-3 py-2 text-xs font-medium hover:bg-red-700 sm:px-4 sm:text-sm transition-colors"
+            className="w-full rounded-md bg-red-600 px-3 py-2 text-xs font-medium transition-colors hover:bg-red-700 sm:px-4 sm:text-sm"
           >
             Logout
           </button>
         )}
       </div>
-
     </aside>
   );
 }

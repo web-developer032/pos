@@ -31,9 +31,11 @@ export default function SupplierLedgerPage() {
   const params = useParams();
   const supplierId = parseInt(params.id as string);
   const { data: supplierData } = useGetSupplierQuery(supplierId);
-  const { data: ledgerData, isLoading, refetch } = useGetSupplierLedgerQuery(
-    supplierId
-  );
+  const {
+    data: ledgerData,
+    isLoading,
+    refetch,
+  } = useGetSupplierLedgerQuery(supplierId);
   const [createPayment] = useCreateSupplierPaymentMutation();
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -122,7 +124,7 @@ export default function SupplierLedgerPage() {
             <Link href="/suppliers">
               <Button variant="outline" className="flex items-center gap-2">
                 <svg
-                  className="w-4 h-4"
+                  className="h-4 w-4"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -213,7 +215,10 @@ export default function SupplierLedgerPage() {
                 <tbody className="divide-y divide-gray-200 bg-white">
                   {purchase_orders.length === 0 ? (
                     <tr>
-                      <td colSpan={4} className="px-6 py-4 text-center text-sm text-gray-500">
+                      <td
+                        colSpan={4}
+                        className="px-6 py-4 text-center text-sm text-gray-500"
+                      >
                         No purchase orders found
                       </td>
                     </tr>
@@ -276,7 +281,10 @@ export default function SupplierLedgerPage() {
                 <tbody className="divide-y divide-gray-200 bg-white">
                   {payments.length === 0 ? (
                     <tr>
-                      <td colSpan={4} className="px-6 py-4 text-center text-sm text-gray-500">
+                      <td
+                        colSpan={4}
+                        className="px-6 py-4 text-center text-sm text-gray-500"
+                      >
                         No payments recorded
                       </td>
                     </tr>
@@ -314,7 +322,10 @@ export default function SupplierLedgerPage() {
           title="Record Payment"
           size="md"
         >
-          <form onSubmit={handleSubmit(handlePaymentSubmit)} className="space-y-4">
+          <form
+            onSubmit={handleSubmit(handlePaymentSubmit)}
+            className="space-y-4"
+          >
             <Select
               label="Purchase Order (Optional)"
               options={[
@@ -388,4 +399,3 @@ export default function SupplierLedgerPage() {
     </ProtectedRoute>
   );
 }
-

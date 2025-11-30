@@ -41,7 +41,10 @@ export const categoriesApi = apiSlice.injectEndpoints({
       query: (id) => `/categories/${id}`,
       providesTags: (result, error, id) => [{ type: "Category", id }],
     }),
-    createCategory: builder.mutation<{ category: Category }, CreateCategoryRequest>({
+    createCategory: builder.mutation<
+      { category: Category },
+      CreateCategoryRequest
+    >({
       query: (body) => ({
         url: "/categories",
         method: "POST",
@@ -97,4 +100,3 @@ export const {
   useImportCategoriesMutation,
   useDeleteAllCategoriesMutation,
 } = categoriesApi;
-

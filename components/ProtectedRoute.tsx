@@ -17,7 +17,7 @@ export function ProtectedRoute({
 }: ProtectedRouteProps) {
   const router = useRouter();
   const dispatch = useAppDispatch();
-  
+
   // Always try to get user info from /auth/me (uses cookie)
   // This will work even after page refresh since token is in httpOnly cookie
   const { data, isLoading, error } = useGetMeQuery();
@@ -38,7 +38,11 @@ export function ProtectedRoute({
   useEffect(() => {
     if (!isLoading) {
       // If /auth/me fails (401/403), user is not authenticated
-      if (error && "status" in error && (error.status === 401 || error.status === 403)) {
+      if (
+        error &&
+        "status" in error &&
+        (error.status === 401 || error.status === 403)
+      ) {
         router.push("/login");
       } else if (
         data?.user &&
@@ -53,14 +57,18 @@ export function ProtectedRoute({
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center">
         <div className="text-lg">Loading...</div>
       </div>
     );
   }
 
   // If error and not authenticated, show nothing (redirecting to login)
-  if (error && "status" in error && (error.status === 401 || error.status === 403)) {
+  if (
+    error &&
+    "status" in error &&
+    (error.status === 401 || error.status === 403)
+  ) {
     return null;
   }
 
@@ -68,7 +76,7 @@ export function ProtectedRoute({
   if (data?.user) {
     if (allowedRoles && !allowedRoles.includes(data.user.role)) {
       return (
-        <div className="min-h-screen flex items-center justify-center">
+        <div className="flex min-h-screen items-center justify-center">
           <div className="text-lg text-red-600">Access Denied</div>
         </div>
       );
@@ -79,7 +87,7 @@ export function ProtectedRoute({
   // If no user data and no error yet, still loading
   if (!data && !error) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center">
         <div className="text-lg">Loading...</div>
       </div>
     );
@@ -87,4 +95,3 @@ export function ProtectedRoute({
 
   return null;
 }
-

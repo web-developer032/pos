@@ -5,7 +5,10 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { useGetSalesQuery } from "@/lib/api/salesApi";
 import { useCurrency } from "@/lib/hooks/useCurrency";
-import { DateRangeSelector, type DateRange } from "@/components/common/DateRangeSelector";
+import {
+  DateRangeSelector,
+  type DateRange,
+} from "@/components/common/DateRangeSelector";
 import { format } from "date-fns";
 import {
   BarChart,

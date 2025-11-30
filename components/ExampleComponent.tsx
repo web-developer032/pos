@@ -1,6 +1,9 @@
 "use client";
 
-import { useGetExamplesQuery, useCreateExampleMutation } from "@/lib/api/exampleApi";
+import {
+  useGetExamplesQuery,
+  useCreateExampleMutation,
+} from "@/lib/api/exampleApi";
 import { useState } from "react";
 
 export function ExampleComponent() {
@@ -26,27 +29,27 @@ export function ExampleComponent() {
 
   return (
     <div className="p-4">
-      <h2 className="text-2xl font-bold mb-4">Example Component</h2>
-      
+      <h2 className="mb-4 text-2xl font-bold">Example Component</h2>
+
       <form onSubmit={handleSubmit} className="mb-4">
         <input
           type="text"
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="Enter name"
-          className="border p-2 mr-2"
+          className="mr-2 border p-2"
         />
         <button
           type="submit"
           disabled={isCreating}
-          className="bg-blue-500 text-white px-4 py-2 rounded disabled:opacity-50"
+          className="rounded bg-blue-500 px-4 py-2 text-white disabled:opacity-50"
         >
           {isCreating ? "Creating..." : "Create"}
         </button>
       </form>
 
       <div>
-        <h3 className="text-xl font-semibold mb-2">Items:</h3>
+        <h3 className="mb-2 text-xl font-semibold">Items:</h3>
         <ul>
           {data?.map((item) => (
             <li key={item.id} className="mb-2">
@@ -58,4 +61,3 @@ export function ExampleComponent() {
     </div>
   );
 }
-

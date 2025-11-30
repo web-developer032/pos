@@ -8,7 +8,10 @@ import { SalesChart } from "@/components/dashboard/SalesChart";
 import { TopProducts } from "@/components/dashboard/TopProducts";
 import { RecentSales } from "@/components/dashboard/RecentSales";
 import { LowStockAlerts } from "@/components/dashboard/LowStockAlerts";
-import { DateRangeSelector, type DateRange } from "@/components/common/DateRangeSelector";
+import {
+  DateRangeSelector,
+  type DateRange,
+} from "@/components/common/DateRangeSelector";
 
 export default function DashboardPage() {
   const [dateRange, setDateRange] = useState<DateRange>({

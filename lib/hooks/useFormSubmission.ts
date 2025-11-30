@@ -50,4 +50,3 @@ export function useFormSubmission<T>({
     isSubmitting,
   };
 }
-

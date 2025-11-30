@@ -62,4 +62,3 @@ export function toOptionalId(
   const num = Number(value);
   return isNaN(num) ? undefined : num;
 }
-
