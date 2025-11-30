@@ -170,13 +170,6 @@ const productUnitEnum = z.enum([
   "kilogram",
   "liter",
   "milliliter",
-  "meter",
-  "centimeter",
-  "box",
-  "pack",
-  "bottle",
-  "can",
-  "bag",
 ]);
 
 const productSchema = z.object({
@@ -216,19 +209,7 @@ interface ProductFormData {
   selling_price: number;
   stock_quantity: number;
   min_stock_level: number;
-  unit:
-    | "piece"
-    | "gram"
-    | "kilogram"
-    | "liter"
-    | "milliliter"
-    | "meter"
-    | "centimeter"
-    | "box"
-    | "pack"
-    | "bottle"
-    | "can"
-    | "bag";
+  unit: "piece" | "gram" | "kilogram" | "liter" | "milliliter";
   image_url?: string;
 }
 
@@ -526,13 +507,6 @@ export function ProductForm({ productId, onSuccess }: ProductFormProps) {
                   { value: "kilogram", label: "Kilogram (kg)" },
                   { value: "liter", label: "Liter (L)" },
                   { value: "milliliter", label: "Milliliter (mL)" },
-                  { value: "meter", label: "Meter (m)" },
-                  { value: "centimeter", label: "Centimeter (cm)" },
-                  { value: "box", label: "Box" },
-                  { value: "pack", label: "Pack" },
-                  { value: "bottle", label: "Bottle" },
-                  { value: "can", label: "Can" },
-                  { value: "bag", label: "Bag" },
                 ]}
                 value={field.value || "piece"}
                 onChange={(e) => field.onChange(e.target.value)}

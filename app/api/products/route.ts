@@ -16,13 +16,6 @@ const productUnitEnum = z.enum([
   "kilogram",
   "liter",
   "milliliter",
-  "meter",
-  "centimeter",
-  "box",
-  "pack",
-  "bottle",
-  "can",
-  "bag",
 ]);
 
 const productSchema = z.object({

@@ -2,7 +2,6 @@
 
 import { useGetSalesQuery } from "@/lib/api/salesApi";
 import { useCurrency } from "@/lib/hooks/useCurrency";
-import { format } from "date-fns";
 import type { DateRange } from "@/components/common/DateRangeSelector";
 
 interface StatsCardsProps {

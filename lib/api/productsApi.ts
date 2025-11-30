@@ -5,14 +5,7 @@ export type ProductUnit =
   | "gram"
   | "kilogram"
   | "liter"
-  | "milliliter"
-  | "meter"
-  | "centimeter"
-  | "box"
-  | "pack"
-  | "bottle"
-  | "can"
-  | "bag";
+  | "milliliter";
 
 export interface Product {
   id: number;

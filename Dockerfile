@@ -23,6 +23,9 @@ RUN corepack enable && corepack prepare pnpm@latest --activate
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
+# Ensure public directory exists (Next.js may not have one)
+RUN mkdir -p ./public
+
 # Set environment variables for build
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
@@ -44,7 +47,7 @@ RUN apk add --no-cache wget
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
-# Copy necessary files from builder
+# Copy public directory from builder (will be empty if it doesn't exist, which is fine)
 COPY --from=builder /app/public ./public
 
 # Copy standalone output
@@ -53,13 +56,17 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
 # Copy necessary files for database initialization
 COPY --from=builder /app/package.json ./package.json
+COPY --from=builder /app/pnpm-lock.yaml* ./pnpm-lock.yaml
 COPY --from=builder /app/scripts ./scripts
 COPY --from=builder /app/lib ./lib
 COPY --from=builder /app/tsconfig.json ./tsconfig.json
 
-# Install pnpm and tsx for database initialization
+# Install production dependencies (including native modules for libsql)
 RUN corepack enable && corepack prepare pnpm@latest --activate
-RUN pnpm add -g tsx typescript
+RUN pnpm install --prod --frozen-lockfile
+
+# Install tsx and typescript globally for database initialization (using npm for global installs)
+RUN npm install -g tsx typescript
 
 # Copy entrypoint script
 COPY --chown=nextjs:nodejs docker-entrypoint.sh /app/docker-entrypoint.sh
@@ -67,7 +74,7 @@ COPY --chown=nextjs:nodejs docker-entrypoint.sh /app/docker-entrypoint.sh
 # Create data directory for database with proper permissions
 RUN mkdir -p /app/data/db && chown -R nextjs:nodejs /app/data
 
-# Set correct permissions
+# Set correct permissions (including node_modules)
 RUN chown -R nextjs:nodejs /app && chmod +x /app/docker-entrypoint.sh
 
 USER nextjs

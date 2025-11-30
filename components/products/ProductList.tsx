@@ -227,13 +227,6 @@ export function ProductList() {
                 "kilogram",
                 "liter",
                 "milliliter",
-                "meter",
-                "centimeter",
-                "box",
-                "pack",
-                "bottle",
-                "can",
-                "bag",
               ] as const;
               return unitValue &&
                 validUnits.includes(unitValue as (typeof validUnits)[number])

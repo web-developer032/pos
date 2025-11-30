@@ -51,7 +51,7 @@ export async function initializeDatabase() {
       selling_price REAL NOT NULL DEFAULT 0,
       stock_quantity REAL NOT NULL DEFAULT 0,
       min_stock_level REAL NOT NULL DEFAULT 0,
-      unit TEXT NOT NULL DEFAULT 'piece' CHECK(unit IN ('piece', 'gram', 'kilogram', 'liter', 'milliliter', 'meter', 'centimeter', 'box', 'pack', 'bottle', 'can', 'bag')),
+      unit TEXT NOT NULL DEFAULT 'piece' CHECK(unit IN ('piece', 'gram', 'kilogram', 'liter', 'milliliter')),
       image_url TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -71,7 +71,7 @@ export async function initializeDatabase() {
 
     if (!hasUnitColumn) {
       await client.execute(`
-        ALTER TABLE products ADD COLUMN unit TEXT NOT NULL DEFAULT 'piece' CHECK(unit IN ('piece', 'gram', 'kilogram', 'liter', 'milliliter', 'meter', 'centimeter', 'box', 'pack', 'bottle', 'can', 'bag'))
+        ALTER TABLE products ADD COLUMN unit TEXT NOT NULL DEFAULT 'piece' CHECK(unit IN ('piece', 'gram', 'kilogram', 'liter', 'milliliter'))
       `);
       console.log("Migration: Added 'unit' column to products table");
 

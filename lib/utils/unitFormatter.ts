@@ -27,13 +27,6 @@ export function getUnitLabel(unit: ProductUnit = "piece"): string {
     kilogram: "kg",
     liter: "L",
     milliliter: "mL",
-    meter: "m",
-    centimeter: "cm",
-    box: "box",
-    pack: "pack",
-    bottle: "bottle",
-    can: "can",
-    bag: "bag",
   };
 
   return unitLabels[unit] || unit;
@@ -49,13 +42,6 @@ export function getUnitFullName(unit: ProductUnit = "piece"): string {
     kilogram: "Kilogram",
     liter: "Liter",
     milliliter: "Milliliter",
-    meter: "Meter",
-    centimeter: "Centimeter",
-    box: "Box",
-    pack: "Pack",
-    bottle: "Bottle",
-    can: "Can",
-    bag: "Bag",
   };
 
   return unitNames[unit] || unit;

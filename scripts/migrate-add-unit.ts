@@ -18,7 +18,7 @@ async function migrate() {
 
     console.log("Adding 'unit' column to products table...");
     await client.execute(`
-      ALTER TABLE products ADD COLUMN unit TEXT NOT NULL DEFAULT 'piece' CHECK(unit IN ('piece', 'gram', 'kilogram', 'liter', 'milliliter', 'meter', 'centimeter', 'box', 'pack', 'bottle', 'can', 'bag'))
+      ALTER TABLE products ADD COLUMN unit TEXT NOT NULL DEFAULT 'piece' CHECK(unit IN ('piece', 'gram', 'kilogram', 'liter', 'milliliter'))
     `);
 
     // Update existing products to have 'piece' as default unit
