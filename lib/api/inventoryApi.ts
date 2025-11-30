@@ -8,6 +8,7 @@ export interface InventoryItem {
   barcode?: string;
   stock_quantity: number;
   min_stock_level: number;
+  unit?: string;
   category_name?: string;
 }
 
@@ -81,4 +82,3 @@ export const {
   useGetTransactionsQuery,
   useAdjustInventoryMutation,
 } = inventoryApi;
-

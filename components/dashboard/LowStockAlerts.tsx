@@ -35,7 +35,7 @@ export function LowStockAlerts() {
               <div>
                 <p className="text-sm font-medium">{product.name}</p>
                 <p className="text-xs text-gray-500">
-                  Stock: {product.stock_quantity} / Min: {product.min_stock_level}
+                  Stock: {product.stock_quantity} {product.unit || "pcs"} / Min: {product.min_stock_level} {product.unit || "pcs"}
                 </p>
               </div>
               <span className="text-red-600 font-semibold text-sm">Low</span>

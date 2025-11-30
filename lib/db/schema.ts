@@ -49,8 +49,9 @@ export async function initializeDatabase() {
       supplier_id INTEGER,
       cost_price REAL NOT NULL DEFAULT 0,
       selling_price REAL NOT NULL DEFAULT 0,
-      stock_quantity INTEGER NOT NULL DEFAULT 0,
-      min_stock_level INTEGER NOT NULL DEFAULT 0,
+      stock_quantity REAL NOT NULL DEFAULT 0,
+      min_stock_level REAL NOT NULL DEFAULT 0,
+      unit TEXT NOT NULL DEFAULT 'piece' CHECK(unit IN ('piece', 'gram', 'kilogram', 'liter', 'milliliter', 'meter', 'centimeter', 'box', 'pack', 'bottle', 'can', 'bag')),
       image_url TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -58,6 +59,42 @@ export async function initializeDatabase() {
       FOREIGN KEY (supplier_id) REFERENCES suppliers(id)
     )
   `);
+
+  // Migration: Add unit column to existing products table if it doesn't exist
+  try {
+    // Check if column exists by querying table info
+    const tableInfo = await client.execute(`PRAGMA table_info(products)`);
+    const hasUnitColumn = tableInfo.rows.some((row) => {
+      const name = row.name as string | undefined;
+      return name === "unit";
+    });
+
+    if (!hasUnitColumn) {
+      await client.execute(`
+        ALTER TABLE products ADD COLUMN unit TEXT NOT NULL DEFAULT 'piece' CHECK(unit IN ('piece', 'gram', 'kilogram', 'liter', 'milliliter', 'meter', 'centimeter', 'box', 'pack', 'bottle', 'can', 'bag'))
+      `);
+      console.log("Migration: Added 'unit' column to products table");
+
+      // Update existing products to have 'piece' as default unit
+      await client.execute(`
+        UPDATE products SET unit = 'piece' WHERE unit IS NULL OR unit = ''
+      `);
+    }
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.warn(
+      "Migration warning: Failed to check/add unit column:",
+      errorMessage
+    );
+  }
+
+  // Migration: Change stock_quantity and min_stock_level to REAL if they're INTEGER
+  try {
+    // SQLite doesn't support ALTER COLUMN, so we'll handle this in application logic
+    // The schema now uses REAL for both fields to support decimal quantities
+  } catch {
+    // Ignore migration errors
+  }
 
   // Customers table
   await client.execute(`
@@ -208,13 +245,28 @@ export async function initializeDatabase() {
   `);
 
   // Create indexes for better performance
-  await client.execute(`CREATE INDEX IF NOT EXISTS idx_products_barcode ON products(barcode)`);
-  await client.execute(`CREATE INDEX IF NOT EXISTS idx_products_category ON products(category_id)`);
-  await client.execute(`CREATE INDEX IF NOT EXISTS idx_sales_user ON sales(user_id)`);
-  await client.execute(`CREATE INDEX IF NOT EXISTS idx_sales_date ON sales(created_at)`);
-  await client.execute(`CREATE INDEX IF NOT EXISTS idx_sale_items_sale ON sale_items(sale_id)`);
-  await client.execute(`CREATE INDEX IF NOT EXISTS idx_inventory_product ON inventory_transactions(product_id)`);
-  await client.execute(`CREATE INDEX IF NOT EXISTS idx_supplier_payments_supplier ON supplier_payments(supplier_id)`);
-  await client.execute(`CREATE INDEX IF NOT EXISTS idx_supplier_payments_po ON supplier_payments(purchase_order_id)`);
+  await client.execute(
+    `CREATE INDEX IF NOT EXISTS idx_products_barcode ON products(barcode)`
+  );
+  await client.execute(
+    `CREATE INDEX IF NOT EXISTS idx_products_category ON products(category_id)`
+  );
+  await client.execute(
+    `CREATE INDEX IF NOT EXISTS idx_sales_user ON sales(user_id)`
+  );
+  await client.execute(
+    `CREATE INDEX IF NOT EXISTS idx_sales_date ON sales(created_at)`
+  );
+  await client.execute(
+    `CREATE INDEX IF NOT EXISTS idx_sale_items_sale ON sale_items(sale_id)`
+  );
+  await client.execute(
+    `CREATE INDEX IF NOT EXISTS idx_inventory_product ON inventory_transactions(product_id)`
+  );
+  await client.execute(
+    `CREATE INDEX IF NOT EXISTS idx_supplier_payments_supplier ON supplier_payments(supplier_id)`
+  );
+  await client.execute(
+    `CREATE INDEX IF NOT EXISTS idx_supplier_payments_po ON supplier_payments(purchase_order_id)`
+  );
 }
-

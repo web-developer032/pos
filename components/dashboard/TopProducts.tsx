@@ -17,7 +17,7 @@ export function TopProducts() {
   if (isLoading) {
     return (
       <div className="rounded-lg bg-white p-6 shadow">
-        <h3 className="mb-4 text-lg font-semibold ">Top Products</h3>
+        <h3 className="mb-4 text-lg font-semibold">Top Products</h3>
         <div>Loading...</div>
       </div>
     );
@@ -25,13 +25,13 @@ export function TopProducts() {
 
   return (
     <div className="rounded-lg bg-white p-6 shadow">
-      <h3 className="mb-4 text-lg font-semibold ">Top Products by Stock</h3>
+      <h3 className="mb-4 text-lg font-semibold">Top Products by Stock</h3>
       <div className="space-y-2">
         {topProducts.map((product) => (
           <div key={product.id} className="flex items-center justify-between">
             <span className="text-sm">{product.name}</span>
             <span className="font-semibold">
-              {product.stock_quantity} units
+              {product.stock_quantity} {product.unit || "pcs"}
             </span>
           </div>
         ))}

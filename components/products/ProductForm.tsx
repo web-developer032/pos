@@ -24,7 +24,6 @@ import { Modal } from "@/components/ui/Modal";
 import { useFormSubmission } from "@/lib/hooks/useFormSubmission";
 import {
   toFloat,
-  toInt,
   toOptionalId,
   validateNonNegative,
 } from "@/lib/utils/formHelpers";
@@ -53,8 +52,9 @@ function InlineCategoryForm({
       }).unwrap();
       return result;
     },
-    onSuccess: (result: any) => {
-      onSuccess(result.category.id);
+    onSuccess: (result: unknown) => {
+      const categoryResult = result as { category: { id: number } };
+      onSuccess(categoryResult.category.id);
     },
     successMessage: "Category created successfully",
     errorMessage: "Failed to create category",
@@ -119,8 +119,9 @@ function InlineSupplierForm({
       }).unwrap();
       return result;
     },
-    onSuccess: (result: any) => {
-      onSuccess(result.supplier.id);
+    onSuccess: (result: unknown) => {
+      const supplierResult = result as { supplier: { id: number } };
+      onSuccess(supplierResult.supplier.id);
     },
     successMessage: "Supplier created successfully",
     errorMessage: "Failed to create supplier",
@@ -163,6 +164,21 @@ function InlineSupplierForm({
   );
 }
 
+const productUnitEnum = z.enum([
+  "piece",
+  "gram",
+  "kilogram",
+  "liter",
+  "milliliter",
+  "meter",
+  "centimeter",
+  "box",
+  "pack",
+  "bottle",
+  "can",
+  "bag",
+]);
+
 const productSchema = z.object({
   name: z.string().min(1, "Name is required"),
   barcode: z.string().optional(),
@@ -183,6 +199,7 @@ const productSchema = z.object({
   ),
   stock_quantity: z.union([z.number(), z.string()]),
   min_stock_level: z.union([z.number(), z.string()]),
+  unit: productUnitEnum,
   image_url: z.string().optional(),
 });
 
@@ -199,6 +216,19 @@ interface ProductFormData {
   selling_price: number;
   stock_quantity: number;
   min_stock_level: number;
+  unit:
+    | "piece"
+    | "gram"
+    | "kilogram"
+    | "liter"
+    | "milliliter"
+    | "meter"
+    | "centimeter"
+    | "box"
+    | "pack"
+    | "bottle"
+    | "can"
+    | "bag";
   image_url?: string;
 }
 
@@ -223,7 +253,7 @@ export function ProductForm({ productId, onSuccess }: ProductFormProps) {
 
   const {
     register,
-    handleSubmit,
+    handleSubmit: reactHookFormHandleSubmit,
     control,
     setValue,
     formState: { errors },
@@ -241,6 +271,7 @@ export function ProductForm({ productId, onSuccess }: ProductFormProps) {
       selling_price: "",
       stock_quantity: "",
       min_stock_level: "",
+      unit: "piece" as const,
       image_url: "",
     },
   });
@@ -258,88 +289,100 @@ export function ProductForm({ productId, onSuccess }: ProductFormProps) {
         selling_price: productData.product.selling_price.toString(),
         stock_quantity: productData.product.stock_quantity.toString(),
         min_stock_level: productData.product.min_stock_level.toString(),
+        unit: (productData.product.unit ||
+          "piece") as ProductFormDataRaw["unit"],
         image_url: productData.product.image_url || "",
       });
     }
   }, [productData, reset]);
 
-  const { handleSubmit: handleFormSubmit, isSubmitting } = useFormSubmission({
-    onSubmit: async (data: ProductFormDataRaw) => {
-      // Convert and validate number fields using formHelpers
-      const costPrice = toFloat(data.cost_price);
-      const sellingPrice = toFloat(data.selling_price);
-      const stockQuantity = toInt(data.stock_quantity);
-      const minStockLevel = toInt(data.min_stock_level);
+  const { handleSubmit: handleFormSubmit, isSubmitting } =
+    useFormSubmission<ProductFormDataRaw>({
+      onSubmit: async (data) => {
+        // Convert and validate number fields using formHelpers
+        const costPrice = toFloat(data.cost_price);
+        const sellingPrice = toFloat(data.selling_price);
+        const stockQuantity = toFloat(data.stock_quantity);
+        const minStockLevel = toFloat(data.min_stock_level);
 
-      // Validate required number fields
-      const costPriceValidation = validateNonNegative(costPrice, "Cost price");
-      if (!costPriceValidation.valid) {
-        throw new Error(costPriceValidation.error);
-      }
+        // Validate required number fields
+        const costPriceValidation = validateNonNegative(
+          costPrice,
+          "Cost price"
+        );
+        if (!costPriceValidation.valid) {
+          throw new Error(costPriceValidation.error);
+        }
 
-      const sellingPriceValidation = validateNonNegative(
-        sellingPrice,
-        "Selling price"
-      );
-      if (!sellingPriceValidation.valid) {
-        throw new Error(sellingPriceValidation.error);
-      }
+        const sellingPriceValidation = validateNonNegative(
+          sellingPrice,
+          "Selling price"
+        );
+        if (!sellingPriceValidation.valid) {
+          throw new Error(sellingPriceValidation.error);
+        }
 
-      const stockQuantityValidation = validateNonNegative(
-        stockQuantity,
-        "Stock quantity"
-      );
-      if (!stockQuantityValidation.valid) {
-        throw new Error(stockQuantityValidation.error);
-      }
+        const stockQuantityValidation = validateNonNegative(
+          stockQuantity,
+          "Stock quantity"
+        );
+        if (!stockQuantityValidation.valid) {
+          throw new Error(stockQuantityValidation.error);
+        }
 
-      const minStockLevelValidation = validateNonNegative(
-        minStockLevel,
-        "Min stock level"
-      );
-      if (!minStockLevelValidation.valid) {
-        throw new Error(minStockLevelValidation.error);
-      }
+        const minStockLevelValidation = validateNonNegative(
+          minStockLevel,
+          "Min stock level"
+        );
+        if (!minStockLevelValidation.valid) {
+          throw new Error(minStockLevelValidation.error);
+        }
 
-      // Convert category_id and supplier_id using formHelpers
-      const categoryId = toOptionalId(data.category_id);
-      const supplierId = toOptionalId(data.supplier_id);
+        // Convert category_id and supplier_id using formHelpers
+        const categoryId = toOptionalId(data.category_id);
+        const supplierId = toOptionalId(data.supplier_id);
 
-      const submitData: ProductFormData = {
-        name: data.name,
-        barcode: data.barcode || undefined,
-        sku: data.sku || undefined,
-        description: data.description || undefined,
-        category_id: categoryId,
-        supplier_id: supplierId,
-        cost_price: costPrice,
-        selling_price: sellingPrice,
-        stock_quantity: stockQuantity,
-        min_stock_level: minStockLevel,
-        image_url: data.image_url || undefined,
-      };
+        const submitData: ProductFormData = {
+          name: data.name,
+          barcode: data.barcode || undefined,
+          sku: data.sku || undefined,
+          description: data.description || undefined,
+          category_id: categoryId,
+          supplier_id: supplierId,
+          cost_price: costPrice,
+          selling_price: sellingPrice,
+          stock_quantity: stockQuantity,
+          min_stock_level: minStockLevel,
+          unit: data.unit || "piece",
+          image_url: data.image_url || undefined,
+        };
 
-      if (productId) {
-        return await updateProduct({
-          id: productId,
-          data: submitData,
-        }).unwrap();
-      } else {
-        return await createProduct(submitData).unwrap();
-      }
-    },
-    onSuccess: () => {
-      onSuccess?.();
-    },
-    successMessage: productId
-      ? "Product updated successfully"
-      : "Product created successfully",
-    errorMessage: "Failed to save product",
-  });
+        if (productId) {
+          return await updateProduct({
+            id: productId,
+            data: submitData,
+          }).unwrap();
+        } else {
+          return await createProduct(submitData).unwrap();
+        }
+      },
+      onSuccess: () => {
+        onSuccess?.();
+      },
+      successMessage: productId
+        ? "Product updated successfully"
+        : "Product created successfully",
+      errorMessage: "Failed to save product",
+    });
 
   return (
     <>
-      <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4">
+      <form
+        onSubmit={reactHookFormHandleSubmit((data: ProductFormDataRaw) =>
+          handleFormSubmit(data)
+        )}
+        className="space-y-4"
+      >
         <div className="grid grid-cols-2 gap-4">
           <Input
             label="Name *"
@@ -458,14 +501,44 @@ export function ProductForm({ productId, onSuccess }: ProductFormProps) {
           <Input
             label="Stock Quantity *"
             type="number"
+            step="any"
             {...register("stock_quantity")}
             error={errors.stock_quantity?.message}
           />
           <Input
             label="Min Stock Level *"
             type="number"
+            step="any"
             {...register("min_stock_level")}
             error={errors.min_stock_level?.message}
+          />
+        </div>
+        <div>
+          <Controller
+            name="unit"
+            control={control}
+            render={({ field }) => (
+              <Select
+                label="Measuring Unit *"
+                options={[
+                  { value: "piece", label: "Piece" },
+                  { value: "gram", label: "Gram (g)" },
+                  { value: "kilogram", label: "Kilogram (kg)" },
+                  { value: "liter", label: "Liter (L)" },
+                  { value: "milliliter", label: "Milliliter (mL)" },
+                  { value: "meter", label: "Meter (m)" },
+                  { value: "centimeter", label: "Centimeter (cm)" },
+                  { value: "box", label: "Box" },
+                  { value: "pack", label: "Pack" },
+                  { value: "bottle", label: "Bottle" },
+                  { value: "can", label: "Can" },
+                  { value: "bag", label: "Bag" },
+                ]}
+                value={field.value || "piece"}
+                onChange={(e) => field.onChange(e.target.value)}
+                error={errors.unit?.message}
+              />
+            )}
           />
         </div>
         <div className="flex justify-end space-x-2">

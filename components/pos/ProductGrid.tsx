@@ -185,7 +185,7 @@ export function ProductGrid() {
               {formatCurrency(product.selling_price)}
             </p>
             <p className="text-xs text-gray-700 sm:text-sm">
-              Stock: {product.stock_quantity}
+              Stock: {product.stock_quantity} {product.unit || "pcs"}
             </p>
             {product.stock_quantity <= product.min_stock_level && (
               <p className="mt-1 text-xs font-semibold text-red-600">

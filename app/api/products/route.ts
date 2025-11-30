@@ -10,6 +10,21 @@ import {
   handleValidationError,
 } from "@/lib/utils/apiHelpers";
 
+const productUnitEnum = z.enum([
+  "piece",
+  "gram",
+  "kilogram",
+  "liter",
+  "milliliter",
+  "meter",
+  "centimeter",
+  "box",
+  "pack",
+  "bottle",
+  "can",
+  "bag",
+]);
+
 const productSchema = z.object({
   name: z.string().min(1),
   barcode: z.string().optional(),
@@ -19,8 +34,9 @@ const productSchema = z.object({
   supplier_id: z.number().optional(),
   cost_price: z.number().min(0),
   selling_price: z.number().min(0),
-  stock_quantity: z.number().int().min(0),
-  min_stock_level: z.number().int().min(0),
+  stock_quantity: z.number().min(0),
+  min_stock_level: z.number().min(0),
+  unit: productUnitEnum.default("piece"),
   image_url: z.string().optional(),
 });
 
@@ -46,7 +62,11 @@ async function getHandler(req: NextRequest) {
     }
 
     // Add search condition
-    const searchCondition = buildSearchCondition(search, ["name", "barcode", "sku"], "p");
+    const searchCondition = buildSearchCondition(
+      search,
+      ["name", "barcode", "sku"],
+      "p"
+    );
     sql += searchCondition.sql;
     args.push(...searchCondition.args);
 
@@ -75,8 +95,8 @@ async function postHandler(req: NextRequest) {
 
     const result = await client.execute({
       sql: `INSERT INTO products (name, barcode, sku, description, category_id, supplier_id, 
-            cost_price, selling_price, stock_quantity, min_stock_level, image_url) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`,
+            cost_price, selling_price, stock_quantity, min_stock_level, unit, image_url) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`,
       args: [
         validated.name,
         validated.barcode || null,
@@ -88,6 +108,7 @@ async function postHandler(req: NextRequest) {
         validated.selling_price,
         validated.stock_quantity,
         validated.min_stock_level,
+        validated.unit || "piece",
         validated.image_url || null,
       ],
     });

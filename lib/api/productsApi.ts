@@ -1,5 +1,19 @@
 import { apiSlice } from "./apiSlice";
 
+export type ProductUnit =
+  | "piece"
+  | "gram"
+  | "kilogram"
+  | "liter"
+  | "milliliter"
+  | "meter"
+  | "centimeter"
+  | "box"
+  | "pack"
+  | "bottle"
+  | "can"
+  | "bag";
+
 export interface Product {
   id: number;
   name: string;
@@ -12,6 +26,7 @@ export interface Product {
   selling_price: number;
   stock_quantity: number;
   min_stock_level: number;
+  unit: ProductUnit;
   image_url?: string;
   created_at?: string;
   updated_at?: string;
@@ -30,6 +45,7 @@ export interface CreateProductRequest {
   selling_price: number;
   stock_quantity: number;
   min_stock_level: number;
+  unit: ProductUnit;
   image_url?: string;
 }
 
@@ -44,6 +60,7 @@ export interface UpdateProductRequest {
   selling_price?: number;
   stock_quantity?: number;
   min_stock_level?: number;
+  unit?: ProductUnit;
   image_url?: string;
 }
 

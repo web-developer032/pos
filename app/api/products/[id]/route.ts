@@ -3,6 +3,21 @@ import { requireAuth, RouteContext } from "@/lib/middleware/auth";
 import client from "@/lib/db";
 import { z } from "zod";
 
+const productUnitEnum = z.enum([
+  "piece",
+  "gram",
+  "kilogram",
+  "liter",
+  "milliliter",
+  "meter",
+  "centimeter",
+  "box",
+  "pack",
+  "bottle",
+  "can",
+  "bag",
+]);
+
 const productSchema = z.object({
   name: z.string().min(1).optional(),
   barcode: z.string().optional(),
@@ -12,8 +27,9 @@ const productSchema = z.object({
   supplier_id: z.number().optional(),
   cost_price: z.number().min(0).optional(),
   selling_price: z.number().min(0).optional(),
-  stock_quantity: z.number().int().min(0).optional(),
-  min_stock_level: z.number().int().min(0).optional(),
+  stock_quantity: z.number().min(0).optional(),
+  min_stock_level: z.number().min(0).optional(),
+  unit: productUnitEnum.optional(),
   image_url: z.string().optional(),
 });
 

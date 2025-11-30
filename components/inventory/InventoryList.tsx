@@ -62,11 +62,11 @@ export function InventoryList() {
                         : ""
                     }
                   >
-                    {item.stock_quantity}
+                    {item.stock_quantity} {item.unit || "pcs"}
                   </span>
                 </td>
                 <td className="hidden px-3 py-4 text-sm text-gray-500 sm:table-cell sm:px-6">
-                  {item.min_stock_level}
+                  {item.min_stock_level} {item.unit || "pcs"}
                 </td>
                 <td className="whitespace-nowrap px-3 py-4 text-right text-sm font-medium sm:px-6">
                   <button

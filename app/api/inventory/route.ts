@@ -12,7 +12,7 @@ async function getHandler(req: NextRequest) {
 
     const sql = `
       SELECT p.id, p.name, p.sku, p.barcode, p.stock_quantity, p.min_stock_level,
-             c.name as category_name
+             p.unit, c.name as category_name
       FROM products p
       LEFT JOIN categories c ON p.category_id = c.id
       WHERE 1=1

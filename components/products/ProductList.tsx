@@ -23,7 +23,7 @@ import toast from "react-hot-toast";
 export function ProductList() {
   const [categoryId, setCategoryId] = useState<number | undefined>();
   const [isDeletingAll, setIsDeletingAll] = useState(false);
-  
+
   // Use list management hook for common state
   const {
     search,
@@ -217,6 +217,29 @@ export function ProductList() {
               ),
               0
             ),
+            unit: (() => {
+              const unitValue = normalizeString(
+                getField(item, "unit", "Unit", "UNIT")
+              );
+              const validUnits = [
+                "piece",
+                "gram",
+                "kilogram",
+                "liter",
+                "milliliter",
+                "meter",
+                "centimeter",
+                "box",
+                "pack",
+                "bottle",
+                "can",
+                "bag",
+              ] as const;
+              return unitValue &&
+                validUnits.includes(unitValue as (typeof validUnits)[number])
+                ? (unitValue as (typeof validUnits)[number])
+                : "piece";
+            })(),
             image_url: normalizeString(
               getField(item, "image_url", "Image URL", "image_url")
             ),
@@ -387,7 +410,7 @@ export function ProductList() {
                         : ""
                     }
                   >
-                    {product.stock_quantity}
+                    {product.stock_quantity} {product.unit || "pcs"}
                   </span>
                 </td>
                 <td className="whitespace-nowrap px-3 py-4 text-right text-sm font-medium sm:px-6">
