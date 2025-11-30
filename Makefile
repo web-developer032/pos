@@ -38,6 +38,48 @@ restore: ## Restore database from backup (usage: make restore BACKUP=backups/db-
 	@docker run --rm -v pos-database:/data -v $(PWD):/backup alpine sh -c "cd /data && tar xzf /backup/$(BACKUP)"
 	@echo "Database restored from $(BACKUP)"
 
+export-volume: ## Export database volume for transfer to another PC
+	@mkdir -p backups
+	@echo "Exporting database volume..."
+	@docker run --rm -v pos-database:/data -v $(PWD)/backups:/backup alpine tar czf /backup/pos-database-$$(date +%Y%m%d-%H%M%S).tar.gz -C /data .
+	@echo "Volume exported to ./backups/pos-database-*.tar.gz"
+	@echo "Copy this file to the destination PC and use 'make import-volume'"
+
+import-volume: ## Import database volume from backup (usage: make import-volume BACKUP=backups/pos-database-20240101-120000.tar.gz)
+	@if [ -z "$(BACKUP)" ]; then \
+		echo "Usage: make import-volume BACKUP=backups/pos-database-20240101-120000.tar.gz"; \
+		exit 1; \
+	fi
+	@if [ ! -f "$(BACKUP)" ]; then \
+		echo "Error: Backup file $(BACKUP) not found"; \
+		exit 1; \
+	fi
+	@echo "Creating volume if it doesn't exist..."
+	@docker volume create pos-database 2>/dev/null || true
+	@echo "Importing database from $(BACKUP)..."
+	@docker run --rm -v pos-database:/data -v $(PWD):/backup alpine sh -c "cd /data && rm -rf * && tar xzf /backup/$(BACKUP)"
+	@echo "Database volume imported successfully from $(BACKUP)"
+
+export-image: ## Export Docker image for transfer (usage: make export-image)
+	@mkdir -p backups
+	@echo "Exporting Docker image..."
+	@docker save pos-pos:latest -o backups/pos-app-image-$$(date +%Y%m%d-%H%M%S).tar
+	@echo "Image exported to ./backups/pos-app-image-*.tar"
+	@echo "Copy this file to the destination PC and use 'make import-image'"
+
+import-image: ## Import Docker image from backup (usage: make import-image IMAGE=backups/pos-app-image-20240101-120000.tar)
+	@if [ -z "$(IMAGE)" ]; then \
+		echo "Usage: make import-image IMAGE=backups/pos-app-image-20240101-120000.tar"; \
+		exit 1; \
+	fi
+	@if [ ! -f "$(IMAGE)" ]; then \
+		echo "Error: Image file $(IMAGE) not found"; \
+		exit 1; \
+	fi
+	@echo "Importing Docker image from $(IMAGE)..."
+	@docker load -i $(IMAGE)
+	@echo "Docker image imported successfully"
+
 shell: ## Open shell in container
 	docker exec -it pos-application sh
 

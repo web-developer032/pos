@@ -46,6 +46,8 @@ The application will be available at `http://localhost:3000`
 
 The database is automatically stored in a Docker volume (`pos-database`) and persists across container restarts and updates.
 
+**Transferring to Another PC?** See [DOCKER_VOLUME_TRANSFER.md](./DOCKER_VOLUME_TRANSFER.md) for step-by-step instructions.
+
 For detailed Docker setup instructions, see [DOCKER_SETUP.md](./DOCKER_SETUP.md)
 
 ## Local Development Setup
