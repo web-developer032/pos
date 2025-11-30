@@ -5,6 +5,7 @@ import { useAppSelector, useAppDispatch } from "@/lib/hooks";
 import {
   removeItem,
   updateQuantity,
+  updateWeight,
   updatePrice,
 } from "@/lib/slices/cartSlice";
 import { useCurrency } from "@/lib/hooks/useCurrency";
@@ -20,11 +21,13 @@ export function Cart({ onCheckout }: CartProps) {
   const { format: formatCurrency } = useCurrency();
   const [editingPriceId, setEditingPriceId] = useState<number | null>(null);
   const [priceInputs, setPriceInputs] = useState<Record<number, string>>({});
+  const [editingWeightId, setEditingWeightId] = useState<number | null>(null);
+  const [weightInputs, setWeightInputs] = useState<Record<number, string>>({});
 
-  const subtotal = items.reduce(
-    (sum, item) => sum + item.price * item.quantity,
-    0
-  );
+  const subtotal = items.reduce((sum, item) => {
+    const weight = item.weight ?? 1.0;
+    return sum + item.price * item.quantity * weight;
+  }, 0);
   const finalTotal = subtotal - discount + tax;
 
   const handlePriceChange = (productId: number, value: string) => {
@@ -107,26 +110,116 @@ export function Cart({ onCheckout }: CartProps) {
                       )}
                     </div>
                     <span className="text-xs text-gray-500">
-                      x {item.quantity} ={" "}
-                      {formatCurrency(item.price * item.quantity)}
+                      x {item.quantity}
+                      {(item.weight ?? 1.0) !== 1.0 && (
+                        <span> × {(item.weight ?? 1.0).toFixed(2)}</span>
+                      )}{" "}
+                      ={" "}
+                      {formatCurrency(
+                        item.price * item.quantity * (item.weight ?? 1.0)
+                      )}
                     </span>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="number"
-                    min="1"
-                    value={item.quantity}
-                    onChange={(e) =>
-                      dispatch(
-                        updateQuantity({
-                          product_id: item.product_id,
-                          quantity: parseInt(e.target.value) || 1,
-                        })
-                      )
-                    }
-                    className="w-16 rounded border px-2 py-1 text-center"
-                  />
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      min="1"
+                      value={item.quantity}
+                      onChange={(e) =>
+                        dispatch(
+                          updateQuantity({
+                            product_id: item.product_id,
+                            quantity: parseInt(e.target.value) || 1,
+                          })
+                        )
+                      }
+                      className="w-16 rounded border px-2 py-1 text-center"
+                    />
+                    {editingWeightId === item.product_id ? (
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        max="1"
+                        value={
+                          weightInputs[item.product_id] ??
+                          (item.weight ?? 1.0).toFixed(2)
+                        }
+                        onChange={(e) => {
+                          setWeightInputs((prev) => ({
+                            ...prev,
+                            [item.product_id]: e.target.value,
+                          }));
+                        }}
+                        onBlur={() => {
+                          const inputValue = weightInputs[item.product_id];
+                          if (inputValue !== undefined) {
+                            const weight = parseFloat(inputValue);
+                            if (!isNaN(weight) && weight >= 0 && weight <= 1) {
+                              dispatch(
+                                updateWeight({
+                                  product_id: item.product_id,
+                                  weight: weight,
+                                })
+                              );
+                            }
+                            setWeightInputs((prev) => {
+                              const updated = { ...prev };
+                              delete updated[item.product_id];
+                              return updated;
+                            });
+                          }
+                          setEditingWeightId(null);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            const inputValue = weightInputs[item.product_id];
+                            if (inputValue !== undefined) {
+                              const weight = parseFloat(inputValue);
+                              if (
+                                !isNaN(weight) &&
+                                weight >= 0 &&
+                                weight <= 1
+                              ) {
+                                dispatch(
+                                  updateWeight({
+                                    product_id: item.product_id,
+                                    weight: weight,
+                                  })
+                                );
+                              }
+                              setWeightInputs((prev) => {
+                                const updated = { ...prev };
+                                delete updated[item.product_id];
+                                return updated;
+                              });
+                            }
+                            setEditingWeightId(null);
+                          } else if (e.key === "Escape") {
+                            setEditingWeightId(null);
+                            setWeightInputs((prev) => {
+                              const updated = { ...prev };
+                              delete updated[item.product_id];
+                              return updated;
+                            });
+                          }
+                        }}
+                        autoFocus
+                        className="w-16 rounded border px-2 py-1 text-center text-sm"
+                        title="Weight (0.00 - 1.00)"
+                      />
+                    ) : (
+                      <button
+                        onClick={() => setEditingWeightId(item.product_id)}
+                        className="w-16 rounded border px-2 py-1 text-center text-xs text-gray-600 hover:bg-gray-50"
+                        title="Click to edit weight (0.00 - 1.00)"
+                      >
+                        {(item.weight ?? 1.0).toFixed(2)}
+                      </button>
+                    )}
+                  </div>
                   <button
                     onClick={() => dispatch(removeItem(item.product_id))}
                     className="text-sm text-red-600 hover:text-red-800 sm:text-base"

@@ -5,6 +5,7 @@ export interface CartItem {
   name: string;
   price: number;
   quantity: number;
+  weight?: number; // Weight multiplier (0.00 - 1.00), defaults to 1.0
   stock_quantity: number;
 }
 
@@ -33,7 +34,10 @@ const cartSlice = createSlice({
       if (existingItem) {
         existingItem.quantity += action.payload.quantity;
       } else {
-        state.items.push(action.payload);
+        state.items.push({
+          ...action.payload,
+          weight: action.payload.weight ?? 1.0,
+        });
       }
     },
     removeItem: (state, action: PayloadAction<number>) => {
@@ -50,6 +54,17 @@ const cartSlice = createSlice({
       );
       if (item) {
         item.quantity = action.payload.quantity;
+      }
+    },
+    updateWeight: (
+      state,
+      action: PayloadAction<{ product_id: number; weight: number }>
+    ) => {
+      const item = state.items.find(
+        (item) => item.product_id === action.payload.product_id
+      );
+      if (item) {
+        item.weight = Math.max(0, Math.min(1, action.payload.weight)); // Clamp between 0 and 1
       }
     },
     updatePrice: (
@@ -85,6 +100,7 @@ export const {
   addItem,
   removeItem,
   updateQuantity,
+  updateWeight,
   updatePrice,
   setCustomer,
   setDiscount,
