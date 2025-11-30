@@ -68,11 +68,26 @@ RUN pnpm install --prod --frozen-lockfile
 # Install tsx and typescript globally for database initialization (using npm for global installs)
 RUN npm install -g tsx typescript
 
+# Create default database directory and initialize default database (as root before switching user)
+# Store default database outside the mounted volume path so it's accessible at runtime
+RUN mkdir -p /app/data/db-default && \
+    mkdir -p /app/data/db/temp && \
+    (DATABASE_URL=file:///app/data/db/temp/local.db tsx scripts/init-db.ts || true) && \
+    if [ -f /app/data/db/temp/local.db ]; then \
+      cp /app/data/db/temp/local.db /app/data/db-default/local.db && \
+      rm -rf /app/data/db/temp && \
+      echo "Default database created successfully"; \
+    else \
+      echo "Warning: Default database creation may have failed"; \
+    fi
+
 # Copy entrypoint script
 COPY --chown=nextjs:nodejs docker-entrypoint.sh /app/docker-entrypoint.sh
 
 # Create data directory for database with proper permissions
-RUN mkdir -p /app/data/db && chown -R nextjs:nodejs /app/data
+RUN mkdir -p /app/data/db && \
+    mkdir -p /app/data/db-default && \
+    chown -R nextjs:nodejs /app/data
 
 # Set correct permissions (including node_modules)
 RUN chown -R nextjs:nodejs /app && chmod +x /app/docker-entrypoint.sh

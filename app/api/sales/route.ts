@@ -154,11 +154,13 @@ async function postHandler(req: AuthRequest) {
       args: [saleId],
     });
 
-    // Get sale items with product details
+    // Get sale items with product details (use LEFT JOIN to handle deleted products)
     const saleItemsResult = await client.execute({
-      sql: `SELECT si.*, p.name as product_name, p.barcode
+      sql: `SELECT si.*, 
+                   COALESCE(p.name, 'Deleted Product') as product_name, 
+                   p.barcode
             FROM sale_items si
-            JOIN products p ON si.product_id = p.id
+            LEFT JOIN products p ON si.product_id = p.id
             WHERE si.sale_id = ?
             ORDER BY si.id`,
       args: [saleId],

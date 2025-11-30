@@ -18,7 +18,9 @@ services:
       # Or use local file database (default)
       - DATABASE_URL=file:///app/data/db/local.db
     volumes:
-      # Persist database data
+      # Mount local database as read-only source (for cloning)
+      - ./data/db:/app/data/db-source:ro
+      # Container's own database (isolated from local dev)
       - pos-db-data:/app/data/db
       # Optional: Mount .env.local if you have one
       # - ./.env.local:/app/.env.local:ro

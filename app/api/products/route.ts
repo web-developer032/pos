@@ -45,7 +45,7 @@ async function getHandler(req: NextRequest) {
       FROM products p
       LEFT JOIN categories c ON p.category_id = c.id
       LEFT JOIN suppliers s ON p.supplier_id = s.id
-      WHERE 1=1
+      WHERE p.deleted_at IS NULL
     `;
     const args: (string | number)[] = [];
 
@@ -120,14 +120,10 @@ async function deleteHandler(req: NextRequest) {
     const deleteAll = searchParams.get("delete_all") === "true";
 
     if (deleteAll) {
-      // Delete related records first (due to foreign key constraints)
-      // Order matters: delete child records before parent records
-      await client.execute("DELETE FROM sale_items");
-      await client.execute("DELETE FROM purchase_order_items");
-      await client.execute("DELETE FROM inventory_transactions");
-
-      // Now delete products
-      await client.execute("DELETE FROM products");
+      // Soft delete all products (set deleted_at timestamp)
+      await client.execute(
+        "UPDATE products SET deleted_at = CURRENT_TIMESTAMP WHERE deleted_at IS NULL"
+      );
 
       return NextResponse.json({
         message: "All products deleted successfully",

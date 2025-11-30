@@ -53,6 +53,7 @@ export async function initializeDatabase() {
       min_stock_level REAL NOT NULL DEFAULT 0,
       unit TEXT NOT NULL DEFAULT 'piece' CHECK(unit IN ('piece', 'gram', 'kilogram', 'liter', 'milliliter')),
       image_url TEXT,
+      deleted_at DATETIME,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (category_id) REFERENCES categories(id),
@@ -60,13 +61,17 @@ export async function initializeDatabase() {
     )
   `);
 
-  // Migration: Add unit column to existing products table if it doesn't exist
+  // Migration: Add unit and deleted_at columns to existing products table if they don't exist
   try {
-    // Check if column exists by querying table info
+    // Check if columns exist by querying table info
     const tableInfo = await client.execute(`PRAGMA table_info(products)`);
     const hasUnitColumn = tableInfo.rows.some((row) => {
       const name = row.name as string | undefined;
       return name === "unit";
+    });
+    const hasDeletedAtColumn = tableInfo.rows.some((row) => {
+      const name = row.name as string | undefined;
+      return name === "deleted_at";
     });
 
     if (!hasUnitColumn) {
@@ -80,10 +85,17 @@ export async function initializeDatabase() {
         UPDATE products SET unit = 'piece' WHERE unit IS NULL OR unit = ''
       `);
     }
+
+    if (!hasDeletedAtColumn) {
+      await client.execute(`
+        ALTER TABLE products ADD COLUMN deleted_at DATETIME
+      `);
+      console.log("Migration: Added 'deleted_at' column to products table");
+    }
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     console.warn(
-      "Migration warning: Failed to check/add unit column:",
+      "Migration warning: Failed to check/add columns:",
       errorMessage
     );
   }

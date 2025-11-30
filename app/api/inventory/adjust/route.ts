@@ -15,9 +15,9 @@ async function postHandler(req: NextRequest) {
     const body = await req.json();
     const validated = adjustSchema.parse(body);
 
-    // Update product stock
+    // Update product stock (only for non-deleted products)
     const productResult = await client.execute({
-      sql: "SELECT stock_quantity FROM products WHERE id = ?",
+      sql: "SELECT stock_quantity FROM products WHERE id = ? AND deleted_at IS NULL",
       args: [validated.product_id],
     });
 

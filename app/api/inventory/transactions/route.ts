@@ -8,9 +8,10 @@ async function getHandler(req: NextRequest) {
     const productId = searchParams.get("product_id");
 
     let sql = `
-      SELECT it.*, p.name as product_name
+      SELECT it.*, 
+             COALESCE(p.name, 'Deleted Product') as product_name
       FROM inventory_transactions it
-      JOIN products p ON it.product_id = p.id
+      LEFT JOIN products p ON it.product_id = p.id
       WHERE 1=1
     `;
     const args: (string | number)[] = [];

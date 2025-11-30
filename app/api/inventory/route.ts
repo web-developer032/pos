@@ -15,7 +15,7 @@ async function getHandler(req: NextRequest) {
              p.unit, c.name as category_name
       FROM products p
       LEFT JOIN categories c ON p.category_id = c.id
-      WHERE 1=1
+      WHERE p.deleted_at IS NULL
     `;
 
     const result = await executePaginatedQuery({

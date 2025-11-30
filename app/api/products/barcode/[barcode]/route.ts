@@ -13,7 +13,7 @@ async function getHandler(req: NextRequest, context?: RouteContext) {
             FROM products p
             LEFT JOIN categories c ON p.category_id = c.id
             LEFT JOIN suppliers s ON p.supplier_id = s.id
-            WHERE p.barcode = ?`,
+            WHERE p.barcode = ? AND p.deleted_at IS NULL`,
       args: [params.barcode],
     });
 

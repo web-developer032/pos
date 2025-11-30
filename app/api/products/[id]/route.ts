@@ -37,7 +37,7 @@ async function getHandler(req: NextRequest, context?: RouteContext) {
             FROM products p
             LEFT JOIN categories c ON p.category_id = c.id
             LEFT JOIN suppliers s ON p.supplier_id = s.id
-            WHERE p.id = ?`,
+            WHERE p.id = ? AND p.deleted_at IS NULL`,
       args: [params.id],
     });
 
@@ -111,8 +111,20 @@ async function deleteHandler(req: NextRequest, context?: RouteContext) {
       return NextResponse.json({ error: "Invalid request" }, { status: 400 });
     }
     const params = await context.params;
+
+    // Check if product exists and is not already deleted
+    const productCheck = await client.execute({
+      sql: "SELECT id, name FROM products WHERE id = ?",
+      args: [params.id],
+    });
+
+    if (productCheck.rows.length === 0) {
+      return NextResponse.json({ error: "Product not found" }, { status: 404 });
+    }
+
+    // Soft delete: set deleted_at timestamp
     await client.execute({
-      sql: "DELETE FROM products WHERE id = ?",
+      sql: "UPDATE products SET deleted_at = CURRENT_TIMESTAMP WHERE id = ?",
       args: [params.id],
     });
 
