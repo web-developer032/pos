@@ -31,15 +31,20 @@ async function getHandler(req: NextRequest) {
     const endDate = searchParams.get("end_date");
     const { page, limit, offset } = getPaginationParams(req);
 
+    // Optimized query: Calculate profit using subquery for better performance
     let sql = `
       SELECT s.*, 
              u.username as user_name, 
              c.name as customer_name,
-             COALESCE(SUM((si.unit_price - si.cost_price) * si.quantity), 0) as total_profit
+             COALESCE(
+               (SELECT SUM((si.unit_price - si.cost_price) * si.quantity)
+                FROM sale_items si
+                WHERE si.sale_id = s.id),
+               0
+             ) as total_profit
       FROM sales s
       LEFT JOIN users u ON s.user_id = u.id
       LEFT JOIN customers c ON s.customer_id = c.id
-      LEFT JOIN sale_items si ON s.id = si.sale_id
       WHERE 1=1
     `;
     const args: (string | number)[] = [];
@@ -57,14 +62,10 @@ async function getHandler(req: NextRequest) {
       args.push(`${endDate} 23:59:59`);
     }
 
-    sql += " GROUP BY s.id";
-
-    // Get total count (need to count distinct sales, not rows)
+    // Get total count
     const countSql = `
-      SELECT COUNT(DISTINCT s.id) as total
+      SELECT COUNT(*) as total
       FROM sales s
-      LEFT JOIN users u ON s.user_id = u.id
-      LEFT JOIN customers c ON s.customer_id = c.id
       WHERE 1=1
       ${startDate ? "AND s.created_at >= ?" : ""}
       ${endDate ? "AND s.created_at <= ?" : ""}

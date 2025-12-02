@@ -1,48 +1,48 @@
 /**
- * Calculate profit percentage from cost and selling prices
- * @param costPrice - The cost price of the product
- * @param sellingPrice - The selling price of the product
- * @returns The profit percentage, or null if calculation is not possible
+ * Utility functions for profit calculations
  */
-export function calculateProfitPercentage(
-  costPrice: number | string | null | undefined,
-  sellingPrice: number | string | null | undefined
-): number | null {
-  // Convert to numbers, handling strings and null/undefined
-  const cost = typeof costPrice === "string" ? parseFloat(costPrice) : costPrice;
-  const selling =
-    typeof sellingPrice === "string" ? parseFloat(sellingPrice) : sellingPrice;
 
-  // Validate inputs
-  if (
-    cost === null ||
-    cost === undefined ||
-    selling === null ||
-    selling === undefined ||
-    isNaN(cost) ||
-    isNaN(selling) ||
-    cost <= 0 ||
-    selling < 0
-  ) {
-    return null;
-  }
-
-  // Calculate profit percentage: ((selling - cost) / cost) * 100
-  const profitPercentage = ((selling - cost) / cost) * 100;
-  return profitPercentage;
+/**
+ * Calculate profit for a single sale item
+ * @param unitPrice - Selling price per unit
+ * @param costPrice - Cost price per unit
+ * @param quantity - Quantity sold
+ * @returns Total profit for the item
+ */
+export function calculateItemProfit(
+  unitPrice: number,
+  costPrice: number,
+  quantity: number
+): number {
+  const profitPerUnit = unitPrice - costPrice;
+  return profitPerUnit * quantity;
 }
 
 /**
- * Format profit percentage for display
- * @param profitPercentage - The profit percentage value
- * @param decimals - Number of decimal places (default: 2)
- * @returns Formatted string with sign prefix
+ * Calculate total profit from sale items
+ * @param items - Array of sale items with unit_price, cost_price, and quantity
+ * @returns Total profit
  */
-export function formatProfitPercentage(
-  profitPercentage: number,
-  decimals: number = 2
-): string {
-  const sign = profitPercentage >= 0 ? "+" : "";
-  return `${sign}${profitPercentage.toFixed(decimals)}%`;
+export function calculateTotalProfit(
+  items: Array<{
+    unit_price: number;
+    cost_price: number;
+    quantity: number;
+  }>
+): number {
+  return items.reduce((total, item) => {
+    return total + calculateItemProfit(item.unit_price, item.cost_price, item.quantity);
+  }, 0);
 }
 
+/**
+ * Format profit percentage
+ * @param profit - Profit amount
+ * @param revenue - Revenue amount
+ * @returns Profit percentage as string
+ */
+export function formatProfitPercentage(profit: number, revenue: number): string {
+  if (revenue === 0) return "0.00%";
+  const percentage = (profit / revenue) * 100;
+  return `${percentage.toFixed(2)}%`;
+}

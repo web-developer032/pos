@@ -44,6 +44,23 @@ export interface CreateSaleRequest {
   payment_method: "cash" | "card" | "digital";
 }
 
+export interface SalesAnalytics {
+  data: Array<{
+    date: string;
+    total_sales: number;
+    total_revenue: number;
+    total_profit: number;
+    average_order_value: number;
+  }>;
+  summary: {
+    totalSales: number;
+    totalRevenue: number;
+    totalProfit: number;
+    averageOrderValue: number;
+    profitMargin: string;
+  };
+}
+
 export const salesApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
     getSales: builder.query<
@@ -73,6 +90,30 @@ export const salesApi = apiSlice.injectEndpoints({
         return `/sales${query ? `?${query}` : ""}`;
       },
       providesTags: ["Sale"],
+    }),
+    getSalesAnalytics: builder.query<
+      SalesAnalytics,
+      {
+        startDate?: string;
+        endDate?: string;
+        groupBy?: "day" | "week" | "month";
+      }
+    >({
+      query: (params) => {
+        const searchParams = new URLSearchParams();
+        if (params?.startDate) {
+          searchParams.append("start_date", params.startDate);
+        }
+        if (params?.endDate) {
+          searchParams.append("end_date", params.endDate);
+        }
+        if (params?.groupBy) {
+          searchParams.append("group_by", params.groupBy);
+        }
+        const query = searchParams.toString();
+        return `/reports/analytics${query ? `?${query}` : ""}`;
+      },
+      providesTags: ["Sale", "Report"],
     }),
     getSale: builder.query<{ sale: Sale; items: SaleItem[] }, number>({
       query: (id) => `/sales/${id}`,
@@ -109,6 +150,7 @@ export const salesApi = apiSlice.injectEndpoints({
 export const {
   useGetSalesQuery,
   useGetSaleQuery,
+  useGetSalesAnalyticsQuery,
   useCreateSaleMutation,
   useDeleteSaleMutation,
   useDeleteAllSalesMutation,

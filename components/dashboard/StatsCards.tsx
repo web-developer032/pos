@@ -24,6 +24,10 @@ export function StatsCards({ dateRange }: StatsCardsProps) {
     (sum, sale) => sum + (sale.final_amount || 0),
     0
   );
+  const profit = sales.reduce(
+    (sum, sale) => sum + (sale.total_profit || 0),
+    0
+  );
   const orders = sales.length;
 
   const getLabel = () => {
@@ -43,12 +47,20 @@ export function StatsCards({ dateRange }: StatsCardsProps) {
   };
 
   return (
-    <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+    <div className="grid grid-cols-1 gap-6 md:grid-cols-4">
       <div className="rounded-lg bg-white p-6 shadow">
         <h3 className="text-sm font-medium text-gray-500">
           {getLabel()} Revenue
         </h3>
         <p className="mt-2 text-3xl font-bold">{formatCurrency(revenue)}</p>
+      </div>
+      <div className="rounded-lg bg-white p-6 shadow">
+        <h3 className="text-sm font-medium text-gray-500">
+          {getLabel()} Profit
+        </h3>
+        <p className="mt-2 text-3xl font-bold text-green-600">
+          {formatCurrency(profit)}
+        </p>
       </div>
       <div className="rounded-lg bg-white p-6 shadow">
         <h3 className="text-sm font-medium text-gray-500">

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
-import { useGetSalesQuery } from "@/lib/api/salesApi";
+import { useGetSalesAnalyticsQuery } from "@/lib/api/salesApi";
 import { useCurrency } from "@/lib/hooks/useCurrency";
 import {
   DateRangeSelector,
@@ -18,6 +18,7 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
+  Legend,
 } from "recharts";
 
 export default function ReportsPage() {
@@ -27,9 +28,16 @@ export default function ReportsPage() {
     type: "month",
   });
 
-  const { data, isLoading } = useGetSalesQuery({
+  const groupBy =
+    dateRange.type === "month"
+      ? "day"
+      : dateRange.type === "week"
+        ? "day"
+        : "day";
+  const { data, isLoading } = useGetSalesAnalyticsQuery({
     startDate: dateRange.startDate,
     endDate: dateRange.endDate,
+    groupBy: groupBy as "day" | "week" | "month",
   });
   const { format: formatCurrency } = useCurrency();
 
@@ -43,22 +51,34 @@ export default function ReportsPage() {
     );
   }
 
-  const salesByDate: { [key: string]: number } = {};
-  data?.sales.forEach((sale) => {
-    const date = format(new Date(sale.created_at), "yyyy-MM-dd");
-    salesByDate[date] = (salesByDate[date] || 0) + sale.final_amount;
+  const chartData = (data?.data || []).map((item) => {
+    const dateStr = item.date as string;
+    let formattedDate = dateStr;
+    try {
+      if (dateStr.includes("-W")) {
+        formattedDate = dateStr;
+      } else if (dateStr.match(/^\d{4}-\d{2}$/)) {
+        formattedDate = format(new Date(dateStr + "-01"), "MMM yyyy");
+      } else {
+        formattedDate = format(new Date(dateStr), "MMM dd");
+      }
+    } catch {
+      formattedDate = dateStr;
+    }
+    return {
+      date: formattedDate,
+      revenue: parseFloat((item.total_revenue as number).toFixed(2)),
+      profit: parseFloat((item.total_profit as number).toFixed(2)),
+    };
   });
 
-  const chartData = Object.entries(salesByDate)
-    .sort(([dateA], [dateB]) => dateA.localeCompare(dateB))
-    .map(([date, revenue]) => ({
-      date: format(new Date(date), "MMM dd"),
-      revenue: parseFloat(revenue.toFixed(2)),
-    }));
-
-  const totalRevenue =
-    data?.sales.reduce((sum, sale) => sum + sale.final_amount, 0) || 0;
-  const totalSales = data?.sales.length || 0;
+  const summary = data?.summary || {
+    totalSales: 0,
+    totalRevenue: 0,
+    totalProfit: 0,
+    averageOrderValue: 0,
+    profitMargin: "0.00",
+  };
 
   const getDateRangeLabel = () => {
     switch (dateRange.type) {
@@ -86,34 +106,40 @@ export default function ReportsPage() {
           <DateRangeSelector value={dateRange} onChange={setDateRange} />
         </div>
 
-        <div className="mb-6 grid grid-cols-1 gap-6 md:grid-cols-3">
+        <div className="mb-6 grid grid-cols-1 gap-6 md:grid-cols-4">
           <div className="rounded-lg bg-white p-6 shadow">
             <h3 className="text-sm font-medium text-gray-500">
               Total Revenue ({getDateRangeLabel()})
             </h3>
             <p className="mt-2 text-3xl font-bold">
-              {formatCurrency(totalRevenue)}
+              {formatCurrency(summary.totalRevenue)}
+            </p>
+          </div>
+          <div className="rounded-lg bg-white p-6 shadow">
+            <h3 className="text-sm font-medium text-gray-500">
+              Total Profit ({getDateRangeLabel()})
+            </h3>
+            <p className="mt-2 text-3xl font-bold text-green-600">
+              {formatCurrency(summary.totalProfit)}
             </p>
           </div>
           <div className="rounded-lg bg-white p-6 shadow">
             <h3 className="text-sm font-medium text-gray-500">
               Total Sales ({getDateRangeLabel()})
             </h3>
-            <p className="mt-2 text-3xl font-bold">{totalSales}</p>
+            <p className="mt-2 text-3xl font-bold">{summary.totalSales}</p>
           </div>
           <div className="rounded-lg bg-white p-6 shadow">
-            <h3 className="text-sm font-medium text-gray-500">
-              Average Order Value
-            </h3>
-            <p className="mt-2 text-3xl font-bold">
-              {formatCurrency(totalSales > 0 ? totalRevenue / totalSales : 0)}
+            <h3 className="text-sm font-medium text-gray-500">Profit Margin</h3>
+            <p className="mt-2 text-3xl font-bold text-indigo-600">
+              {summary.profitMargin}%
             </p>
           </div>
         </div>
 
         <div className="rounded-lg bg-white p-6 shadow">
           <h3 className="mb-4 text-lg font-semibold">
-            Revenue Trend ({getDateRangeLabel()})
+            Revenue & Profit Trend ({getDateRangeLabel()})
           </h3>
           <ResponsiveContainer width="100%" height={400}>
             <BarChart data={chartData}>
@@ -121,7 +147,9 @@ export default function ReportsPage() {
               <XAxis dataKey="date" />
               <YAxis />
               <Tooltip />
-              <Bar dataKey="revenue" fill="#4f46e5" />
+              <Legend />
+              <Bar dataKey="revenue" fill="#4f46e5" name="Revenue" />
+              <Bar dataKey="profit" fill="#10b981" name="Profit" />
             </BarChart>
           </ResponsiveContainer>
         </div>
