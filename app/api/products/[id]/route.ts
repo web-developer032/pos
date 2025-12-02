@@ -14,6 +14,7 @@ const productUnitEnum = z.enum([
 const productSchema = z.object({
   name: z.string().min(1).optional(),
   barcode: z.string().optional(),
+  additional_barcodes: z.array(z.string()).optional(),
   sku: z.string().optional(),
   description: z.string().optional(),
   category_id: z.number().optional(),
@@ -45,7 +46,20 @@ async function getHandler(req: NextRequest, context?: RouteContext) {
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
     }
 
-    return NextResponse.json({ product: result.rows[0] });
+    // Fetch additional barcodes
+    const barcodesResult = await client.execute({
+      sql: "SELECT barcode FROM product_barcodes WHERE product_id = ?",
+      args: [params.id],
+    });
+
+    const additionalBarcodes = barcodesResult.rows.map(
+      (row) => (row as unknown as { barcode: string }).barcode
+    );
+
+    const product = result.rows[0] as unknown as Record<string, unknown>;
+    product.additional_barcodes = additionalBarcodes;
+
+    return NextResponse.json({ product });
   } catch (error) {
     console.error("Error fetching product:", error);
     return NextResponse.json(
@@ -66,30 +80,88 @@ async function putHandler(req: NextRequest, context?: RouteContext) {
 
     const updates: string[] = [];
     const values: (string | number | null)[] = [];
+    const additionalBarcodes = validated.additional_barcodes;
 
+    // Handle additional_barcodes separately - exclude it from product updates
     Object.entries(validated).forEach(([key, value]) => {
-      if (value !== undefined) {
+      if (key !== "additional_barcodes" && value !== undefined) {
         updates.push(`${key} = ?`);
-        values.push(value);
+        // Type assertion needed because we've filtered out additional_barcodes
+        values.push(value as string | number | null);
       }
     });
 
-    if (updates.length === 0) {
+    if (updates.length === 0 && !additionalBarcodes) {
       return NextResponse.json(
         { error: "No fields to update" },
         { status: 400 }
       );
     }
 
-    updates.push("updated_at = CURRENT_TIMESTAMP");
-    values.push(params.id);
+    if (updates.length > 0) {
+      updates.push("updated_at = CURRENT_TIMESTAMP");
+      values.push(params.id);
 
+      await client.execute({
+        sql: `UPDATE products SET ${updates.join(", ")} WHERE id = ?`,
+        args: values,
+      });
+    }
+
+    // Update additional barcodes if provided
+    if (additionalBarcodes !== undefined) {
+      // Delete existing additional barcodes
+      await client.execute({
+        sql: "DELETE FROM product_barcodes WHERE product_id = ?",
+        args: [params.id],
+      });
+
+      // Insert new additional barcodes
+      if (additionalBarcodes.length > 0) {
+        for (const barcode of additionalBarcodes) {
+          if (barcode && barcode.trim()) {
+            try {
+              await client.execute({
+                sql: "INSERT INTO product_barcodes (product_id, barcode) VALUES (?, ?)",
+                args: [params.id, barcode.trim()],
+              });
+            } catch (error) {
+              // Ignore duplicate barcode errors
+              console.warn(`Failed to add barcode ${barcode}:`, error);
+            }
+          }
+        }
+      }
+    }
+
+    // Fetch updated product with barcodes
     const result = await client.execute({
-      sql: `UPDATE products SET ${updates.join(", ")} WHERE id = ? RETURNING *`,
-      args: values,
+      sql: `SELECT p.*, c.name as category_name, s.name as supplier_name
+            FROM products p
+            LEFT JOIN categories c ON p.category_id = c.id
+            LEFT JOIN suppliers s ON p.supplier_id = s.id
+            WHERE p.id = ? AND p.deleted_at IS NULL`,
+      args: [params.id],
     });
 
-    return NextResponse.json({ product: result.rows[0] });
+    if (result.rows.length === 0) {
+      return NextResponse.json({ error: "Product not found" }, { status: 404 });
+    }
+
+    // Fetch additional barcodes
+    const barcodesResult = await client.execute({
+      sql: "SELECT barcode FROM product_barcodes WHERE product_id = ?",
+      args: [params.id],
+    });
+
+    const fetchedBarcodes = barcodesResult.rows.map(
+      (row) => (row as unknown as { barcode: string }).barcode
+    );
+
+    const product = result.rows[0] as unknown as Record<string, unknown>;
+    product.additional_barcodes = fetchedBarcodes;
+
+    return NextResponse.json({ product });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(

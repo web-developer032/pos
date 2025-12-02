@@ -5,7 +5,6 @@ import { z } from "zod";
 import {
   getPaginationParams,
   executePaginatedQuery,
-  buildSearchCondition,
   handleApiError,
   handleValidationError,
 } from "@/lib/utils/apiHelpers";
@@ -21,6 +20,7 @@ const productUnitEnum = z.enum([
 const productSchema = z.object({
   name: z.string().min(1),
   barcode: z.string().optional(),
+  additional_barcodes: z.array(z.string()).optional(),
   sku: z.string().optional(),
   description: z.string().optional(),
   category_id: z.number().optional(),
@@ -54,14 +54,20 @@ async function getHandler(req: NextRequest) {
       args.push(categoryId);
     }
 
-    // Add search condition
-    const searchCondition = buildSearchCondition(
-      search,
-      ["name", "barcode", "sku"],
-      "p"
-    );
-    sql += searchCondition.sql;
-    args.push(...searchCondition.args);
+    // Add search condition - include product_barcodes table for barcode search
+    if (search) {
+      const searchTerm = `%${search}%`;
+      sql += ` AND (
+        p.name LIKE ? OR 
+        p.barcode LIKE ? OR 
+        p.sku LIKE ? OR
+        EXISTS (
+          SELECT 1 FROM product_barcodes pb 
+          WHERE pb.product_id = p.id AND pb.barcode LIKE ?
+        )
+      )`;
+      args.push(searchTerm, searchTerm, searchTerm, searchTerm);
+    }
 
     const result = await executePaginatedQuery({
       baseSql: sql,
@@ -105,6 +111,28 @@ async function postHandler(req: NextRequest) {
         validated.image_url || null,
       ],
     });
+
+    const productId = (result.rows[0] as unknown as { id: number }).id;
+
+    // Insert additional barcodes if provided
+    if (
+      validated.additional_barcodes &&
+      validated.additional_barcodes.length > 0
+    ) {
+      for (const barcode of validated.additional_barcodes) {
+        if (barcode && barcode.trim()) {
+          try {
+            await client.execute({
+              sql: "INSERT INTO product_barcodes (product_id, barcode) VALUES (?, ?)",
+              args: [productId, barcode.trim()],
+            });
+          } catch (error) {
+            // Ignore duplicate barcode errors
+            console.warn(`Failed to add barcode ${barcode}:`, error);
+          }
+        }
+      }
+    }
 
     return NextResponse.json({ product: result.rows[0] }, { status: 201 });
   } catch (error) {

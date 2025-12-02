@@ -247,6 +247,18 @@ export async function initializeDatabase() {
     )
   `);
 
+  // Product barcodes table (for multiple barcodes per product)
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS product_barcodes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      product_id INTEGER NOT NULL,
+      barcode TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+      UNIQUE(barcode)
+    )
+  `);
+
   // Settings table
   await client.execute(`
     CREATE TABLE IF NOT EXISTS settings (
@@ -280,5 +292,11 @@ export async function initializeDatabase() {
   );
   await client.execute(
     `CREATE INDEX IF NOT EXISTS idx_supplier_payments_po ON supplier_payments(purchase_order_id)`
+  );
+  await client.execute(
+    `CREATE INDEX IF NOT EXISTS idx_product_barcodes_product ON product_barcodes(product_id)`
+  );
+  await client.execute(
+    `CREATE INDEX IF NOT EXISTS idx_product_barcodes_barcode ON product_barcodes(barcode)`
   );
 }

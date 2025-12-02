@@ -175,6 +175,7 @@ const productUnitEnum = z.enum([
 const productSchema = z.object({
   name: z.string().min(1, "Name is required"),
   barcode: z.string().optional(),
+  additional_barcodes: z.array(z.string()).optional(),
   sku: z.string().optional(),
   description: z.string().optional(),
   category_id: z.union([z.number(), z.string(), z.undefined()]).optional(),
@@ -201,6 +202,7 @@ type ProductFormDataRaw = z.infer<typeof productSchema>;
 interface ProductFormData {
   name: string;
   barcode?: string;
+  additional_barcodes?: string[];
   sku?: string;
   description?: string;
   category_id?: number;
@@ -244,6 +246,7 @@ export function ProductForm({ productId, onSuccess }: ProductFormProps) {
     defaultValues: {
       name: "",
       barcode: "",
+      additional_barcodes: [],
       sku: "",
       description: "",
       category_id: undefined,
@@ -262,6 +265,7 @@ export function ProductForm({ productId, onSuccess }: ProductFormProps) {
       reset({
         name: productData.product.name,
         barcode: productData.product.barcode || "",
+        additional_barcodes: productData.product.additional_barcodes || [],
         sku: productData.product.sku || "",
         description: productData.product.description || "",
         category_id: productData.product.category_id || undefined,
@@ -326,6 +330,7 @@ export function ProductForm({ productId, onSuccess }: ProductFormProps) {
         const submitData: ProductFormData = {
           name: data.name,
           barcode: data.barcode || undefined,
+          additional_barcodes: data.additional_barcodes?.filter((b) => b.trim()) || undefined,
           sku: data.sku || undefined,
           description: data.description || undefined,
           category_id: categoryId,
@@ -382,6 +387,52 @@ export function ProductForm({ productId, onSuccess }: ProductFormProps) {
             label="Image URL"
             {...register("image_url")}
             error={errors.image_url?.message}
+          />
+        </div>
+        <div>
+          <label className="mb-2 block text-sm font-medium text-gray-700">
+            Additional Barcodes
+          </label>
+          <Controller
+            name="additional_barcodes"
+            control={control}
+            render={({ field }) => (
+              <div className="space-y-2">
+                {field.value?.map((barcode, index) => (
+                  <div key={index} className="flex gap-2">
+                    <Input
+                      value={barcode}
+                      onChange={(e) => {
+                        const newBarcodes = [...(field.value || [])];
+                        newBarcodes[index] = e.target.value;
+                        field.onChange(newBarcodes);
+                      }}
+                      placeholder="Enter barcode"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        const newBarcodes = field.value?.filter((_, i) => i !== index) || [];
+                        field.onChange(newBarcodes);
+                      }}
+                      className="text-red-600 hover:text-red-700"
+                    >
+                      Remove
+                    </Button>
+                  </div>
+                ))}
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    field.onChange([...(field.value || []), ""]);
+                  }}
+                >
+                  Add Barcode
+                </Button>
+              </div>
+            )}
           />
         </div>
         <div className="grid grid-cols-2 gap-4">

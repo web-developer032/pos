@@ -11,6 +11,7 @@ export interface Product {
   id: number;
   name: string;
   barcode?: string;
+  additional_barcodes?: string[];
   sku?: string;
   description?: string;
   category_id?: number;
@@ -30,6 +31,7 @@ export interface Product {
 export interface CreateProductRequest {
   name: string;
   barcode?: string;
+  additional_barcodes?: string[];
   sku?: string;
   description?: string;
   category_id?: number;
@@ -45,6 +47,7 @@ export interface CreateProductRequest {
 export interface UpdateProductRequest {
   name?: string;
   barcode?: string;
+  additional_barcodes?: string[];
   sku?: string;
   description?: string;
   category_id?: number;

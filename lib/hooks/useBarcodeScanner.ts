@@ -43,8 +43,13 @@ export function useBarcodeScanner(options: UseBarcodeScannerOptions = {}) {
       const product = barcodeProductData.product;
 
       // CRITICAL: Verify the product's barcode matches the current scan
+      // Check both primary barcode and additional barcodes
       // This prevents adding a cached product from a previous scan
-      if (product.barcode !== barcode) {
+      const matchesPrimaryBarcode = product.barcode === barcode;
+      const matchesAdditionalBarcode =
+        product.additional_barcodes?.includes(barcode) || false;
+
+      if (!matchesPrimaryBarcode && !matchesAdditionalBarcode) {
         // Product doesn't match current barcode, wait for correct result or error
         return;
       }
