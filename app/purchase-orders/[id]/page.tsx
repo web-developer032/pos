@@ -1,19 +1,23 @@
 "use client";
 
+import { useState } from "react";
 import { useParams } from "next/navigation";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { useGetPurchaseOrderQuery } from "@/lib/api/purchaseOrdersApi";
 import { useCurrency } from "@/lib/hooks/useCurrency";
 import { Button } from "@/components/ui/Button";
+import { Modal } from "@/components/ui/Modal";
+import { PurchaseOrderForm } from "@/components/purchase-orders/PurchaseOrderForm";
 import { formatSystemDate } from "@/lib/utils/dateFormat";
 import Link from "next/link";
 
 export default function PurchaseOrderDetailPage() {
   const params = useParams();
   const poId = parseInt(params.id as string);
-  const { data, isLoading, error } = useGetPurchaseOrderQuery(poId);
+  const { data, isLoading, error, refetch } = useGetPurchaseOrderQuery(poId);
   const { format: formatCurrency } = useCurrency();
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   if (isLoading) {
     return (
@@ -79,15 +83,23 @@ export default function PurchaseOrderDetailPage() {
                 Back to Purchase Orders
               </Button>
             </Link>
+            {po.status === "pending" && (
+              <Button
+                onClick={() => setIsEditModalOpen(true)}
+                className="bg-indigo-600 hover:bg-indigo-700"
+              >
+                Edit
+              </Button>
+            )}
           </div>
 
           <h1 className="text-3xl font-bold">Purchase Order Details</h1>
           <p className="mt-2 text-gray-600">PO Number: {po.po_number}</p>
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-3">
+        <div className="grid gap-6 lg:grid-cols-4">
           {/* Purchase Order Information */}
-          <div className="lg:col-span-2">
+          <div className="lg:col-span-1">
             <div className="rounded-lg bg-white shadow">
               <div className="border-b border-gray-200 px-6 py-4">
                 <h2 className="text-lg font-semibold">
@@ -95,7 +107,7 @@ export default function PurchaseOrderDetailPage() {
                 </h2>
               </div>
               <div className="px-6 py-4">
-                <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <dl className="space-y-4">
                   <div>
                     <dt className="text-sm font-medium text-gray-500">
                       PO Number
@@ -114,7 +126,9 @@ export default function PurchaseOrderDetailPage() {
                     <dt className="text-sm font-medium text-gray-500">
                       Supplier
                     </dt>
-                    <dd className="mt-1 text-sm">{po.supplier_name || "N/A"}</dd>
+                    <dd className="mt-1 text-sm">
+                      {po.supplier_name || "N/A"}
+                    </dd>
                   </div>
                   <div>
                     <dt className="text-sm font-medium text-gray-500">
@@ -153,9 +167,11 @@ export default function PurchaseOrderDetailPage() {
                 </dl>
               </div>
             </div>
+          </div>
 
-            {/* Purchase Order Items */}
-            <div className="mt-6 rounded-lg bg-white shadow">
+          {/* Purchase Order Items */}
+          <div className="lg:col-span-3">
+            <div className="rounded-lg bg-white shadow">
               <div className="border-b border-gray-200 px-6 py-4">
                 <h2 className="text-lg font-semibold">Items</h2>
               </div>
@@ -208,32 +224,37 @@ export default function PurchaseOrderDetailPage() {
                   </tbody>
                 </table>
               </div>
-            </div>
-          </div>
-
-          {/* Summary */}
-          <div className="lg:col-span-1">
-            <div className="rounded-lg bg-white shadow">
-              <div className="border-b border-gray-200 px-6 py-4">
-                <h2 className="text-lg font-semibold">Summary</h2>
-              </div>
-              <div className="px-6 py-4">
-                <dl className="space-y-3">
-                  <div className="border-t border-gray-200 pt-3">
-                    <div className="flex justify-between">
-                      <dt className="text-base font-semibold">Total Amount</dt>
-                      <dd className="text-base font-bold text-indigo-600">
-                        {formatCurrency(po.total_amount)}
-                      </dd>
-                    </div>
+              <div className="border-t border-gray-200 px-6 py-4">
+                <div className="flex justify-end">
+                  <div className="flex items-center gap-4">
+                    <span className="text-base font-semibold text-gray-700">
+                      Total Amount:
+                    </span>
+                    <span className="text-base font-bold text-indigo-600">
+                      {formatCurrency(po.total_amount)}
+                    </span>
                   </div>
-                </dl>
+                </div>
               </div>
             </div>
           </div>
         </div>
+
+        <Modal
+          isOpen={isEditModalOpen}
+          onClose={() => setIsEditModalOpen(false)}
+          title="Edit Purchase Order"
+          size="lg"
+        >
+          <PurchaseOrderForm
+            purchaseOrderId={poId}
+            onSuccess={() => {
+              setIsEditModalOpen(false);
+              refetch();
+            }}
+          />
+        </Modal>
       </DashboardLayout>
     </ProtectedRoute>
   );
 }
-
