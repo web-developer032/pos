@@ -46,14 +46,14 @@ export function Modal({
   };
 
   const modalContent = (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
-      <div className="flex min-h-screen items-center justify-center px-4 pb-20 pt-4 text-center sm:block sm:p-0">
+    <div className="fixed inset-0 z-50 overflow-hidden">
+      <div className="flex min-h-screen items-center justify-center px-4 py-4">
         <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" />
 
         <div
-          className={`inline-block transform overflow-hidden rounded-lg bg-white text-left align-bottom shadow-xl transition-all sm:my-8 sm:align-middle ${sizeClasses[size]} w-full`}
+          className={`relative transform overflow-hidden rounded-lg bg-white text-left shadow-xl transition-all ${sizeClasses[size]} flex max-h-[90vh] w-full flex-col sm:w-auto`}
         >
-          <div className="border-b border-gray-200 px-6 py-4">
+          <div className="flex-shrink-0 border-b border-gray-200 px-6 py-4">
             <div className="flex items-center justify-between">
               {title ? (
                 <h3 className="text-lg font-medium">{title}</h3>
@@ -81,7 +81,7 @@ export function Modal({
               </button>
             </div>
           </div>
-          <div className="px-6 py-4">{children}</div>
+          <div className="flex-1 overflow-y-auto px-6 py-4">{children}</div>
         </div>
       </div>
     </div>
