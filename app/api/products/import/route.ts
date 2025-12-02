@@ -25,26 +25,30 @@ const productSchema = z.object({
       val === "" || val === null || val === undefined ? undefined : Number(val),
     z.number().optional()
   ),
-  cost_price: z.preprocess(
-    (val) =>
-      val === "" || val === null || val === undefined ? 0 : Number(val),
-    z.number().min(0)
-  ),
-  selling_price: z.preprocess(
-    (val) =>
-      val === "" || val === null || val === undefined ? 0 : Number(val),
-    z.number().min(0)
-  ),
-  stock_quantity: z.preprocess(
-    (val) =>
-      val === "" || val === null || val === undefined ? 0 : Number(val),
-    z.number().min(0).optional().default(0)
-  ),
-  min_stock_level: z.preprocess(
-    (val) =>
-      val === "" || val === null || val === undefined ? 0 : Number(val),
-    z.number().min(0).optional().default(0)
-  ),
+  cost_price: z.preprocess((val) => {
+    if (val === "" || val === null || val === undefined) return 0;
+    // Remove commas from string before parsing
+    const cleaned = String(val).replace(/,/g, "").trim();
+    return cleaned === "" ? 0 : Number(cleaned);
+  }, z.number().min(0)),
+  selling_price: z.preprocess((val) => {
+    if (val === "" || val === null || val === undefined) return 0;
+    // Remove commas from string before parsing
+    const cleaned = String(val).replace(/,/g, "").trim();
+    return cleaned === "" ? 0 : Number(cleaned);
+  }, z.number().min(0)),
+  stock_quantity: z.preprocess((val) => {
+    if (val === "" || val === null || val === undefined) return 0;
+    // Remove commas from string before parsing
+    const cleaned = String(val).replace(/,/g, "").trim();
+    return cleaned === "" ? 0 : Number(cleaned);
+  }, z.number().min(0).optional().default(0)),
+  min_stock_level: z.preprocess((val) => {
+    if (val === "" || val === null || val === undefined) return 0;
+    // Remove commas from string before parsing
+    const cleaned = String(val).replace(/,/g, "").trim();
+    return cleaned === "" ? 0 : Number(cleaned);
+  }, z.number().min(0).optional().default(0)),
   unit: z.preprocess(
     (val) => {
       const str = String(val || "")

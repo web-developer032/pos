@@ -128,7 +128,7 @@ export function ProductList() {
         return str.length > 0 ? str : undefined;
       };
 
-      // Helper to parse numbers safely
+      // Helper to parse numbers safely (handles comma-separated numbers)
       const parseNumber = (
         value: unknown,
         defaultValue: number = 0
@@ -136,8 +136,12 @@ export function ProductList() {
         if (value === null || value === undefined || value === "") {
           return defaultValue;
         }
-        const parsed =
-          typeof value === "string" ? parseFloat(value) : Number(value);
+        // Remove commas and parse
+        const cleanedValue =
+          typeof value === "string"
+            ? value.replace(/,/g, "").trim()
+            : String(value).replace(/,/g, "").trim();
+        const parsed = parseFloat(cleanedValue);
         return isNaN(parsed) ? defaultValue : parsed;
       };
 
@@ -148,8 +152,12 @@ export function ProductList() {
         if (value === null || value === undefined || value === "") {
           return defaultValue;
         }
-        const parsed =
-          typeof value === "string" ? parseInt(value, 10) : Number(value);
+        // Remove commas and parse
+        const cleanedValue =
+          typeof value === "string"
+            ? value.replace(/,/g, "").trim()
+            : String(value).replace(/,/g, "").trim();
+        const parsed = parseInt(cleanedValue, 10);
         return isNaN(parsed) ? defaultValue : parsed;
       };
 
