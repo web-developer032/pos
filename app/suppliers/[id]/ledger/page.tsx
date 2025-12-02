@@ -7,6 +7,8 @@ import {
   useGetSupplierQuery,
   useGetSupplierLedgerQuery,
   useCreateSupplierPaymentMutation,
+  useUpdateSupplierPaymentMutation,
+  useDeleteSupplierPaymentMutation,
 } from "@/lib/api/suppliersApi";
 import { useCurrency } from "@/lib/hooks/useCurrency";
 import { Button } from "@/components/ui/Button";
@@ -37,8 +39,14 @@ export default function SupplierLedgerPage() {
     refetch,
   } = useGetSupplierLedgerQuery(supplierId);
   const [createPayment] = useCreateSupplierPaymentMutation();
+  const [updatePayment] = useUpdateSupplierPaymentMutation();
+  const [deletePayment] = useDeleteSupplierPaymentMutation();
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [editingPaymentId, setEditingPaymentId] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [deletingPaymentId, setDeletingPaymentId] = useState<number | null>(
+    null
+  );
   const { format: formatCurrency } = useCurrency();
 
   const {
@@ -60,29 +68,80 @@ export default function SupplierLedgerPage() {
     if (isSubmitting) return;
     setIsSubmitting(true);
     try {
-      await createPayment({
-        supplierId,
-        data: {
-          purchase_order_id:
-            data.purchase_order_id === ""
-              ? undefined
-              : parseInt(data.purchase_order_id),
-          amount: parseFloat(data.amount),
-          payment_method: data.payment_method,
-          reference_number:
-            data.reference_number === "" ? undefined : data.reference_number,
-          notes: data.notes === "" ? undefined : data.notes,
-        },
-      }).unwrap();
-      toast.success("Payment recorded successfully");
+      const paymentData = {
+        purchase_order_id:
+          data.purchase_order_id === ""
+            ? undefined
+            : parseInt(data.purchase_order_id),
+        amount: parseFloat(data.amount),
+        payment_method: data.payment_method,
+        reference_number:
+          data.reference_number === "" ? undefined : data.reference_number,
+        notes: data.notes === "" ? undefined : data.notes,
+      };
+
+      if (editingPaymentId) {
+        await updatePayment({
+          supplierId,
+          paymentId: editingPaymentId,
+          data: paymentData,
+        }).unwrap();
+        toast.success("Payment updated successfully");
+      } else {
+        await createPayment({
+          supplierId,
+          data: paymentData,
+        }).unwrap();
+        toast.success("Payment recorded successfully");
+      }
       reset();
       setIsPaymentModalOpen(false);
+      setEditingPaymentId(null);
       refetch();
     } catch (error: unknown) {
       const err = error as { data?: { error?: string } };
-      toast.error(err.data?.error || "Failed to record payment");
+      toast.error(err.data?.error || "Failed to save payment");
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleEditPayment = (paymentId: number) => {
+    const payment = payments.find((p) => p.id === paymentId);
+    if (payment) {
+      setEditingPaymentId(paymentId);
+      reset({
+        purchase_order_id: payment.purchase_order_id?.toString() || "",
+        amount: payment.amount.toString(),
+        payment_method: payment.payment_method,
+        reference_number: payment.reference_number || "",
+        notes: payment.notes || "",
+      });
+      setIsPaymentModalOpen(true);
+    }
+  };
+
+  const handleDeletePayment = async (paymentId: number) => {
+    if (
+      !confirm(
+        "Are you sure you want to delete this payment? This action cannot be undone."
+      )
+    ) {
+      return;
+    }
+    setDeletingPaymentId(paymentId);
+    try {
+      await deletePayment({
+        supplierId,
+        paymentId,
+      }).unwrap();
+      toast.success("Payment deleted successfully");
+      refetch();
+    } catch (error: unknown) {
+      const err = error as { data?: { error?: string } };
+      toast.error(err.data?.error || "Failed to delete payment");
+    } finally {
+      setDeletingPaymentId(null);
     }
   };
 
@@ -210,13 +269,16 @@ export default function SupplierLedgerPage() {
                     <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                       Status
                     </th>
+                    <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">
+                      Actions
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200 bg-white">
                   {purchase_orders.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={4}
+                        colSpan={5}
                         className="px-6 py-4 text-center text-sm text-gray-500"
                       >
                         No purchase orders found
@@ -247,6 +309,14 @@ export default function SupplierLedgerPage() {
                             {po.status}
                           </span>
                         </td>
+                        <td className="whitespace-nowrap px-6 py-4 text-right text-sm font-medium">
+                          <Link
+                            href={`/purchase-orders/${po.id}`}
+                            className="text-indigo-600 hover:text-indigo-900"
+                          >
+                            View
+                          </Link>
+                        </td>
                       </tr>
                     ))
                   )}
@@ -276,13 +346,16 @@ export default function SupplierLedgerPage() {
                     <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                       Method
                     </th>
+                    <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">
+                      Actions
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200 bg-white">
                   {payments.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={4}
+                        colSpan={5}
                         className="px-6 py-4 text-center text-sm text-gray-500"
                       >
                         No payments recorded
@@ -303,6 +376,25 @@ export default function SupplierLedgerPage() {
                         <td className="whitespace-nowrap px-6 py-4 text-sm capitalize text-gray-500">
                           {payment.payment_method.replace("_", " ")}
                         </td>
+                        <td className="whitespace-nowrap px-6 py-4 text-right text-sm font-medium">
+                          <div className="flex items-center justify-end gap-3">
+                            <button
+                              onClick={() => handleEditPayment(payment.id)}
+                              className="text-indigo-600 hover:text-indigo-900"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => handleDeletePayment(payment.id)}
+                              disabled={deletingPaymentId === payment.id}
+                              className="text-red-600 hover:text-red-900 disabled:opacity-50"
+                            >
+                              {deletingPaymentId === payment.id
+                                ? "Deleting..."
+                                : "Delete"}
+                            </button>
+                          </div>
+                        </td>
                       </tr>
                     ))
                   )}
@@ -318,8 +410,9 @@ export default function SupplierLedgerPage() {
           onClose={() => {
             setIsPaymentModalOpen(false);
             reset();
+            setEditingPaymentId(null);
           }}
-          title="Record Payment"
+          title={editingPaymentId ? "Edit Payment" : "Record Payment"}
           size="md"
         >
           <form
@@ -390,7 +483,11 @@ export default function SupplierLedgerPage() {
                 Cancel
               </Button>
               <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? "Recording..." : "Record Payment"}
+                {isSubmitting
+                  ? "Saving..."
+                  : editingPaymentId
+                    ? "Update Payment"
+                    : "Record Payment"}
               </Button>
             </div>
           </form>

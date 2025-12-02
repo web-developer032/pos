@@ -63,6 +63,14 @@ export interface CreateSupplierPaymentRequest {
   notes?: string;
 }
 
+export interface UpdateSupplierPaymentRequest {
+  purchase_order_id?: number;
+  amount: number;
+  payment_method: "cash" | "bank_transfer" | "check" | "other";
+  reference_number?: string;
+  notes?: string;
+}
+
 export const suppliersApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
     getSuppliers: builder.query<
@@ -150,6 +158,45 @@ export const suppliersApi = apiSlice.injectEndpoints({
         { type: "Supplier", id: supplierId },
       ],
     }),
+    getSupplierPayment: builder.query<
+      { payment: SupplierPayment },
+      { supplierId: number; paymentId: number }
+    >({
+      query: ({ supplierId, paymentId }) =>
+        `/suppliers/${supplierId}/payments/${paymentId}`,
+      providesTags: (result, error, { paymentId }) => [
+        { type: "Supplier", id: paymentId },
+      ],
+    }),
+    updateSupplierPayment: builder.mutation<
+      { payment: SupplierPayment },
+      {
+        supplierId: number;
+        paymentId: number;
+        data: UpdateSupplierPaymentRequest;
+      }
+    >({
+      query: ({ supplierId, paymentId, data }) => ({
+        url: `/suppliers/${supplierId}/payments/${paymentId}`,
+        method: "PUT",
+        body: data,
+      }),
+      invalidatesTags: (result, error, { supplierId }) => [
+        { type: "Supplier", id: supplierId },
+      ],
+    }),
+    deleteSupplierPayment: builder.mutation<
+      { message: string },
+      { supplierId: number; paymentId: number }
+    >({
+      query: ({ supplierId, paymentId }) => ({
+        url: `/suppliers/${supplierId}/payments/${paymentId}`,
+        method: "DELETE",
+      }),
+      invalidatesTags: (result, error, { supplierId }) => [
+        { type: "Supplier", id: supplierId },
+      ],
+    }),
   }),
 });
 
@@ -163,4 +210,7 @@ export const {
   useDeleteAllSuppliersMutation,
   useGetSupplierLedgerQuery,
   useCreateSupplierPaymentMutation,
+  useGetSupplierPaymentQuery,
+  useUpdateSupplierPaymentMutation,
+  useDeleteSupplierPaymentMutation,
 } = suppliersApi;
