@@ -54,7 +54,7 @@ export async function seedDatabase() {
     });
   }
 
-  // Seed default settings
+  // Seed default settings (only if they don't exist)
   const settings = [
     { key: "store_name", value: "Super Store" },
     { key: "tax_rate", value: "10" },
@@ -63,9 +63,16 @@ export async function seedDatabase() {
   ];
 
   for (const setting of settings) {
-    await client.execute({
-      sql: "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
-      args: [setting.key, setting.value],
+    const existing = await client.execute({
+      sql: "SELECT key FROM settings WHERE key = ?",
+      args: [setting.key],
     });
+
+    if (existing.rows.length === 0) {
+      await client.execute({
+        sql: "INSERT INTO settings (key, value) VALUES (?, ?)",
+        args: [setting.key, setting.value],
+      });
+    }
   }
 }
