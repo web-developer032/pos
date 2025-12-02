@@ -120,6 +120,9 @@ export default function SalesPage() {
                 <th className="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 sm:px-6">
                   Total
                 </th>
+                <th className="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 sm:px-6">
+                  Profit
+                </th>
                 <th className="px-3 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 sm:px-6">
                   Actions
                 </th>
@@ -142,6 +145,9 @@ export default function SalesPage() {
                   </td>
                   <td className="px-3 py-4 text-sm font-semibold sm:px-6">
                     {formatCurrency(sale.final_amount)}
+                  </td>
+                  <td className="px-3 py-4 text-sm font-semibold text-green-600 sm:px-6">
+                    {formatCurrency(sale.total_profit || 0)}
                   </td>
                   <td className="whitespace-nowrap px-3 py-4 text-right text-sm font-medium sm:px-6">
                     <div className="flex items-center justify-end gap-2">

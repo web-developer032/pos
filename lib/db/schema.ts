@@ -149,12 +149,47 @@ export async function initializeDatabase() {
       product_id INTEGER NOT NULL,
       quantity REAL NOT NULL,
       unit_price REAL NOT NULL,
+      cost_price REAL NOT NULL DEFAULT 0,
       discount REAL NOT NULL DEFAULT 0,
       subtotal REAL NOT NULL,
       FOREIGN KEY (sale_id) REFERENCES sales(id) ON DELETE CASCADE,
       FOREIGN KEY (product_id) REFERENCES products(id)
     )
   `);
+
+  // Migration: Add cost_price column to sale_items if it doesn't exist
+  try {
+    const tableInfo = await client.execute(`PRAGMA table_info(sale_items)`);
+    const hasCostPriceColumn = tableInfo.rows.some(
+      (row) => (row.name as string) === "cost_price"
+    );
+    if (!hasCostPriceColumn) {
+      await client.execute(`
+        ALTER TABLE sale_items ADD COLUMN cost_price REAL NOT NULL DEFAULT 0
+      `);
+      console.log("Migration: Added 'cost_price' column to sale_items table");
+
+      // Update existing sale_items with cost_price from products table
+      await client.execute(`
+        UPDATE sale_items 
+        SET cost_price = (
+          SELECT COALESCE(p.cost_price, 0) 
+          FROM products p 
+          WHERE p.id = sale_items.product_id
+        )
+        WHERE cost_price = 0
+      `);
+      console.log(
+        "Migration: Updated existing sale_items with cost_price from products"
+      );
+    }
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.warn(
+      "Migration warning: Failed to check/add cost_price column:",
+      errorMessage
+    );
+  }
 
   // Payments table
   await client.execute(`

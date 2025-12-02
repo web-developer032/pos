@@ -4,7 +4,7 @@ import client from "@/lib/db";
 import { z } from "zod";
 import {
   getPaginationParams,
-  executePaginatedQuery,
+  buildPaginationResponse,
   handleApiError,
   handleValidationError,
 } from "@/lib/utils/apiHelpers";
@@ -32,10 +32,14 @@ async function getHandler(req: NextRequest) {
     const { page, limit, offset } = getPaginationParams(req);
 
     let sql = `
-      SELECT s.*, u.username as user_name, c.name as customer_name
+      SELECT s.*, 
+             u.username as user_name, 
+             c.name as customer_name,
+             COALESCE(SUM((si.unit_price - si.cost_price) * si.quantity), 0) as total_profit
       FROM sales s
       LEFT JOIN users u ON s.user_id = u.id
       LEFT JOIN customers c ON s.customer_id = c.id
+      LEFT JOIN sale_items si ON s.id = si.sale_id
       WHERE 1=1
     `;
     const args: (string | number)[] = [];
@@ -53,18 +57,41 @@ async function getHandler(req: NextRequest) {
       args.push(`${endDate} 23:59:59`);
     }
 
-    const result = await executePaginatedQuery({
-      baseSql: sql,
-      baseArgs: args,
-      orderBy: "s.created_at DESC",
-      page,
-      limit,
-      offset,
+    sql += " GROUP BY s.id";
+
+    // Get total count (need to count distinct sales, not rows)
+    const countSql = `
+      SELECT COUNT(DISTINCT s.id) as total
+      FROM sales s
+      LEFT JOIN users u ON s.user_id = u.id
+      LEFT JOIN customers c ON s.customer_id = c.id
+      WHERE 1=1
+      ${startDate ? "AND s.created_at >= ?" : ""}
+      ${endDate ? "AND s.created_at <= ?" : ""}
+    `;
+    const countArgs: (string | number)[] = [];
+    if (startDate) countArgs.push(`${startDate} 00:00:00`);
+    if (endDate) countArgs.push(`${endDate} 23:59:59`);
+
+    const countResult = await client.execute({
+      sql: countSql,
+      args: countArgs,
+    });
+    const total = (countResult.rows[0] as unknown as { total: number }).total;
+
+    // Execute paginated query
+    const paginatedSql = `${sql} ORDER BY s.created_at DESC LIMIT ? OFFSET ?`;
+    const paginatedArgs = [...args, limit, offset];
+    const dataResult = await client.execute({
+      sql: paginatedSql,
+      args: paginatedArgs,
     });
 
+    const pagination = buildPaginationResponse(total, page, limit);
+
     return NextResponse.json({
-      sales: result.data,
-      pagination: result.pagination,
+      sales: dataResult.rows,
+      pagination,
     });
   } catch (error) {
     return handleApiError(error, "fetching sales");
@@ -122,13 +149,25 @@ async function postHandler(req: AuthRequest) {
     for (const item of validated.items) {
       const subtotal = item.quantity * item.unit_price - (item.discount || 0);
 
+      // Get current cost_price from product to store with sale
+      const productResult = await client.execute({
+        sql: "SELECT cost_price FROM products WHERE id = ?",
+        args: [item.product_id],
+      });
+      const costPrice =
+        productResult.rows.length > 0
+          ? (productResult.rows[0] as unknown as { cost_price: number })
+              .cost_price || 0
+          : 0;
+
       await client.execute({
-        sql: "INSERT INTO sale_items (sale_id, product_id, quantity, unit_price, discount, subtotal) VALUES (?, ?, ?, ?, ?, ?)",
+        sql: "INSERT INTO sale_items (sale_id, product_id, quantity, unit_price, cost_price, discount, subtotal) VALUES (?, ?, ?, ?, ?, ?, ?)",
         args: [
           saleId,
           item.product_id,
           item.quantity,
           item.unit_price,
+          costPrice,
           item.discount || 0,
           subtotal,
         ],
@@ -164,11 +203,11 @@ async function postHandler(req: AuthRequest) {
     });
 
     // Get sale items with product details (use LEFT JOIN to handle deleted products)
+    // Use stored cost_price from sale_items instead of current product cost_price
     const saleItemsResult = await client.execute({
       sql: `SELECT si.*, 
                    COALESCE(p.name, 'Deleted Product') as product_name, 
-                   p.barcode,
-                   COALESCE(p.cost_price, 0) as cost_price
+                   p.barcode
             FROM sale_items si
             LEFT JOIN products p ON si.product_id = p.id
             WHERE si.sale_id = ?

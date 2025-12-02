@@ -21,11 +21,11 @@ async function getHandler(req: NextRequest, context?: RouteContext) {
       return NextResponse.json({ error: "Sale not found" }, { status: 404 });
     }
 
+    // Use stored cost_price from sale_items instead of current product cost_price
     const itemsResult = await client.execute({
       sql: `SELECT si.*, 
                    COALESCE(p.name, 'Deleted Product') as product_name, 
-                   p.barcode,
-                   COALESCE(p.cost_price, 0) as cost_price
+                   p.barcode
             FROM sale_items si
             LEFT JOIN products p ON si.product_id = p.id
             WHERE si.sale_id = ?`,
