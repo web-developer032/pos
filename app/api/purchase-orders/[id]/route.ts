@@ -57,6 +57,8 @@ const updateItemsSchema = z.object({
       })
     )
     .optional(),
+  discount_type: z.enum(["percentage", "amount"]).optional(),
+  discount_value: z.number().min(0).optional(),
 });
 
 async function putHandler(req: AuthRequest, context?: RouteContext) {
@@ -111,11 +113,22 @@ async function putHandler(req: AuthRequest, context?: RouteContext) {
           args: [poId],
         });
 
-        // Calculate new total
-        const totalAmount = validated.items.reduce(
+        // Calculate subtotal
+        const subtotal = validated.items.reduce(
           (sum, item) => sum + item.quantity * item.unit_cost,
           0
         );
+
+        // Calculate discount
+        let discountAmount = 0;
+        if (validated.discount_type && validated.discount_value) {
+          if (validated.discount_type === "percentage") {
+            discountAmount = (subtotal * validated.discount_value) / 100;
+          } else {
+            discountAmount = validated.discount_value;
+          }
+        }
+        const totalAmount = Math.max(0, subtotal - discountAmount);
 
         // Insert new items
         for (const item of validated.items) {
@@ -132,10 +145,20 @@ async function putHandler(req: AuthRequest, context?: RouteContext) {
           });
         }
 
-        // Update total amount
+        // Update total amount and discount
         await client.execute({
-          sql: "UPDATE purchase_orders SET total_amount = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-          args: [totalAmount, poId],
+          sql: `UPDATE purchase_orders 
+                SET total_amount = ?, 
+                    discount_type = ?, 
+                    discount_value = ?, 
+                    updated_at = CURRENT_TIMESTAMP 
+                WHERE id = ?`,
+          args: [
+            totalAmount,
+            validated.discount_type || null,
+            validated.discount_value || null,
+            poId,
+          ],
         });
       }
 

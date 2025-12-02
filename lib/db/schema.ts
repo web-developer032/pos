@@ -177,6 +177,8 @@ export async function initializeDatabase() {
       supplier_id INTEGER NOT NULL,
       user_id INTEGER NOT NULL,
       total_amount REAL NOT NULL DEFAULT 0,
+      discount_type TEXT CHECK(discount_type IN ('percentage', 'amount')),
+      discount_value REAL DEFAULT 0,
       status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending', 'completed', 'cancelled')),
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -184,6 +186,43 @@ export async function initializeDatabase() {
       FOREIGN KEY (user_id) REFERENCES users(id)
     )
   `);
+
+  // Migration: Add discount columns if they don't exist
+  try {
+    const tableInfo = await client.execute(
+      `PRAGMA table_info(purchase_orders)`
+    );
+    const hasDiscountType = tableInfo.rows.some(
+      (row) => (row.name as string | undefined) === "discount_type"
+    );
+    const hasDiscountValue = tableInfo.rows.some(
+      (row) => (row.name as string | undefined) === "discount_value"
+    );
+
+    if (!hasDiscountType) {
+      await client.execute(`
+        ALTER TABLE purchase_orders ADD COLUMN discount_type TEXT CHECK(discount_type IN ('percentage', 'amount'))
+      `);
+      console.log(
+        "Migration: Added 'discount_type' column to purchase_orders table"
+      );
+    }
+
+    if (!hasDiscountValue) {
+      await client.execute(`
+        ALTER TABLE purchase_orders ADD COLUMN discount_value REAL DEFAULT 0
+      `);
+      console.log(
+        "Migration: Added 'discount_value' column to purchase_orders table"
+      );
+    }
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.warn(
+      "Migration warning: Failed to check/add discount columns:",
+      errorMessage
+    );
+  }
 
   // Purchase order items table
   await client.execute(`

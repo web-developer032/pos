@@ -7,6 +7,8 @@ export interface PurchaseOrder {
   supplier_id: number;
   user_id: number;
   total_amount: number;
+  discount_type?: "percentage" | "amount" | null;
+  discount_value?: number | null;
   status: "pending" | "completed" | "cancelled";
   created_at: string;
   updated_at: string;
@@ -31,6 +33,8 @@ export interface CreatePurchaseOrderRequest {
     quantity: number;
     unit_cost: number;
   }[];
+  discount_type?: "percentage" | "amount";
+  discount_value?: number;
 }
 
 export interface UpdatePurchaseOrderItemsRequest {
@@ -40,6 +44,8 @@ export interface UpdatePurchaseOrderItemsRequest {
     quantity: number;
     unit_cost: number;
   }[];
+  discount_type?: "percentage" | "amount";
+  discount_value?: number;
 }
 
 export const purchaseOrdersApi = apiSlice.injectEndpoints({

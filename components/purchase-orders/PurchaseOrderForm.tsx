@@ -42,6 +42,8 @@ const purchaseOrderSchema = z.object({
       })
     )
     .min(1, "At least one item is required"),
+  discount_type: z.enum(["percentage", "amount"]).optional(),
+  discount_value: z.number().min(0).optional(),
 });
 
 type PurchaseOrderFormData = z.infer<typeof purchaseOrderSchema>;
@@ -195,6 +197,8 @@ export function PurchaseOrderForm({
     defaultValues: {
       supplier_id: 0,
       items: [{ product_id: 0, quantity: 1, unit_cost: 0 }],
+      discount_type: undefined,
+      discount_value: undefined,
     },
   });
 
@@ -204,6 +208,8 @@ export function PurchaseOrderForm({
   });
 
   const watchedItems = watch("items");
+  const discountType = watch("discount_type");
+  const discountValue = watch("discount_value");
 
   // Update cache when products are loaded
   useEffect(() => {
@@ -228,6 +234,8 @@ export function PurchaseOrderForm({
                 unit_cost: item.unit_cost,
               }))
             : [{ product_id: 0, quantity: 1, unit_cost: 0 }],
+        discount_type: purchase_order.discount_type || undefined,
+        discount_value: purchase_order.discount_value || undefined,
       });
     }
   }, [purchaseOrderData, isEditMode, reset]);
@@ -339,10 +347,39 @@ export function PurchaseOrderForm({
   }, [productsData?.products, watchedItems, formatCurrency]);
 
   const calculateTotal = () => {
-    return watchedItems.reduce(
+    const subtotal = watchedItems.reduce(
       (sum, item) => sum + (item.quantity || 0) * (item.unit_cost || 0),
       0
     );
+
+    if (!discountType || !discountValue || discountValue <= 0) {
+      return subtotal;
+    }
+
+    if (discountType === "percentage") {
+      const discountAmount = (subtotal * discountValue) / 100;
+      return subtotal - discountAmount;
+    } else {
+      // amount
+      return Math.max(0, subtotal - discountValue);
+    }
+  };
+
+  const calculateDiscountAmount = () => {
+    const subtotal = watchedItems.reduce(
+      (sum, item) => sum + (item.quantity || 0) * (item.unit_cost || 0),
+      0
+    );
+
+    if (!discountType || !discountValue || discountValue <= 0) {
+      return 0;
+    }
+
+    if (discountType === "percentage") {
+      return (subtotal * discountValue) / 100;
+    } else {
+      return discountValue;
+    }
   };
 
   const onSubmit = async (data: PurchaseOrderFormData) => {
@@ -355,17 +392,25 @@ export function PurchaseOrderForm({
         unit_cost: item.unit_cost,
       }));
 
+      const submitData = {
+        supplier_id: data.supplier_id,
+        items,
+        ...(data.discount_type && data.discount_value
+          ? {
+              discount_type: data.discount_type,
+              discount_value: data.discount_value,
+            }
+          : {}),
+      };
+
       if (isEditMode && purchaseOrderId) {
         await updatePurchaseOrderItems({
           id: purchaseOrderId,
-          data: { supplier_id: data.supplier_id, items },
+          data: submitData,
         }).unwrap();
         toast.success("Purchase order updated successfully");
       } else {
-        await createPurchaseOrder({
-          supplier_id: data.supplier_id,
-          items,
-        }).unwrap();
+        await createPurchaseOrder(submitData).unwrap();
         toast.success("Purchase order created successfully");
         reset();
       }
@@ -525,12 +570,103 @@ export function PurchaseOrderForm({
           )}
         </div>
 
-        <div className="border-t border-gray-200 pt-4">
-          <div className="flex items-center justify-between">
-            <span className="text-lg font-semibold">Total:</span>
-            <span className="text-lg font-bold text-indigo-600">
-              {formatCurrency(calculateTotal())}
-            </span>
+        <div className="space-y-3 border-t border-gray-200 pt-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <Controller
+                name="discount_type"
+                control={control}
+                render={({ field }) => (
+                  <Select
+                    label="Discount Type"
+                    options={[
+                      { value: "", label: "No Discount" },
+                      { value: "percentage", label: "Percentage (%)" },
+                      { value: "amount", label: "Amount" },
+                    ]}
+                    value={field.value || ""}
+                    onChange={(e) => {
+                      field.onChange(
+                        e.target.value === "" ? undefined : e.target.value
+                      );
+                      if (e.target.value === "") {
+                        setValue("discount_value", undefined);
+                      }
+                    }}
+                    error={errors.discount_type?.message}
+                  />
+                )}
+              />
+            </div>
+            {discountType && (
+              <div>
+                <Input
+                  label={
+                    discountType === "percentage"
+                      ? "Discount Percentage (%)"
+                      : "Discount Amount"
+                  }
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  max={discountType === "percentage" ? "100" : undefined}
+                  {...register("discount_value", {
+                    valueAsNumber: true,
+                    validate: (val) => {
+                      if (discountType && (!val || val <= 0)) {
+                        return "Discount value must be greater than 0";
+                      }
+                      if (
+                        discountType === "percentage" &&
+                        val !== undefined &&
+                        val > 100
+                      ) {
+                        return "Percentage cannot exceed 100%";
+                      }
+                      return true;
+                    },
+                  })}
+                  error={errors.discount_value?.message}
+                />
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-base font-medium text-gray-700">
+                Subtotal:
+              </span>
+              <span className="text-base font-medium">
+                {formatCurrency(
+                  watchedItems.reduce(
+                    (sum, item) =>
+                      sum + (item.quantity || 0) * (item.unit_cost || 0),
+                    0
+                  )
+                )}
+              </span>
+            </div>
+            {discountType && discountValue && discountValue > 0 && (
+              <div className="flex items-center justify-between text-red-600">
+                <span className="text-base font-medium">
+                  Discount (
+                  {discountType === "percentage"
+                    ? `${discountValue}%`
+                    : formatCurrency(discountValue)}
+                  ):
+                </span>
+                <span className="text-base font-medium">
+                  -{formatCurrency(calculateDiscountAmount())}
+                </span>
+              </div>
+            )}
+            <div className="flex items-center justify-between border-t border-gray-200 pt-2">
+              <span className="text-lg font-semibold">Total:</span>
+              <span className="text-lg font-bold text-indigo-600">
+                {formatCurrency(calculateTotal())}
+              </span>
+            </div>
           </div>
         </div>
 

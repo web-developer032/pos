@@ -60,12 +60,32 @@ export default function PurchaseOrderDetailPage() {
     supplier_id: number;
     user_id: number;
     total_amount: number;
+    discount_type?: "percentage" | "amount" | null;
+    discount_value?: number | null;
     status: "pending" | "completed" | "cancelled";
     created_at: string;
     updated_at: string;
     supplier_name?: string;
     user_name?: string;
   };
+
+  // Calculate subtotal and discount amount
+  const itemsSubtotal = items.reduce(
+    (sum, item) =>
+      sum +
+      ((item as { quantity: number; unit_cost: number }).quantity || 0) *
+        ((item as { quantity: number; unit_cost: number }).unit_cost || 0),
+    0
+  );
+
+  let discountAmount = 0;
+  if (po.discount_type && po.discount_value) {
+    if (po.discount_type === "percentage") {
+      discountAmount = (itemsSubtotal * po.discount_value) / 100;
+    } else {
+      discountAmount = po.discount_value;
+    }
+  }
 
   const handleDelete = async () => {
     if (
@@ -269,8 +289,32 @@ export default function PurchaseOrderDetailPage() {
                 </table>
               </div>
               <div className="border-t border-gray-200 px-6 py-4">
-                <div className="flex justify-end">
-                  <div className="flex items-center gap-4">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-end gap-4">
+                    <span className="text-base font-medium text-gray-700">
+                      Subtotal:
+                    </span>
+                    <span className="text-base font-medium">
+                      {formatCurrency(itemsSubtotal)}
+                    </span>
+                  </div>
+                  {po.discount_type &&
+                    po.discount_value &&
+                    po.discount_value > 0 && (
+                      <div className="flex items-center justify-end gap-4 text-red-600">
+                        <span className="text-base font-medium">
+                          Discount (
+                          {po.discount_type === "percentage"
+                            ? `${po.discount_value}%`
+                            : formatCurrency(po.discount_value)}
+                          ):
+                        </span>
+                        <span className="text-base font-medium">
+                          -{formatCurrency(discountAmount)}
+                        </span>
+                      </div>
+                    )}
+                  <div className="flex items-center justify-end gap-4 border-t border-gray-200 pt-2">
                     <span className="text-base font-semibold text-gray-700">
                       Total Amount:
                     </span>

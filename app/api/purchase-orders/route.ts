@@ -18,6 +18,8 @@ const poSchema = z.object({
       unit_cost: z.number().min(0),
     })
   ),
+  discount_type: z.enum(["percentage", "amount"]).optional(),
+  discount_value: z.number().min(0).optional(),
 });
 
 async function getHandler(req: NextRequest) {
@@ -76,15 +78,33 @@ async function postHandler(req: AuthRequest) {
     }
 
     const poNumber = `PO-${Date.now()}`;
-    const totalAmount = validated.items.reduce(
+    const subtotal = validated.items.reduce(
       (sum, item) => sum + item.quantity * item.unit_cost,
       0
     );
 
+    // Calculate discount
+    let discountAmount = 0;
+    if (validated.discount_type && validated.discount_value) {
+      if (validated.discount_type === "percentage") {
+        discountAmount = (subtotal * validated.discount_value) / 100;
+      } else {
+        discountAmount = validated.discount_value;
+      }
+    }
+    const totalAmount = Math.max(0, subtotal - discountAmount);
+
     const poResult = await client.execute({
-      sql: `INSERT INTO purchase_orders (po_number, supplier_id, user_id, total_amount) 
-            VALUES (?, ?, ?, ?) RETURNING *`,
-      args: [poNumber, validated.supplier_id, user.userId, totalAmount],
+      sql: `INSERT INTO purchase_orders (po_number, supplier_id, user_id, total_amount, discount_type, discount_value) 
+            VALUES (?, ?, ?, ?, ?, ?) RETURNING *`,
+      args: [
+        poNumber,
+        validated.supplier_id,
+        user.userId,
+        totalAmount,
+        validated.discount_type || null,
+        validated.discount_value || null,
+      ],
     });
 
     const poId = (poResult.rows[0] as unknown as { id: number }).id;
