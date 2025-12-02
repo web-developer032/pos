@@ -27,13 +27,19 @@ const cartSlice = createSlice({
   initialState,
   reducers: {
     addItem: (state, action: PayloadAction<CartItem>) => {
-      const existingItem = state.items.find(
+      const existingItemIndex = state.items.findIndex(
         (item) => item.product_id === action.payload.product_id
       );
-      if (existingItem) {
+      if (existingItemIndex !== -1) {
+        // Item exists: update quantity and move to top
+        const existingItem = state.items[existingItemIndex];
         existingItem.quantity += action.payload.quantity;
+        // Remove from current position and add to beginning
+        state.items.splice(existingItemIndex, 1);
+        state.items.unshift(existingItem);
       } else {
-        state.items.push(action.payload);
+        // New item: add to beginning (top of cart)
+        state.items.unshift(action.payload);
       }
     },
     removeItem: (state, action: PayloadAction<number>) => {
