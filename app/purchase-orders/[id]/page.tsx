@@ -12,7 +12,7 @@ import { useCurrency } from "@/lib/hooks/useCurrency";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { PurchaseOrderForm } from "@/components/purchase-orders/PurchaseOrderForm";
-import { formatSystemDate } from "@/lib/utils/dateFormat";
+import { formatDateTime } from "@/lib/utils/dateTime";
 import Link from "next/link";
 import toast from "react-hot-toast";
 
@@ -183,7 +183,7 @@ export default function PurchaseOrderDetailPage() {
                   <div>
                     <dt className="text-sm font-medium text-gray-500">Date</dt>
                     <dd className="mt-1 text-sm">
-                      {formatSystemDate(po.created_at)}
+                      {formatDateTime(po.created_at)}
                     </dd>
                   </div>
                   <div>
@@ -224,7 +224,7 @@ export default function PurchaseOrderDetailPage() {
                         Last Updated
                       </dt>
                       <dd className="mt-1 text-sm">
-                        {formatSystemDate(po.updated_at)}
+                        {formatDateTime(po.updated_at)}
                       </dd>
                     </div>
                   )}

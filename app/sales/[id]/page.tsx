@@ -8,7 +8,7 @@ import { useGetSaleQuery } from "@/lib/api/salesApi";
 import { useCurrency } from "@/lib/hooks/useCurrency";
 import { Button } from "@/components/ui/Button";
 import { Receipt, type ReceiptRef } from "@/components/pos/Receipt";
-import { formatSystemDate } from "@/lib/utils/dateFormat";
+import { formatDateTime } from "@/lib/utils/dateTime";
 import Link from "next/link";
 
 export default function SaleDetailPage() {
@@ -102,7 +102,7 @@ export default function SaleDetailPage() {
                   <div>
                     <dt className="text-sm font-medium text-gray-500">Date</dt>
                     <dd className="mt-1 text-sm">
-                      {formatSystemDate(sale.created_at)}
+                      {formatDateTime(sale.created_at)}
                     </dd>
                   </div>
                   <div>

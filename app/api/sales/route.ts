@@ -41,12 +41,16 @@ async function getHandler(req: NextRequest) {
     const args: (string | number)[] = [];
 
     if (startDate) {
-      sql += " AND DATE(s.created_at) >= ?";
-      args.push(startDate);
+      // Use datetime comparison to include the full start day
+      // Format: "YYYY-MM-DD" -> "YYYY-MM-DD 00:00:00"
+      sql += " AND s.created_at >= ?";
+      args.push(`${startDate} 00:00:00`);
     }
     if (endDate) {
-      sql += " AND DATE(s.created_at) <= ?";
-      args.push(endDate);
+      // Use datetime comparison to include the full end day
+      // Format: "YYYY-MM-DD" -> "YYYY-MM-DD 23:59:59"
+      sql += " AND s.created_at <= ?";
+      args.push(`${endDate} 23:59:59`);
     }
 
     const result = await executePaginatedQuery({
@@ -90,11 +94,15 @@ async function postHandler(req: AuthRequest) {
     const taxAmount = validated.tax_amount || 0;
     const finalAmount = totalAmount - discountAmount + taxAmount;
 
-    // Create sale
+    // Create sale with explicit timestamp to avoid timezone issues
+    // Use getCurrentTimestamp from dateTime utility for consistency
+    const { getCurrentTimestamp } = await import("@/lib/utils/dateTime");
+    const timestamp = getCurrentTimestamp();
+
     const saleResult = await client.execute({
       sql: `INSERT INTO sales (sale_number, customer_id, user_id, total_amount, 
-            discount_amount, tax_amount, final_amount, payment_method) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`,
+            discount_amount, tax_amount, final_amount, payment_method, created_at) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`,
       args: [
         saleNumber,
         validated.customer_id || null,
@@ -104,6 +112,7 @@ async function postHandler(req: AuthRequest) {
         taxAmount,
         finalAmount,
         validated.payment_method,
+        timestamp,
       ],
     });
 

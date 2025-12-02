@@ -20,12 +20,14 @@ async function getHandler(req: NextRequest) {
     const args: (string | number)[] = [];
 
     if (startDate) {
-      sql += " AND DATE(created_at) >= ?";
-      args.push(startDate);
+      // Use datetime comparison to include the full start day
+      sql += " AND created_at >= ?";
+      args.push(`${startDate} 00:00:00`);
     }
     if (endDate) {
-      sql += " AND DATE(created_at) <= ?";
-      args.push(endDate);
+      // Use datetime comparison to include the full end day
+      sql += " AND created_at <= ?";
+      args.push(`${endDate} 23:59:59`);
     }
 
     sql += " GROUP BY DATE(created_at) ORDER BY date";

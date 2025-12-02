@@ -11,6 +11,8 @@ import { useReactToPrint } from "react-to-print";
 import { useCurrency } from "@/lib/hooks/useCurrency";
 import type { Sale, SaleItem } from "@/lib/api/salesApi";
 import { useGetSettingsQuery } from "@/lib/api/settingsApi";
+import { parseDatabaseTimestamp, formatTimeOnly } from "@/lib/utils/dateTime";
+import { format } from "date-fns";
 
 interface ReceiptProps {
   sale: Sale;
@@ -60,39 +62,11 @@ export const Receipt = forwardRef<ReceiptRef, ReceiptProps>(
       print: handlePrint,
     }));
 
-    // Format date and time - handle UTC dates correctly
-    let saleDate: Date;
-    const dateString = sale.created_at;
-    if (typeof dateString === "string") {
-      // If the string doesn't have timezone info, treat it as UTC
-      // Database stores times in UTC, so we need to parse them as UTC
-      if (
-        !dateString.includes("Z") &&
-        !dateString.includes("+") &&
-        !dateString.includes("-", 10)
-      ) {
-        // Format: "2025-11-23 19:54:00" - treat as UTC
-        saleDate = new Date(dateString + "Z");
-      } else {
-        saleDate = new Date(dateString);
-      }
-    } else {
-      saleDate = new Date(dateString);
-    }
-
-    const formattedDate = saleDate.toLocaleDateString("en-GB", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      timeZone: undefined, // Use system timezone
-    });
-    const formattedTime = saleDate.toLocaleTimeString("en-US", {
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-      hour12: true,
-      timeZone: undefined, // Use system timezone
-    });
+    // Format date and time using centralized utility
+    const saleDate = parseDatabaseTimestamp(sale.created_at);
+    // Use DD/MM/YYYY format for receipt (as per design)
+    const formattedDate = format(saleDate, "dd/MM/yyyy");
+    const formattedTime = formatTimeOnly(saleDate, { includeSeconds: true, hour12: true });
 
     // Parse terms (split by newline)
     const termsLines = receiptSettings.terms
