@@ -11,6 +11,7 @@ import {
 import { useGetCategoriesQuery } from "@/lib/api/categoriesApi";
 import { useCurrency } from "@/lib/hooks/useCurrency";
 import { useListManagement } from "@/lib/hooks/useListManagement";
+import { ProfitPercentage } from "@/components/common/ProfitPercentage";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
@@ -383,6 +384,9 @@ export function ProductList() {
               <th className="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 sm:px-6">
                 Price
               </th>
+              <th className="hidden px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 sm:table-cell sm:px-6">
+                Profit %
+              </th>
               <th className="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 sm:px-6">
                 Stock
               </th>
@@ -405,6 +409,13 @@ export function ProductList() {
                 </td>
                 <td className="px-3 py-4 text-sm sm:px-6">
                   {formatCurrency(product.selling_price)}
+                </td>
+                <td className="hidden px-3 py-4 text-sm sm:table-cell sm:px-6">
+                  <ProfitPercentage
+                    costPrice={product.cost_price}
+                    sellingPrice={product.selling_price}
+                    variant="inline"
+                  />
                 </td>
                 <td className="px-3 py-4 text-sm sm:px-6">
                   <span

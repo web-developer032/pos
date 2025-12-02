@@ -28,6 +28,7 @@ import {
   validateNonNegative,
 } from "@/lib/utils/formHelpers";
 import toast from "react-hot-toast";
+import { ProfitPercentage } from "@/components/common/ProfitPercentage";
 
 // Inline Category Form Component
 function InlineCategoryForm({
@@ -239,6 +240,7 @@ export function ProductForm({ productId, onSuccess }: ProductFormProps) {
     handleSubmit: reactHookFormHandleSubmit,
     control,
     setValue,
+    watch,
     formState: { errors },
     reset,
   } = useForm<ProductFormDataRaw>({
@@ -533,6 +535,12 @@ export function ProductForm({ productId, onSuccess }: ProductFormProps) {
             error={errors.selling_price?.message}
           />
         </div>
+        <ProfitPercentage
+          costPrice={watch("cost_price")}
+          sellingPrice={watch("selling_price")}
+          variant="card"
+          showLabel={true}
+        />
         <div className="grid grid-cols-2 gap-4">
           <Input
             label="Stock Quantity *"
