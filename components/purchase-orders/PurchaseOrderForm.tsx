@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { useForm, useFieldArray, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -13,7 +13,11 @@ import {
   useGetSuppliersQuery,
   useCreateSupplierMutation,
 } from "@/lib/api/suppliersApi";
-import { useGetProductsQuery, type Product } from "@/lib/api/productsApi";
+import {
+  useGetProductsQuery,
+  useGetProductByBarcodeQuery,
+  type Product,
+} from "@/lib/api/productsApi";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
@@ -139,42 +143,33 @@ export function PurchaseOrderForm({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSupplierModal, setShowSupplierModal] = useState(false);
   const [productSearch, setProductSearch] = useState("");
+  const [barcodeToScan, setBarcodeToScan] = useState<{
+    index: number;
+    barcode: string;
+  } | null>(null);
   const productInputRefs = useRef<{ [key: number]: HTMLInputElement | null }>(
     {}
   );
-  // Cache selected products to ensure they're always available in options
-  const selectedProductsCache = useRef<Map<number, Product>>(new Map());
+  const productsCache = useRef<Map<number, Product>>(new Map());
+
   const { data: suppliersData, refetch: refetchSuppliers } =
     useGetSuppliersQuery();
   const debouncedProductSearch = useDebounce(productSearch, 300);
 
-  // Fetch products with search filter
+  // Single query for products with search - more efficient
   const { data: productsData } = useGetProductsQuery({
     search: debouncedProductSearch || undefined,
-    limit: 1000, // Fetch up to 1000 products to show all available products
-  });
-
-  // Also fetch all products (without search) to get selected products that might not match search
-  const { data: allProductsData } = useGetProductsQuery({
     limit: 1000,
   });
 
-  // Update cache when products are loaded
-  useEffect(() => {
-    if (productsData?.products) {
-      productsData.products.forEach((product) => {
-        selectedProductsCache.current.set(product.id, product);
-      });
-    }
-  }, [productsData]);
-
-  useEffect(() => {
-    if (allProductsData?.products) {
-      allProductsData.products.forEach((product) => {
-        selectedProductsCache.current.set(product.id, product);
-      });
-    }
-  }, [allProductsData]);
+  // Query product by barcode when scanning
+  const {
+    data: barcodeProductData,
+    error: barcodeError,
+    isLoading: isBarcodeLoading,
+  } = useGetProductByBarcodeQuery(barcodeToScan?.barcode || "", {
+    skip: !barcodeToScan?.barcode,
+  });
 
   const { data: purchaseOrderData } = useGetPurchaseOrderQuery(
     purchaseOrderId!,
@@ -203,6 +198,22 @@ export function PurchaseOrderForm({
     },
   });
 
+  const { fields, prepend, remove } = useFieldArray({
+    control,
+    name: "items",
+  });
+
+  const watchedItems = watch("items");
+
+  // Update cache when products are loaded
+  useEffect(() => {
+    if (productsData?.products) {
+      productsData.products.forEach((product) => {
+        productsCache.current.set(product.id, product);
+      });
+    }
+  }, [productsData]);
+
   // Load existing data when editing
   useEffect(() => {
     if (purchaseOrderData && isEditMode) {
@@ -221,25 +232,111 @@ export function PurchaseOrderForm({
     }
   }, [purchaseOrderData, isEditMode, reset]);
 
-  const { fields, prepend, remove } = useFieldArray({
-    control,
-    name: "items",
-  });
+  // Handle barcode scan - auto-select product when found
+  useEffect(() => {
+    if (!barcodeToScan || !barcodeProductData?.product) return;
+
+    const { index, barcode } = barcodeToScan;
+    const product = barcodeProductData.product;
+
+    // Verify barcode matches
+    const matchesPrimaryBarcode = product.barcode === barcode;
+    const matchesAdditionalBarcode =
+      product.additional_barcodes?.includes(barcode) || false;
+
+    if (matchesPrimaryBarcode || matchesAdditionalBarcode) {
+      // Cache and select product
+      productsCache.current.set(product.id, product);
+      setValue(`items.${index}.product_id`, product.id, {
+        shouldValidate: true,
+      });
+      setValue(`items.${index}.unit_cost`, product.cost_price);
+      setProductSearch("");
+      toast.success(`${product.name} selected`);
+      setBarcodeToScan(null);
+    }
+  }, [barcodeToScan, barcodeProductData, setValue]);
+
+  // Handle barcode error
+  useEffect(() => {
+    if (barcodeToScan && barcodeError && !isBarcodeLoading) {
+      toast.error("Product not found");
+      setBarcodeToScan(null);
+    }
+  }, [barcodeToScan, barcodeError, isBarcodeLoading]);
 
   const handleAddItem = () => {
-    const newIndex = 0; // Since we're prepending, new item is always at index 0
     prepend({ product_id: 0, quantity: 1, unit_cost: 0 });
-    // Focus the product input after a short delay to ensure DOM is updated
     setTimeout(() => {
-      const productInput = productInputRefs.current[newIndex];
+      const productInput = productInputRefs.current[0];
       if (productInput) {
         productInput.focus();
-        productInput.click(); // Also open the dropdown
+        productInput.click();
       }
     }, 100);
   };
 
-  const watchedItems = watch("items");
+  const handleProductChange = (index: number, productId: number) => {
+    const product =
+      productsData?.products.find((p) => p.id === productId) ||
+      productsCache.current.get(productId);
+
+    if (product) {
+      productsCache.current.set(productId, product);
+      setValue(`items.${index}.unit_cost`, product.cost_price);
+      setProductSearch("");
+    }
+  };
+
+  // Handle barcode keydown - detect barcode scan
+  const handleBarcodeKeyDown = (
+    index: number,
+    e: React.KeyboardEvent<HTMLInputElement>
+  ) => {
+    if (e.key === "Enter") {
+      const value = e.currentTarget.value.trim();
+      const isBarcode =
+        (value.length >= 8 && /^[0-9A-Za-z]+$/.test(value)) ||
+        (value.length >= 6 && /^[0-9]+$/.test(value));
+
+      if (isBarcode && value) {
+        e.preventDefault();
+        setBarcodeToScan({ index, barcode: value });
+      }
+    }
+  };
+
+  // Memoized product options - optimized
+  const getProductOptions = useMemo(() => {
+    const searchResults = productsData?.products || [];
+    const selectedProductIds = watchedItems
+      .map((item) => item.product_id)
+      .filter((id): id is number => id > 0 && id !== null);
+
+    const searchResultIds = new Set(searchResults.map((p) => p.id));
+    const options = searchResults.map((p) => ({
+      value: p.id,
+      label: `${p.name} - ${formatCurrency(p.cost_price)}`,
+    }));
+
+    // Add cached products for selected items not in search results
+    selectedProductIds.forEach((productId) => {
+      if (!searchResultIds.has(productId)) {
+        const cachedProduct = productsCache.current.get(productId);
+        if (cachedProduct) {
+          options.push({
+            value: cachedProduct.id,
+            label: `${cachedProduct.name} - ${formatCurrency(
+              cachedProduct.cost_price
+            )}`,
+          });
+        }
+      }
+    });
+
+    // Remove duplicates
+    return Array.from(new Map(options.map((opt) => [opt.value, opt])).values());
+  }, [productsData?.products, watchedItems, formatCurrency]);
 
   const calculateTotal = () => {
     return watchedItems.reduce(
@@ -252,27 +349,22 @@ export function PurchaseOrderForm({
     if (isSubmitting) return;
     setIsSubmitting(true);
     try {
+      const items = data.items.map((item) => ({
+        product_id: item.product_id,
+        quantity: item.quantity,
+        unit_cost: item.unit_cost,
+      }));
+
       if (isEditMode && purchaseOrderId) {
         await updatePurchaseOrderItems({
           id: purchaseOrderId,
-          data: {
-            supplier_id: data.supplier_id,
-            items: data.items.map((item) => ({
-              product_id: item.product_id,
-              quantity: item.quantity,
-              unit_cost: item.unit_cost,
-            })),
-          },
+          data: { supplier_id: data.supplier_id, items },
         }).unwrap();
         toast.success("Purchase order updated successfully");
       } else {
         await createPurchaseOrder({
           supplier_id: data.supplier_id,
-          items: data.items.map((item) => ({
-            product_id: item.product_id,
-            quantity: item.quantity,
-            unit_cost: item.unit_cost,
-          })),
+          items,
         }).unwrap();
         toast.success("Purchase order created successfully");
         reset();
@@ -287,110 +379,6 @@ export function PurchaseOrderForm({
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  const handleProductChange = (index: number, productId: number) => {
-    // Try to find product in search results first
-    let product = productsData?.products.find((p) => p.id === productId);
-
-    // If not found, try all products list
-    if (!product) {
-      product = allProductsData?.products.find((p) => p.id === productId);
-    }
-
-    // If still not found, check cache
-    if (!product) {
-      product = selectedProductsCache.current.get(productId);
-    }
-
-    if (product) {
-      // Cache the product for future use
-      selectedProductsCache.current.set(productId, product);
-      setValue(`items.${index}.unit_cost`, product.cost_price);
-      // Clear search after selecting a product
-      setProductSearch("");
-    }
-  };
-
-  // Get product options for searchable select
-  // Always include products that are already selected (in current or other fields)
-  const getProductOptions = (currentIndex: number) => {
-    const searchResults = productsData?.products || [];
-    const allProductsList = allProductsData?.products || [];
-
-    // Get the currently selected product ID for this field
-    const currentProductId = watchedItems[currentIndex]?.product_id;
-
-    // Get all selected product IDs (from all fields, including current)
-    const selectedProductIds = watchedItems
-      .map((item) => item.product_id)
-      .filter((id): id is number => id !== null && id > 0);
-
-    // Create a set of product IDs from search results for quick lookup
-    const searchResultIds = new Set(searchResults.map((p) => p.id));
-
-    // Get selected products that are not in search results
-    const missingSelectedProducts = allProductsList.filter(
-      (p) => selectedProductIds.includes(p.id) && !searchResultIds.has(p.id)
-    );
-
-    // If current product is selected but not in search results or missing products, fetch it
-    let currentProduct: Product | undefined;
-    if (currentProductId && currentProductId > 0) {
-      currentProduct =
-        searchResults.find((p) => p.id === currentProductId) ||
-        missingSelectedProducts.find((p) => p.id === currentProductId) ||
-        allProductsList.find((p) => p.id === currentProductId) ||
-        selectedProductsCache.current.get(currentProductId);
-    }
-
-    // Combine search results with missing selected products
-    const allOptions = [
-      ...searchResults.map((p) => ({
-        value: p.id,
-        label: `${p.name} - ${formatCurrency(p.cost_price)}`,
-      })),
-      ...missingSelectedProducts.map((p) => ({
-        value: p.id,
-        label: `${p.name} - ${formatCurrency(p.cost_price)}`,
-      })),
-    ];
-
-    // Always include cached products for selected items that aren't in options yet
-    selectedProductIds.forEach((productId) => {
-      if (!allOptions.some((opt) => opt.value === productId)) {
-        const cachedProduct = selectedProductsCache.current.get(productId);
-        if (cachedProduct) {
-          allOptions.push({
-            value: cachedProduct.id,
-            label: `${cachedProduct.name} - ${formatCurrency(cachedProduct.cost_price)}`,
-          });
-        }
-      }
-    });
-
-    // If current product exists but is not in options, add it
-    if (
-      currentProduct &&
-      !allOptions.some((opt) => opt.value === currentProduct!.id)
-    ) {
-      allOptions.push({
-        value: currentProduct.id,
-        label: `${currentProduct.name} - ${formatCurrency(currentProduct.cost_price)}`,
-      });
-    }
-
-    // Remove duplicates based on product ID
-    const uniqueOptions = Array.from(
-      new Map(allOptions.map((opt) => [opt.value, opt])).values()
-    );
-
-    return uniqueOptions;
-  };
-
-  // Handle product search
-  const handleProductSearch = (searchTerm: string) => {
-    setProductSearch(searchTerm);
   };
 
   return (
@@ -474,7 +462,7 @@ export function PurchaseOrderForm({
                     label="Product *"
                     options={[
                       { value: 0, label: "Select Product" },
-                      ...getProductOptions(index),
+                      ...getProductOptions,
                     ]}
                     value={watch(`items.${index}.product_id`) || 0}
                     onChange={(val) => {
@@ -486,9 +474,12 @@ export function PurchaseOrderForm({
                         handleProductChange(index, productId);
                       }
                     }}
-                    onSearch={handleProductSearch}
+                    onSearch={setProductSearch}
+                    onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) =>
+                      handleBarcodeKeyDown(index, e)
+                    }
                     placeholder="Search and select product..."
-                    searchPlaceholder="Type product name, barcode, or SKU..."
+                    searchPlaceholder="Type product name, barcode, or scan barcode..."
                     error={errors.items?.[index]?.product_id?.message}
                   />
 

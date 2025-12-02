@@ -13,6 +13,7 @@ interface SearchableSelectProps {
   className?: string;
   searchPlaceholder?: string;
   onSearch?: (searchTerm: string) => void;
+  onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
 }
 
 export const SearchableSelect = forwardRef<
@@ -30,6 +31,7 @@ export const SearchableSelect = forwardRef<
       className = "",
       searchPlaceholder = "Type to search...",
       onSearch,
+      onKeyDown: customOnKeyDown,
     },
     ref
   ) => {
@@ -147,6 +149,15 @@ export const SearchableSelect = forwardRef<
     };
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+      // Call custom onKeyDown handler first (for barcode scanning, etc.)
+      if (customOnKeyDown) {
+        customOnKeyDown(e);
+        // If the custom handler prevented default, don't handle further
+        if (e.defaultPrevented) {
+          return;
+        }
+      }
+
       if (!isOpen && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
         setIsOpen(true);
         return;
