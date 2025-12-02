@@ -330,7 +330,8 @@ export function ProductForm({ productId, onSuccess }: ProductFormProps) {
         const submitData: ProductFormData = {
           name: data.name,
           barcode: data.barcode || undefined,
-          additional_barcodes: data.additional_barcodes?.filter((b) => b.trim()) || undefined,
+          additional_barcodes:
+            data.additional_barcodes?.filter((b) => b.trim()) || undefined,
           sku: data.sku || undefined,
           description: data.description || undefined,
           category_id: categoryId,
@@ -413,7 +414,8 @@ export function ProductForm({ productId, onSuccess }: ProductFormProps) {
                       type="button"
                       variant="outline"
                       onClick={() => {
-                        const newBarcodes = field.value?.filter((_, i) => i !== index) || [];
+                        const newBarcodes =
+                          field.value?.filter((_, i) => i !== index) || [];
                         field.onChange(newBarcodes);
                       }}
                       className="text-red-600 hover:text-red-700"
@@ -518,12 +520,14 @@ export function ProductForm({ productId, onSuccess }: ProductFormProps) {
           <Input
             label="Cost Price *"
             type="number"
+            step="0.01"
             {...register("cost_price")}
             error={errors.cost_price?.message}
           />
           <Input
             label="Selling Price *"
             type="number"
+            step="0.01"
             required
             {...register("selling_price")}
             error={errors.selling_price?.message}
