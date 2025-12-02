@@ -87,6 +87,13 @@ export const salesApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ["Sale", "Inventory", "Product", "Report"],
     }),
+    deleteSale: builder.mutation<{ message: string }, number>({
+      query: (id) => ({
+        url: `/sales/${id}`,
+        method: "DELETE",
+      }),
+      invalidatesTags: ["Sale", "Inventory", "Product", "Report"],
+    }),
     deleteAllSales: builder.mutation<{ message: string }, void>({
       query: () => ({
         url: "/sales?delete_all=true",
@@ -101,5 +108,6 @@ export const {
   useGetSalesQuery,
   useGetSaleQuery,
   useCreateSaleMutation,
+  useDeleteSaleMutation,
   useDeleteAllSalesMutation,
 } = salesApi;

@@ -5,6 +5,7 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import {
   useGetSalesQuery,
+  useDeleteSaleMutation,
   useDeleteAllSalesMutation,
 } from "@/lib/api/salesApi";
 import { useCurrency } from "@/lib/hooks/useCurrency";
@@ -18,9 +19,34 @@ export default function SalesPage() {
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(25);
   const { data, isLoading, refetch } = useGetSalesQuery({ page, limit });
+  const [deleteSale] = useDeleteSaleMutation();
   const [deleteAllSales] = useDeleteAllSalesMutation();
   const [isDeletingAll, setIsDeletingAll] = useState(false);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
   const { format: formatCurrency } = useCurrency();
+
+  const handleDelete = async (saleId: number, saleNumber: string) => {
+    if (
+      !confirm(
+        `Are you sure you want to delete sale ${saleNumber}? This action cannot be undone and will restore inventory.`
+      )
+    ) {
+      return;
+    }
+    setDeletingId(saleId);
+    try {
+      await deleteSale(saleId).unwrap();
+      toast.success("Sale deleted successfully");
+      refetch();
+    } catch (error) {
+      const errorMessage =
+        (error as { data?: { error?: string } })?.data?.error ||
+        "Failed to delete sale";
+      toast.error(errorMessage);
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   const handleDeleteAll = async () => {
     if (
@@ -118,12 +144,38 @@ export default function SalesPage() {
                     {formatCurrency(sale.final_amount)}
                   </td>
                   <td className="whitespace-nowrap px-3 py-4 text-right text-sm font-medium sm:px-6">
-                    <Link
-                      href={`/sales/${sale.id}`}
-                      className="text-indigo-600 hover:text-indigo-900"
-                    >
-                      View
-                    </Link>
+                    <div className="flex items-center justify-end gap-2">
+                      <Link
+                        href={`/sales/${sale.id}`}
+                        className="text-indigo-600 hover:text-indigo-900"
+                      >
+                        View
+                      </Link>
+                      <button
+                        onClick={() => handleDelete(sale.id, sale.sale_number)}
+                        disabled={deletingId === sale.id}
+                        className="text-red-600 hover:text-red-900 disabled:opacity-50"
+                        title="Delete sale"
+                      >
+                        {deletingId === sale.id ? (
+                          "Deleting..."
+                        ) : (
+                          <svg
+                            className="h-4 w-4"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                            />
+                          </svg>
+                        )}
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

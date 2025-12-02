@@ -38,8 +38,16 @@ export function useBarcodeScanner(options: UseBarcodeScannerOptions = {}) {
       return;
     }
 
+    // Check if we have a product result
     if (barcodeProductData?.product) {
       const product = barcodeProductData.product;
+
+      // CRITICAL: Verify the product's barcode matches the current scan
+      // This prevents adding a cached product from a previous scan
+      if (product.barcode !== barcode) {
+        // Product doesn't match current barcode, wait for correct result or error
+        return;
+      }
 
       // Mark as processed immediately to prevent duplicates
       processedBarcodesRef.current.add(barcode);
