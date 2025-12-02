@@ -20,6 +20,7 @@ import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { useCurrency } from "@/lib/hooks/useCurrency";
+import { useDebounce } from "@/lib/hooks/useDebounce";
 import toast from "react-hot-toast";
 
 const purchaseOrderSchema = z.object({
@@ -137,12 +138,17 @@ export function PurchaseOrderForm({
 }: PurchaseOrderFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSupplierModal, setShowSupplierModal] = useState(false);
+  const [productSearch, setProductSearch] = useState("");
   const productInputRefs = useRef<{ [key: number]: HTMLInputElement | null }>(
     {}
   );
   const { data: suppliersData, refetch: refetchSuppliers } =
     useGetSuppliersQuery();
-  const { data: productsData } = useGetProductsQuery();
+  const debouncedProductSearch = useDebounce(productSearch, 300);
+  const { data: productsData } = useGetProductsQuery({
+    search: debouncedProductSearch || undefined,
+    limit: 1000, // Fetch up to 1000 products to show all available products
+  });
   const { data: purchaseOrderData } = useGetPurchaseOrderQuery(
     purchaseOrderId!,
     {
@@ -260,6 +266,8 @@ export function PurchaseOrderForm({
     const product = productsData?.products.find((p) => p.id === productId);
     if (product) {
       setValue(`items.${index}.unit_cost`, product.cost_price);
+      // Clear search after selecting a product
+      setProductSearch("");
     }
   };
 
@@ -268,9 +276,14 @@ export function PurchaseOrderForm({
     return (
       productsData?.products.map((p) => ({
         value: p.id,
-        label: `${p.name}${p.barcode ? ` (${p.barcode})` : ""}${p.sku ? ` [${p.sku}]` : ""} - ${formatCurrency(p.cost_price)}`,
+        label: `${p.name} - ${formatCurrency(p.cost_price)}`,
       })) || []
     );
+  };
+
+  // Handle product search
+  const handleProductSearch = (searchTerm: string) => {
+    setProductSearch(searchTerm);
   };
 
   return (
@@ -366,6 +379,7 @@ export function PurchaseOrderForm({
                         handleProductChange(index, productId);
                       }
                     }}
+                    onSearch={handleProductSearch}
                     placeholder="Search and select product..."
                     searchPlaceholder="Type product name, barcode, or SKU..."
                     error={errors.items?.[index]?.product_id?.message}
