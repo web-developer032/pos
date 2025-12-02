@@ -3,6 +3,51 @@
  */
 
 /**
+ * Calculate profit percentage from cost and selling price
+ * @param costPrice - Cost price
+ * @param sellingPrice - Selling price
+ * @returns Profit percentage (e.g., 25.5 for 25.5%) or null if invalid
+ */
+export function calculateProfitPercentage(
+  costPrice: number | string | null | undefined,
+  sellingPrice: number | string | null | undefined
+): number | null {
+  const cost =
+    typeof costPrice === "string" ? parseFloat(costPrice) : costPrice;
+  const selling =
+    typeof sellingPrice === "string" ? parseFloat(sellingPrice) : sellingPrice;
+
+  if (
+    cost === null ||
+    cost === undefined ||
+    selling === null ||
+    selling === undefined ||
+    isNaN(cost) ||
+    isNaN(selling) ||
+    cost <= 0 ||
+    selling < 0
+  ) {
+    return null;
+  }
+  const profitPercentage = ((selling - cost) / cost) * 100;
+  return profitPercentage;
+}
+
+/**
+ * Format profit percentage number to string
+ * @param profitPercentage - Profit percentage as number (e.g., 25.5 for 25.5%)
+ * @param decimals - Number of decimal places (default: 2)
+ * @returns Formatted percentage string (e.g., "+25.50%")
+ */
+export function formatProfitPercentage(
+  profitPercentage: number,
+  decimals: number = 2
+): string {
+  const sign = profitPercentage >= 0 ? "+" : "";
+  return `${sign}${profitPercentage.toFixed(decimals)}%`;
+}
+
+/**
  * Calculate profit for a single sale item
  * @param unitPrice - Selling price per unit
  * @param costPrice - Cost price per unit
@@ -31,17 +76,20 @@ export function calculateTotalProfit(
   }>
 ): number {
   return items.reduce((total, item) => {
-    return total + calculateItemProfit(item.unit_price, item.cost_price, item.quantity);
+    return (
+      total +
+      calculateItemProfit(item.unit_price, item.cost_price, item.quantity)
+    );
   }, 0);
 }
 
 /**
- * Format profit percentage
+ * Calculate profit margin percentage from profit and revenue
  * @param profit - Profit amount
  * @param revenue - Revenue amount
- * @returns Profit percentage as string
+ * @returns Profit margin percentage as string
  */
-export function formatProfitPercentage(profit: number, revenue: number): string {
+export function calculateProfitMargin(profit: number, revenue: number): string {
   if (revenue === 0) return "0.00%";
   const percentage = (profit / revenue) * 100;
   return `${percentage.toFixed(2)}%`;
