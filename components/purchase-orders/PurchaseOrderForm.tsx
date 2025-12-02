@@ -13,7 +13,7 @@ import {
   useGetSuppliersQuery,
   useCreateSupplierMutation,
 } from "@/lib/api/suppliersApi";
-import { useGetProductsQuery } from "@/lib/api/productsApi";
+import { useGetProductsQuery, type Product } from "@/lib/api/productsApi";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
@@ -142,6 +142,8 @@ export function PurchaseOrderForm({
   const productInputRefs = useRef<{ [key: number]: HTMLInputElement | null }>(
     {}
   );
+  // Cache selected products to ensure they're always available in options
+  const selectedProductsCache = useRef<Map<number, Product>>(new Map());
   const { data: suppliersData, refetch: refetchSuppliers } =
     useGetSuppliersQuery();
   const debouncedProductSearch = useDebounce(productSearch, 300);
@@ -156,6 +158,24 @@ export function PurchaseOrderForm({
   const { data: allProductsData } = useGetProductsQuery({
     limit: 1000,
   });
+
+  // Update cache when products are loaded
+  useEffect(() => {
+    if (productsData?.products) {
+      productsData.products.forEach((product) => {
+        selectedProductsCache.current.set(product.id, product);
+      });
+    }
+  }, [productsData]);
+
+  useEffect(() => {
+    if (allProductsData?.products) {
+      allProductsData.products.forEach((product) => {
+        selectedProductsCache.current.set(product.id, product);
+      });
+    }
+  }, [allProductsData]);
+
   const { data: purchaseOrderData } = useGetPurchaseOrderQuery(
     purchaseOrderId!,
     {
@@ -270,8 +290,22 @@ export function PurchaseOrderForm({
   };
 
   const handleProductChange = (index: number, productId: number) => {
-    const product = productsData?.products.find((p) => p.id === productId);
+    // Try to find product in search results first
+    let product = productsData?.products.find((p) => p.id === productId);
+
+    // If not found, try all products list
+    if (!product) {
+      product = allProductsData?.products.find((p) => p.id === productId);
+    }
+
+    // If still not found, check cache
+    if (!product) {
+      product = selectedProductsCache.current.get(productId);
+    }
+
     if (product) {
+      // Cache the product for future use
+      selectedProductsCache.current.set(productId, product);
       setValue(`items.${index}.unit_cost`, product.cost_price);
       // Clear search after selecting a product
       setProductSearch("");
@@ -280,9 +314,12 @@ export function PurchaseOrderForm({
 
   // Get product options for searchable select
   // Always include products that are already selected (in current or other fields)
-  const getProductOptions = () => {
+  const getProductOptions = (currentIndex: number) => {
     const searchResults = productsData?.products || [];
     const allProductsList = allProductsData?.products || [];
+
+    // Get the currently selected product ID for this field
+    const currentProductId = watchedItems[currentIndex]?.product_id;
 
     // Get all selected product IDs (from all fields, including current)
     const selectedProductIds = watchedItems
@@ -297,6 +334,16 @@ export function PurchaseOrderForm({
       (p) => selectedProductIds.includes(p.id) && !searchResultIds.has(p.id)
     );
 
+    // If current product is selected but not in search results or missing products, fetch it
+    let currentProduct: Product | undefined;
+    if (currentProductId && currentProductId > 0) {
+      currentProduct =
+        searchResults.find((p) => p.id === currentProductId) ||
+        missingSelectedProducts.find((p) => p.id === currentProductId) ||
+        allProductsList.find((p) => p.id === currentProductId) ||
+        selectedProductsCache.current.get(currentProductId);
+    }
+
     // Combine search results with missing selected products
     const allOptions = [
       ...searchResults.map((p) => ({
@@ -308,6 +355,30 @@ export function PurchaseOrderForm({
         label: `${p.name} - ${formatCurrency(p.cost_price)}`,
       })),
     ];
+
+    // Always include cached products for selected items that aren't in options yet
+    selectedProductIds.forEach((productId) => {
+      if (!allOptions.some((opt) => opt.value === productId)) {
+        const cachedProduct = selectedProductsCache.current.get(productId);
+        if (cachedProduct) {
+          allOptions.push({
+            value: cachedProduct.id,
+            label: `${cachedProduct.name} - ${formatCurrency(cachedProduct.cost_price)}`,
+          });
+        }
+      }
+    });
+
+    // If current product exists but is not in options, add it
+    if (
+      currentProduct &&
+      !allOptions.some((opt) => opt.value === currentProduct!.id)
+    ) {
+      allOptions.push({
+        value: currentProduct.id,
+        label: `${currentProduct.name} - ${formatCurrency(currentProduct.cost_price)}`,
+      });
+    }
 
     // Remove duplicates based on product ID
     const uniqueOptions = Array.from(
@@ -403,7 +474,7 @@ export function PurchaseOrderForm({
                     label="Product *"
                     options={[
                       { value: 0, label: "Select Product" },
-                      ...getProductOptions(),
+                      ...getProductOptions(index),
                     ]}
                     value={watch(`items.${index}.product_id`) || 0}
                     onChange={(val) => {
