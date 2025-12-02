@@ -37,6 +37,12 @@ const menuItems: MenuItem[] = [
     icon: "⚙️",
     roles: ["admin", "manager"],
   },
+  {
+    name: "Print Settings",
+    href: "/print-settings",
+    icon: "🖨️",
+    roles: ["admin", "manager"],
+  },
 ];
 
 export function Sidebar() {

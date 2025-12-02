@@ -28,7 +28,6 @@ function SettingsForm() {
   const { data, isLoading } = useGetSettingsQuery();
   const [updateSettings] = useUpdateSettingsMutation();
   const [formData, setFormData] = useState({
-    store_name: "",
     tax_rate: "",
     currency: "",
     currency_symbol: "",
@@ -37,7 +36,6 @@ function SettingsForm() {
   useEffect(() => {
     if (data?.settings) {
       setFormData({
-        store_name: data.settings.store_name || "",
         tax_rate: data.settings.tax_rate || "",
         currency: data.settings.currency || "",
         currency_symbol: data.settings.currency_symbol || "",
@@ -67,13 +65,6 @@ function SettingsForm() {
       onSubmit={handleSubmit}
       className="max-w-2xl space-y-4 rounded-lg bg-white p-6 shadow"
     >
-      <Input
-        label="Store Name"
-        value={formData.store_name}
-        onChange={(e) =>
-          setFormData({ ...formData, store_name: e.target.value })
-        }
-      />
       <Input
         label="Tax Rate (%)"
         type="number"
