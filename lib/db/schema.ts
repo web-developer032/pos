@@ -147,7 +147,7 @@ export async function initializeDatabase() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       sale_id INTEGER NOT NULL,
       product_id INTEGER NOT NULL,
-      quantity INTEGER NOT NULL,
+      quantity REAL NOT NULL,
       unit_price REAL NOT NULL,
       discount REAL NOT NULL DEFAULT 0,
       subtotal REAL NOT NULL,
