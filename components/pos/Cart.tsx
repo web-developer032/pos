@@ -16,18 +16,13 @@ interface CartProps {
 
 export function Cart({ onCheckout }: CartProps) {
   const dispatch = useAppDispatch();
-  const { items, discount, tax } = useAppSelector((state) => state.cart);
+  const { items } = useAppSelector((state) => state.cart);
   const { format: formatCurrency } = useCurrency();
   const [editingPriceId, setEditingPriceId] = useState<number | null>(null);
   const [priceInputs, setPriceInputs] = useState<Record<number, string>>({});
   const [quantityInputs, setQuantityInputs] = useState<Record<number, string>>(
     {}
   );
-
-  const subtotal = items.reduce((sum, item) => {
-    return sum + item.price * item.quantity;
-  }, 0);
-  const finalTotal = subtotal - discount + tax;
 
   const handlePriceChange = (productId: number, value: string) => {
     setPriceInputs((prev) => ({ ...prev, [productId]: value }));
@@ -64,7 +59,18 @@ export function Cart({ onCheckout }: CartProps) {
 
   return (
     <div className="flex flex-col rounded-lg bg-white p-4 shadow-lg sm:p-6">
-      <h2 className="mb-4 text-xl font-bold sm:text-2xl">Cart</h2>
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <h2 className="text-xl font-bold sm:text-2xl">Cart</h2>
+        {onCheckout && (
+          <Button
+            className="bg-indigo-600 hover:bg-indigo-700"
+            onClick={onCheckout}
+            disabled={items.length === 0}
+          >
+            Checkout
+          </Button>
+        )}
+      </div>
       <div className="mb-4 max-h-[400px] flex-1 overflow-y-auto sm:max-h-[500px]">
         {items.length === 0 ? (
           <p className="py-8 text-center text-gray-500">Cart is empty</p>
@@ -190,33 +196,6 @@ export function Cart({ onCheckout }: CartProps) {
               </div>
             ))}
           </div>
-        )}
-      </div>
-      <div className="space-y-2 border-t pt-4">
-        <div className="flex justify-between text-sm sm:text-base">
-          <span>Subtotal:</span>
-          <span>{formatCurrency(subtotal)}</span>
-        </div>
-        <div className="flex justify-between text-sm sm:text-base">
-          <span>Discount:</span>
-          <span>-{formatCurrency(discount)}</span>
-        </div>
-        <div className="flex justify-between text-sm sm:text-base">
-          <span>Tax:</span>
-          <span>{formatCurrency(tax)}</span>
-        </div>
-        <div className="flex justify-between border-t pt-2 text-base font-bold sm:text-lg">
-          <span>Total:</span>
-          <span>{formatCurrency(finalTotal)}</span>
-        </div>
-        {onCheckout && (
-          <Button
-            className="mt-4 w-full"
-            onClick={onCheckout}
-            disabled={items.length === 0}
-          >
-            Checkout
-          </Button>
         )}
       </div>
     </div>

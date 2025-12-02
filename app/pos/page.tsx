@@ -10,16 +10,26 @@ import { useAppSelector, useAppDispatch } from "@/lib/hooks";
 import { setCustomer, setDiscount, setTax } from "@/lib/slices/cartSlice";
 import { useGetCustomersQuery } from "@/lib/api/customersApi";
 import { useBarcodeScanner } from "@/lib/hooks/useBarcodeScanner";
+import { useCurrency } from "@/lib/hooks/useCurrency";
 import { Select } from "@/components/ui/Select";
 import { Input } from "@/components/ui/Input";
 
 export default function POSPage() {
   const dispatch = useAppDispatch();
-  const { customerId, discount, tax } = useAppSelector((state) => state.cart);
+  const { items, customerId, discount, tax } = useAppSelector(
+    (state) => state.cart
+  );
   const { data: customersData } = useGetCustomersQuery();
+  const { format: formatCurrency } = useCurrency();
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [barcodeInput, setBarcodeInput] = useState("");
   const barcodeInputRef = useRef<HTMLInputElement>(null);
+
+  // Calculate totals
+  const subtotal = items.reduce((sum, item) => {
+    return sum + item.price * item.quantity;
+  }, 0);
+  const finalTotal = subtotal - discount + tax;
 
   // Use optimized barcode scanner hook
   const { scanBarcode } = useBarcodeScanner({
@@ -52,8 +62,42 @@ export default function POSPage() {
   return (
     <ProtectedRoute allowedRoles={["admin", "cashier", "manager"]}>
       <DashboardLayout>
-        <div className="mb-4 sm:mb-6">
-          <h1 className="text-2xl font-bold sm:text-3xl">Point of Sale</h1>
+        {/* Price Summary Bar - Top Section (Sticky) */}
+        <div className="mb-4 rounded-xl border border-gray-200 bg-white p-4">
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 lg:gap-6">
+            <div className="flex flex-col">
+              <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                Subtotal
+              </span>
+              <span className="mt-1.5 text-xl font-bold text-gray-900 sm:text-2xl">
+                {formatCurrency(subtotal)}
+              </span>
+            </div>
+            <div className="flex flex-col">
+              <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                Discount
+              </span>
+              <span className="mt-1.5 text-xl font-bold text-red-600 sm:text-2xl">
+                -{formatCurrency(discount)}
+              </span>
+            </div>
+            <div className="flex flex-col">
+              <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                Tax
+              </span>
+              <span className="mt-1.5 text-xl font-bold text-gray-900 sm:text-2xl">
+                {formatCurrency(tax)}
+              </span>
+            </div>
+            <div className="col-span-2 flex flex-col border-t-2 border-indigo-300 pt-3 sm:col-span-1 sm:border-l-2 sm:border-t-0 sm:border-indigo-300 sm:pl-6 sm:pt-0">
+              <span className="text-xs font-semibold uppercase tracking-wide text-indigo-600">
+                Total Amount
+              </span>
+              <span className="mt-1.5 text-2xl font-bold text-indigo-600 sm:text-3xl">
+                {formatCurrency(finalTotal)}
+              </span>
+            </div>
+          </div>
         </div>
 
         {/* Barcode Scanner Input - Hidden but always focused */}
