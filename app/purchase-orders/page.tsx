@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import {
@@ -193,30 +194,42 @@ export default function PurchaseOrdersPage() {
                     </span>
                   </td>
                   <td className="px-6 py-4 text-right text-sm">
-                    {po.status === "pending" && (
-                      <>
-                        <button
-                          onClick={() => setEditingPOId(po.id)}
-                          className="mr-4 text-indigo-600 hover:text-indigo-900"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => handleStatusChange(po.id, "completed")}
-                          disabled={updatingId === po.id}
-                          className="mr-4 text-green-600 hover:text-green-900 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          {updatingId === po.id ? "Updating..." : "Complete"}
-                        </button>
-                        <button
-                          onClick={() => handleStatusChange(po.id, "cancelled")}
-                          disabled={updatingId === po.id}
-                          className="text-red-600 hover:text-red-900 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          {updatingId === po.id ? "Updating..." : "Cancel"}
-                        </button>
-                      </>
-                    )}
+                    <div className="flex items-center justify-end gap-3">
+                      <Link
+                        href={`/purchase-orders/${po.id}`}
+                        className="text-indigo-600 hover:text-indigo-900"
+                      >
+                        View
+                      </Link>
+                      {po.status === "pending" && (
+                        <>
+                          <button
+                            onClick={() => setEditingPOId(po.id)}
+                            className="text-indigo-600 hover:text-indigo-900"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() =>
+                              handleStatusChange(po.id, "completed")
+                            }
+                            disabled={updatingId === po.id}
+                            className="text-green-600 hover:text-green-900 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            {updatingId === po.id ? "Updating..." : "Complete"}
+                          </button>
+                          <button
+                            onClick={() =>
+                              handleStatusChange(po.id, "cancelled")
+                            }
+                            disabled={updatingId === po.id}
+                            className="text-red-600 hover:text-red-900 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            {updatingId === po.id ? "Updating..." : "Cancel"}
+                          </button>
+                        </>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}

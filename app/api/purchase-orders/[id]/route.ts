@@ -26,9 +26,9 @@ async function getHandler(req: NextRequest, context?: RouteContext) {
     }
 
     const itemsResult = await client.execute({
-      sql: `SELECT poi.*, p.name as product_name
+      sql: `SELECT poi.*, COALESCE(p.name, 'Deleted Product') as product_name
             FROM purchase_order_items poi
-            JOIN products p ON poi.product_id = p.id
+            LEFT JOIN products p ON poi.product_id = p.id
             WHERE poi.po_id = ?`,
       args: [params.id],
     });
