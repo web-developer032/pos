@@ -29,6 +29,8 @@ export function StatsCards({ dateRange }: StatsCardsProps) {
   const getLabel = () => {
     if (!dateRange) return "Today's";
     switch (dateRange.type) {
+      case "day":
+        return "This Day's";
       case "week":
         return "This Week's";
       case "month":

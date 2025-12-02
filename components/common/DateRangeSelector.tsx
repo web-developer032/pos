@@ -7,12 +7,14 @@ import {
   endOfWeek,
   startOfMonth,
   endOfMonth,
+  startOfDay,
+  endOfDay,
   subDays,
 } from "date-fns";
 import { Select } from "@/components/ui/Select";
 import { Input } from "@/components/ui/Input";
 
-export type DateRangeType = "week" | "month" | "custom";
+export type DateRangeType = "day" | "week" | "month" | "custom";
 
 export interface DateRange {
   startDate: string;
@@ -52,6 +54,10 @@ export function DateRangeSelector({
     let endDate: string;
 
     switch (rangeType) {
+      case "day":
+        startDate = format(startOfDay(today), "yyyy-MM-dd");
+        endDate = format(endOfDay(today), "yyyy-MM-dd");
+        break;
       case "week":
         startDate = format(
           startOfWeek(today, { weekStartsOn: 1 }),
@@ -115,6 +121,7 @@ export function DateRangeSelector({
           value={type}
           onChange={(e) => setType(e.target.value as DateRangeType)}
           options={[
+            { value: "day", label: "This Day" },
             { value: "week", label: "This Week" },
             { value: "month", label: "This Month" },
             { value: "custom", label: "Custom Range" },

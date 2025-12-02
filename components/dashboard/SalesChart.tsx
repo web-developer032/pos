@@ -26,6 +26,8 @@ export function SalesChart({ dateRange }: SalesChartProps) {
   const getTitle = () => {
     if (!dateRange) return "Sales Trend (Last 7 Days)";
     switch (dateRange.type) {
+      case "day":
+        return "Sales Trend (This Day)";
       case "week":
         return "Sales Trend (This Week)";
       case "month":

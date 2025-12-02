@@ -62,6 +62,8 @@ export default function ReportsPage() {
 
   const getDateRangeLabel = () => {
     switch (dateRange.type) {
+      case "day":
+        return "This Day";
       case "week":
         return "This Week";
       case "month":
