@@ -66,7 +66,10 @@ export const Receipt = forwardRef<ReceiptRef, ReceiptProps>(
     const saleDate = parseDatabaseTimestamp(sale.created_at);
     // Use DD/MM/YYYY format for receipt (as per design)
     const formattedDate = format(saleDate, "dd/MM/yyyy");
-    const formattedTime = formatTimeOnly(saleDate, { includeSeconds: true, hour12: true });
+    const formattedTime = formatTimeOnly(saleDate, {
+      includeSeconds: true,
+      hour12: true,
+    });
 
     // Parse terms (split by newline)
     const termsLines = receiptSettings.terms

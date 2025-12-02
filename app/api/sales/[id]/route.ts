@@ -24,7 +24,8 @@ async function getHandler(req: NextRequest, context?: RouteContext) {
     const itemsResult = await client.execute({
       sql: `SELECT si.*, 
                    COALESCE(p.name, 'Deleted Product') as product_name, 
-                   p.barcode
+                   p.barcode,
+                   COALESCE(p.cost_price, 0) as cost_price
             FROM sale_items si
             LEFT JOIN products p ON si.product_id = p.id
             WHERE si.sale_id = ?`,

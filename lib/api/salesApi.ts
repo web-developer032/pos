@@ -27,6 +27,7 @@ export interface SaleItem {
   subtotal: number;
   product_name?: string;
   barcode?: string;
+  cost_price?: number;
 }
 
 export interface CreateSaleRequest {

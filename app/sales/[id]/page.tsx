@@ -174,33 +174,44 @@ export default function SaleDetailPage() {
                       <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">
                         Subtotal
                       </th>
+                      <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">
+                        Profit
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200 bg-white">
-                    {items.map((item) => (
-                      <tr key={item.id}>
-                        <td className="whitespace-nowrap px-6 py-4 text-sm font-medium">
-                          {item.product_name}
-                        </td>
-                        <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-500">
-                          {item.barcode || "N/A"}
-                        </td>
-                        <td className="whitespace-nowrap px-6 py-4 text-right text-sm">
-                          {item.quantity}
-                        </td>
-                        <td className="whitespace-nowrap px-6 py-4 text-right text-sm">
-                          {formatCurrency(item.unit_price)}
-                        </td>
-                        <td className="whitespace-nowrap px-6 py-4 text-right text-sm text-red-600">
-                          {item.discount > 0
-                            ? formatCurrency(item.discount)
-                            : "-"}
-                        </td>
-                        <td className="whitespace-nowrap px-6 py-4 text-right text-sm font-semibold">
-                          {formatCurrency(item.subtotal)}
-                        </td>
-                      </tr>
-                    ))}
+                    {items.map((item) => {
+                      const costPrice = item.cost_price || 0;
+                      const profitPerUnit = item.unit_price - costPrice;
+                      const totalProfit = profitPerUnit * item.quantity;
+                      return (
+                        <tr key={item.id}>
+                          <td className="whitespace-nowrap px-6 py-4 text-sm font-medium">
+                            {item.product_name}
+                          </td>
+                          <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-500">
+                            {item.barcode || "N/A"}
+                          </td>
+                          <td className="whitespace-nowrap px-6 py-4 text-right text-sm">
+                            {item.quantity}
+                          </td>
+                          <td className="whitespace-nowrap px-6 py-4 text-right text-sm">
+                            {formatCurrency(item.unit_price)}
+                          </td>
+                          <td className="whitespace-nowrap px-6 py-4 text-right text-sm text-red-600">
+                            {item.discount > 0
+                              ? formatCurrency(item.discount)
+                              : "-"}
+                          </td>
+                          <td className="whitespace-nowrap px-6 py-4 text-right text-sm font-semibold">
+                            {formatCurrency(item.subtotal)}
+                          </td>
+                          <td className="whitespace-nowrap px-6 py-4 text-right text-sm font-semibold text-green-600">
+                            {formatCurrency(totalProfit)}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -242,6 +253,22 @@ export default function SaleDetailPage() {
                       <dt className="text-base font-semibold">Total</dt>
                       <dd className="text-base font-bold text-indigo-600">
                         {formatCurrency(sale.final_amount)}
+                      </dd>
+                    </div>
+                  </div>
+                  <div className="border-t border-gray-200 pt-3">
+                    <div className="flex justify-between">
+                      <dt className="text-base font-semibold text-green-600">
+                        Total Profit
+                      </dt>
+                      <dd className="text-base font-bold text-green-600">
+                        {formatCurrency(
+                          items.reduce((sum, item) => {
+                            const costPrice = item.cost_price || 0;
+                            const profitPerUnit = item.unit_price - costPrice;
+                            return sum + profitPerUnit * item.quantity;
+                          }, 0)
+                        )}
                       </dd>
                     </div>
                   </div>
