@@ -145,9 +145,16 @@ export function PurchaseOrderForm({
   const { data: suppliersData, refetch: refetchSuppliers } =
     useGetSuppliersQuery();
   const debouncedProductSearch = useDebounce(productSearch, 300);
+
+  // Fetch products with search filter
   const { data: productsData } = useGetProductsQuery({
     search: debouncedProductSearch || undefined,
     limit: 1000, // Fetch up to 1000 products to show all available products
+  });
+
+  // Also fetch all products (without search) to get selected products that might not match search
+  const { data: allProductsData } = useGetProductsQuery({
+    limit: 1000,
   });
   const { data: purchaseOrderData } = useGetPurchaseOrderQuery(
     purchaseOrderId!,
@@ -272,13 +279,42 @@ export function PurchaseOrderForm({
   };
 
   // Get product options for searchable select
+  // Always include products that are already selected (in current or other fields)
   const getProductOptions = () => {
-    return (
-      productsData?.products.map((p) => ({
+    const searchResults = productsData?.products || [];
+    const allProductsList = allProductsData?.products || [];
+
+    // Get all selected product IDs (from all fields, including current)
+    const selectedProductIds = watchedItems
+      .map((item) => item.product_id)
+      .filter((id): id is number => id !== null && id > 0);
+
+    // Create a set of product IDs from search results for quick lookup
+    const searchResultIds = new Set(searchResults.map((p) => p.id));
+
+    // Get selected products that are not in search results
+    const missingSelectedProducts = allProductsList.filter(
+      (p) => selectedProductIds.includes(p.id) && !searchResultIds.has(p.id)
+    );
+
+    // Combine search results with missing selected products
+    const allOptions = [
+      ...searchResults.map((p) => ({
         value: p.id,
         label: `${p.name} - ${formatCurrency(p.cost_price)}`,
-      })) || []
+      })),
+      ...missingSelectedProducts.map((p) => ({
+        value: p.id,
+        label: `${p.name} - ${formatCurrency(p.cost_price)}`,
+      })),
+    ];
+
+    // Remove duplicates based on product ID
+    const uniqueOptions = Array.from(
+      new Map(allOptions.map((opt) => [opt.value, opt])).values()
     );
+
+    return uniqueOptions;
   };
 
   // Handle product search
