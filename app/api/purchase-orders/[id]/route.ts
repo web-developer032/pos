@@ -186,20 +186,55 @@ async function putHandler(req: AuthRequest, context?: RouteContext) {
         args: [status, params.id],
       });
 
-      // If completing, update inventory
+      // If completing, update inventory and cost prices
       if (status === "completed") {
         const itemsResult = await client.execute({
-          sql: "SELECT product_id, quantity FROM purchase_order_items WHERE po_id = ?",
+          sql: "SELECT product_id, quantity, unit_cost FROM purchase_order_items WHERE po_id = ?",
           args: [params.id],
         });
 
         for (const item of itemsResult.rows as unknown as {
           product_id: number;
           quantity: number;
+          unit_cost: number;
         }[]) {
+          // Get current product information
+          const productResult = await client.execute({
+            sql: "SELECT cost_price, stock_quantity FROM products WHERE id = ?",
+            args: [item.product_id],
+          });
+
+          if (productResult.rows.length === 0) {
+            continue; // Skip if product doesn't exist
+          }
+
+          const product = productResult.rows[0] as unknown as {
+            cost_price: number;
+            stock_quantity: number;
+          };
+
+          const currentStock = product.stock_quantity || 0;
+          const currentCost = product.cost_price || 0;
+          const newQuantity = item.quantity;
+          const newCost = item.unit_cost;
+
+          // Calculate new cost price
+          let newCostPrice: number;
+          if (currentStock > 0) {
+            // Average cost calculation: weighted average
+            const totalCurrentValue = currentStock * currentCost;
+            const totalNewValue = newQuantity * newCost;
+            const totalQuantity = currentStock + newQuantity;
+            newCostPrice = (totalCurrentValue + totalNewValue) / totalQuantity;
+          } else {
+            // No existing stock, replace cost price
+            newCostPrice = newCost;
+          }
+
+          // Update stock quantity and cost price
           await client.execute({
-            sql: "UPDATE products SET stock_quantity = stock_quantity + ? WHERE id = ?",
-            args: [item.quantity, item.product_id],
+            sql: "UPDATE products SET stock_quantity = stock_quantity + ?, cost_price = ? WHERE id = ?",
+            args: [item.quantity, newCostPrice, item.product_id],
           });
 
           await client.execute({
