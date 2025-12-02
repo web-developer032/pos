@@ -1,23 +1,30 @@
 "use client";
 
 import { useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
-import { useGetPurchaseOrderQuery } from "@/lib/api/purchaseOrdersApi";
+import {
+  useGetPurchaseOrderQuery,
+  useDeletePurchaseOrderMutation,
+} from "@/lib/api/purchaseOrdersApi";
 import { useCurrency } from "@/lib/hooks/useCurrency";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { PurchaseOrderForm } from "@/components/purchase-orders/PurchaseOrderForm";
 import { formatSystemDate } from "@/lib/utils/dateFormat";
 import Link from "next/link";
+import toast from "react-hot-toast";
 
 export default function PurchaseOrderDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const poId = parseInt(params.id as string);
   const { data, isLoading, error, refetch } = useGetPurchaseOrderQuery(poId);
   const { format: formatCurrency } = useCurrency();
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [deletePurchaseOrder, { isLoading: isDeleting }] =
+    useDeletePurchaseOrderMutation();
 
   if (isLoading) {
     return (
@@ -60,6 +67,25 @@ export default function PurchaseOrderDetailPage() {
     user_name?: string;
   };
 
+  const handleDelete = async () => {
+    if (
+      !confirm(
+        `Are you sure you want to delete purchase order ${po.po_number}? This action cannot be undone.`
+      )
+    ) {
+      return;
+    }
+
+    try {
+      await deletePurchaseOrder(poId).unwrap();
+      toast.success("Purchase order deleted successfully");
+      router.push("/purchase-orders");
+    } catch (error: unknown) {
+      const err = error as { data?: { error?: string } };
+      toast.error(err.data?.error || "Failed to delete purchase order");
+    }
+  };
+
   return (
     <ProtectedRoute>
       <DashboardLayout>
@@ -84,11 +110,29 @@ export default function PurchaseOrderDetailPage() {
               </Button>
             </Link>
             {po.status === "pending" && (
+              <>
+                <Button
+                  onClick={() => setIsEditModalOpen(true)}
+                  className="bg-indigo-600 hover:bg-indigo-700"
+                >
+                  Edit
+                </Button>
+                <Button
+                  onClick={handleDelete}
+                  disabled={isDeleting}
+                  className="bg-red-600 hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {isDeleting ? "Deleting..." : "Delete"}
+                </Button>
+              </>
+            )}
+            {po.status !== "pending" && (
               <Button
-                onClick={() => setIsEditModalOpen(true)}
-                className="bg-indigo-600 hover:bg-indigo-700"
+                onClick={handleDelete}
+                disabled={isDeleting}
+                className="bg-red-600 hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                Edit
+                {isDeleting ? "Deleting..." : "Delete"}
               </Button>
             )}
           </div>

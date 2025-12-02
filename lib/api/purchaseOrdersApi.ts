@@ -114,6 +114,13 @@ export const purchaseOrdersApi = apiSlice.injectEndpoints({
         "PurchaseOrder",
       ],
     }),
+    deletePurchaseOrder: builder.mutation<{ message: string }, number>({
+      query: (id) => ({
+        url: `/purchase-orders/${id}`,
+        method: "DELETE",
+      }),
+      invalidatesTags: ["PurchaseOrder", "Inventory", "Product"],
+    }),
     deleteAllPurchaseOrders: builder.mutation<{ message: string }, void>({
       query: () => ({
         url: "/purchase-orders?delete_all=true",
@@ -130,5 +137,6 @@ export const {
   useCreatePurchaseOrderMutation,
   useUpdatePurchaseOrderMutation,
   useUpdatePurchaseOrderItemsMutation,
+  useDeletePurchaseOrderMutation,
   useDeleteAllPurchaseOrdersMutation,
 } = purchaseOrdersApi;

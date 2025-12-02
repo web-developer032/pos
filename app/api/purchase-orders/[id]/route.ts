@@ -209,5 +209,81 @@ async function putHandler(req: AuthRequest, context?: RouteContext) {
   }
 }
 
+async function deleteHandler(req: AuthRequest, context?: RouteContext) {
+  try {
+    if (!context) {
+      return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+    }
+    const params = await context.params;
+    const poId = parseInt(params.id);
+
+    // Check if purchase order exists
+    const poCheck = await client.execute({
+      sql: "SELECT id, status FROM purchase_orders WHERE id = ?",
+      args: [poId],
+    });
+
+    if (poCheck.rows.length === 0) {
+      return NextResponse.json(
+        { error: "Purchase order not found" },
+        { status: 404 }
+      );
+    }
+
+    const poStatus = (poCheck.rows[0] as unknown as { status: string }).status;
+
+    // If completed, reverse inventory changes
+    if (poStatus === "completed") {
+      const itemsResult = await client.execute({
+        sql: "SELECT product_id, quantity FROM purchase_order_items WHERE po_id = ?",
+        args: [poId],
+      });
+
+      // Reverse inventory for each item (subtract quantities that were added)
+      for (const item of itemsResult.rows) {
+        const productId = item.product_id as number;
+        const quantity = item.quantity as number;
+
+        // Subtract stock quantity (only if product exists and is not deleted)
+        await client.execute({
+          sql: `UPDATE products 
+                SET stock_quantity = stock_quantity - ? 
+                WHERE id = ? AND deleted_at IS NULL`,
+          args: [quantity, productId],
+        });
+      }
+    }
+
+    // Delete inventory transactions related to this purchase order
+    await client.execute({
+      sql: "DELETE FROM inventory_transactions WHERE reference_id = ? AND transaction_type = 'purchase'",
+      args: [poId],
+    });
+
+    // Delete purchase order items
+    await client.execute({
+      sql: "DELETE FROM purchase_order_items WHERE po_id = ?",
+      args: [poId],
+    });
+
+    // Delete the purchase order
+    await client.execute({
+      sql: "DELETE FROM purchase_orders WHERE id = ?",
+      args: [poId],
+    });
+
+    return NextResponse.json({
+      message: "Purchase order deleted successfully",
+    });
+  } catch (error) {
+    console.error("Error deleting purchase order:", error);
+    return NextResponse.json(
+      { error: "Failed to delete purchase order" },
+      { status: 500 }
+    );
+  }
+}
+
 export const GET = requireAuth(getHandler);
 export const PUT = requireAuth(putHandler);
+export const DELETE = requireAuth(deleteHandler);

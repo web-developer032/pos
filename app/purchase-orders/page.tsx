@@ -7,6 +7,7 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import {
   useGetPurchaseOrdersQuery,
   useUpdatePurchaseOrderMutation,
+  useDeletePurchaseOrderMutation,
   useDeleteAllPurchaseOrdersMutation,
 } from "@/lib/api/purchaseOrdersApi";
 import { useCurrency } from "@/lib/hooks/useCurrency";
@@ -41,8 +42,10 @@ export default function PurchaseOrdersPage() {
     status: statusFilter || undefined,
   });
   const [updatePO] = useUpdatePurchaseOrderMutation();
+  const [deletePO] = useDeletePurchaseOrderMutation();
   const [deleteAllPOs] = useDeleteAllPurchaseOrdersMutation();
   const [updatingId, setUpdatingId] = useState<number | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
   const [isDeletingAll, setIsDeletingAll] = useState(false);
   const { format: formatCurrency } = useCurrency();
 
@@ -61,6 +64,27 @@ export default function PurchaseOrdersPage() {
       toast.error(err.data?.error || "Failed to update");
     } finally {
       setUpdatingId(null);
+    }
+  };
+
+  const handleDelete = async (id: number, poNumber: string) => {
+    if (
+      !confirm(
+        `Are you sure you want to delete purchase order ${poNumber}? This action cannot be undone!`
+      )
+    ) {
+      return;
+    }
+    setDeletingId(id);
+    try {
+      await deletePO(id).unwrap();
+      toast.success("Purchase order deleted successfully");
+      refetch();
+    } catch (error: unknown) {
+      const err = error as { data?: { error?: string } };
+      toast.error(err.data?.error || "Failed to delete purchase order");
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -229,6 +253,30 @@ export default function PurchaseOrdersPage() {
                           </button>
                         </>
                       )}
+                      <button
+                        onClick={() => handleDelete(po.id, po.po_number)}
+                        disabled={deletingId === po.id}
+                        className="text-red-600 hover:text-red-900 disabled:cursor-not-allowed disabled:opacity-50"
+                        title="Delete purchase order"
+                      >
+                        {deletingId === po.id ? (
+                          "Deleting..."
+                        ) : (
+                          <svg
+                            className="h-5 w-5"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                            />
+                          </svg>
+                        )}
+                      </button>
                     </div>
                   </td>
                 </tr>
