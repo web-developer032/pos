@@ -6,15 +6,17 @@ import {
   removeItem,
   updateQuantity,
   updatePrice,
+  clearCart,
 } from "@/lib/slices/cartSlice";
 import { useCurrency } from "@/lib/hooks/useCurrency";
 import { Button } from "@/components/ui/Button";
 
 interface CartProps {
   onCheckout?: () => void;
+  onHoldCart?: () => void;
 }
 
-export function Cart({ onCheckout }: CartProps) {
+export function Cart({ onCheckout, onHoldCart }: CartProps) {
   const dispatch = useAppDispatch();
   const { items } = useAppSelector((state) => state.cart);
   const { format: formatCurrency } = useCurrency();
@@ -61,15 +63,46 @@ export function Cart({ onCheckout }: CartProps) {
     <div className="flex flex-col rounded-lg bg-white p-4 shadow-lg sm:p-6">
       <div className="mb-4 flex items-center justify-between gap-3">
         <h2 className="text-xl font-bold sm:text-2xl">Cart</h2>
-        {onCheckout && (
-          <Button
-            className="bg-indigo-600 hover:bg-indigo-700"
-            onClick={onCheckout}
-            disabled={items.length === 0}
-          >
-            Checkout
-          </Button>
-        )}
+        <div className="flex gap-2">
+          {items.length > 0 && (
+            <Button
+              variant="outline"
+              onClick={() => {
+                if (
+                  confirm(
+                    "Are you sure you want to clear the cart? This action cannot be undone."
+                  )
+                ) {
+                  dispatch(clearCart());
+                }
+              }}
+              className="border-red-500 text-red-600 hover:bg-red-50"
+              size="sm"
+            >
+              Clear
+            </Button>
+          )}
+          {onHoldCart && items.length > 0 && (
+            <Button
+              variant="outline"
+              onClick={onHoldCart}
+              className="border-yellow-500 text-yellow-600 hover:bg-yellow-50"
+              size="sm"
+            >
+              Hold
+            </Button>
+          )}
+          {onCheckout && (
+            <Button
+              className="bg-indigo-600 hover:bg-indigo-700"
+              onClick={onCheckout}
+              disabled={items.length === 0}
+              size="sm"
+            >
+              Checkout
+            </Button>
+          )}
+        </div>
       </div>
       <div className="mb-4 max-h-[400px] flex-1 overflow-y-auto sm:max-h-[500px]">
         {items.length === 0 ? (

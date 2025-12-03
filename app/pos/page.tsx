@@ -6,13 +6,22 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { ProductGrid } from "@/components/pos/ProductGrid";
 import { Cart } from "@/components/pos/Cart";
 import { PaymentModal } from "@/components/pos/PaymentModal";
+import { HeldCarts } from "@/components/pos/HeldCarts";
 import { useAppSelector, useAppDispatch } from "@/lib/hooks";
-import { setCustomer, setDiscount, setTax } from "@/lib/slices/cartSlice";
+import {
+  setCustomer,
+  setDiscount,
+  setTax,
+  holdCart,
+} from "@/lib/slices/cartSlice";
+import { Modal } from "@/components/ui/Modal";
 import { useGetCustomersQuery } from "@/lib/api/customersApi";
 import { useBarcodeScanner } from "@/lib/hooks/useBarcodeScanner";
 import { useCurrency } from "@/lib/hooks/useCurrency";
 import { Select } from "@/components/ui/Select";
 import { Input } from "@/components/ui/Input";
+import { Button } from "@/components/ui/Button";
+import toast from "react-hot-toast";
 
 export default function POSPage() {
   const dispatch = useAppDispatch();
@@ -22,6 +31,8 @@ export default function POSPage() {
   const { data: customersData } = useGetCustomersQuery();
   const { format: formatCurrency } = useCurrency();
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [isHoldCartModalOpen, setIsHoldCartModalOpen] = useState(false);
+  const [holdCartName, setHoldCartName] = useState("");
   const [barcodeInput, setBarcodeInput] = useState("");
   const barcodeInputRef = useRef<HTMLInputElement>(null);
 
@@ -52,12 +63,25 @@ export default function POSPage() {
 
   // Auto-focus barcode input when modal closes
   useEffect(() => {
-    if (!isPaymentModalOpen) {
+    if (!isPaymentModalOpen && !isHoldCartModalOpen) {
       requestAnimationFrame(() => {
         barcodeInputRef.current?.focus();
       });
     }
-  }, [isPaymentModalOpen]);
+  }, [isPaymentModalOpen, isHoldCartModalOpen]);
+
+  const handleHoldCart = () => {
+    if (items.length === 0) return;
+    setIsHoldCartModalOpen(true);
+  };
+
+  const handleConfirmHoldCart = () => {
+    const trimmedName = holdCartName.trim();
+    dispatch(holdCart(trimmedName ? { name: trimmedName } : undefined));
+    setHoldCartName("");
+    setIsHoldCartModalOpen(false);
+    toast.success("Cart held successfully");
+  };
 
   return (
     <ProtectedRoute allowedRoles={["admin", "cashier", "manager"]}>
@@ -164,10 +188,14 @@ export default function POSPage() {
 
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:gap-6">
           <div className="lg:col-span-2">
+            <HeldCarts />
             <ProductGrid />
           </div>
           <div className="lg:sticky lg:top-6 lg:col-span-1 lg:self-start">
-            <Cart onCheckout={() => setIsPaymentModalOpen(true)} />
+            <Cart
+              onCheckout={() => setIsPaymentModalOpen(true)}
+              onHoldCart={handleHoldCart}
+            />
           </div>
         </div>
 
@@ -176,6 +204,48 @@ export default function POSPage() {
           onClose={() => setIsPaymentModalOpen(false)}
           onSuccess={() => {}}
         />
+
+        {/* Hold Cart Modal */}
+        <Modal
+          isOpen={isHoldCartModalOpen}
+          onClose={() => {
+            setIsHoldCartModalOpen(false);
+            setHoldCartName("");
+          }}
+          title="Hold Cart"
+          size="sm"
+        >
+          <div className="space-y-4">
+            <p className="text-sm text-gray-600">
+              This cart will be saved and you can resume it later. You can
+              optionally give it a name to identify it easily.
+            </p>
+            <Input
+              label="Cart Name (Optional)"
+              value={holdCartName}
+              onChange={(e) => setHoldCartName(e.target.value)}
+              placeholder="e.g., Customer Name"
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  handleConfirmHoldCart();
+                }
+              }}
+            />
+            <div className="flex justify-end gap-2 pt-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setIsHoldCartModalOpen(false);
+                  setHoldCartName("");
+                }}
+              >
+                Cancel
+              </Button>
+              <Button onClick={handleConfirmHoldCart}>Hold Cart</Button>
+            </div>
+          </div>
+        </Modal>
       </DashboardLayout>
     </ProtectedRoute>
   );

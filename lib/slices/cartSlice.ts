@@ -8,11 +8,22 @@ export interface CartItem {
   stock_quantity: number;
 }
 
+export interface HeldCart {
+  id: string;
+  items: CartItem[];
+  customerId?: number;
+  discount: number;
+  tax: number;
+  name?: string;
+  createdAt: number;
+}
+
 interface CartState {
   items: CartItem[];
   customerId?: number;
   discount: number;
   tax: number;
+  heldCarts: HeldCart[];
 }
 
 const initialState: CartState = {
@@ -20,6 +31,7 @@ const initialState: CartState = {
   customerId: undefined,
   discount: 0,
   tax: 0,
+  heldCarts: [],
 };
 
 const cartSlice = createSlice({
@@ -84,6 +96,72 @@ const cartSlice = createSlice({
       state.discount = 0;
       state.tax = 0;
     },
+    holdCart: (state, action: PayloadAction<{ name?: string } | undefined>) => {
+      if (state.items.length === 0) return;
+
+      const name = action.payload?.name;
+
+      const heldCart: HeldCart = {
+        id: `held-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        items: [...state.items],
+        customerId: state.customerId,
+        discount: state.discount,
+        tax: state.tax,
+        name: name,
+        createdAt: Date.now(),
+      };
+
+      state.heldCarts.push(heldCart);
+      state.items = [];
+      state.customerId = undefined;
+      state.discount = 0;
+      state.tax = 0;
+    },
+    resumeCart: (state, action: PayloadAction<string>) => {
+      const heldCartIndex = state.heldCarts.findIndex(
+        (cart) => cart.id === action.payload
+      );
+
+      if (heldCartIndex === -1) return;
+
+      const heldCart = state.heldCarts[heldCartIndex];
+
+      // If there are items in the current cart, hold it first
+      if (state.items.length > 0) {
+        const currentHeldCart: HeldCart = {
+          id: `held-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          items: [...state.items],
+          customerId: state.customerId,
+          discount: state.discount,
+          tax: state.tax,
+          createdAt: Date.now(),
+        };
+        state.heldCarts.push(currentHeldCart);
+      }
+
+      // Resume the selected cart
+      state.items = [...heldCart.items];
+      state.customerId = heldCart.customerId;
+      state.discount = heldCart.discount;
+      state.tax = heldCart.tax;
+
+      // Remove from held carts
+      state.heldCarts.splice(heldCartIndex, 1);
+    },
+    deleteHeldCart: (state, action: PayloadAction<string>) => {
+      state.heldCarts = state.heldCarts.filter(
+        (cart) => cart.id !== action.payload
+      );
+    },
+    updateHeldCartName: (
+      state,
+      action: PayloadAction<{ id: string; name: string }>
+    ) => {
+      const cart = state.heldCarts.find((c) => c.id === action.payload.id);
+      if (cart) {
+        cart.name = action.payload.name;
+      }
+    },
   },
 });
 
@@ -96,6 +174,10 @@ export const {
   setDiscount,
   setTax,
   clearCart,
+  holdCart,
+  resumeCart,
+  deleteHeldCart,
+  updateHeldCartName,
 } = cartSlice.actions;
 
 export default cartSlice.reducer;
