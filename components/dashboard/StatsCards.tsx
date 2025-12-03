@@ -1,6 +1,7 @@
 "use client";
 
 import { useGetSalesQuery } from "@/lib/api/salesApi";
+import { useGetExpensesQuery } from "@/lib/api/financeApi";
 import { useCurrency } from "@/lib/hooks/useCurrency";
 import type { DateRange } from "@/components/common/DateRangeSelector";
 
@@ -13,9 +14,14 @@ export function StatsCards({ dateRange }: StatsCardsProps) {
     startDate: dateRange?.startDate,
     endDate: dateRange?.endDate,
   });
+  const { data: expensesData, isLoading: isLoadingExpenses } =
+    useGetExpensesQuery({
+      startDate: dateRange?.startDate,
+      endDate: dateRange?.endDate,
+    });
   const { format: formatCurrency } = useCurrency();
 
-  if (isLoading) {
+  if (isLoading || isLoadingExpenses) {
     return <div>Loading stats...</div>;
   }
 
@@ -24,10 +30,7 @@ export function StatsCards({ dateRange }: StatsCardsProps) {
     (sum, sale) => sum + (sale.final_amount || 0),
     0
   );
-  const profit = sales.reduce(
-    (sum, sale) => sum + (sale.total_profit || 0),
-    0
-  );
+  const profit = sales.reduce((sum, sale) => sum + (sale.total_profit || 0), 0);
   const orders = sales.length;
 
   const getLabel = () => {
@@ -46,8 +49,10 @@ export function StatsCards({ dateRange }: StatsCardsProps) {
     }
   };
 
+  const totalExpenses = expensesData?.summary.total_expenses || 0;
+
   return (
-    <div className="grid grid-cols-1 gap-6 md:grid-cols-4">
+    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-5">
       <div className="rounded-lg bg-white p-6 shadow">
         <h3 className="text-sm font-medium text-gray-500">
           {getLabel()} Revenue
@@ -60,6 +65,14 @@ export function StatsCards({ dateRange }: StatsCardsProps) {
         </h3>
         <p className="mt-2 text-3xl font-bold text-green-600">
           {formatCurrency(profit)}
+        </p>
+      </div>
+      <div className="rounded-lg bg-white p-6 shadow">
+        <h3 className="text-sm font-medium text-gray-500">
+          {getLabel()} Expenses
+        </h3>
+        <p className="mt-2 text-3xl font-bold text-red-600">
+          {formatCurrency(totalExpenses)}
         </p>
       </div>
       <div className="rounded-lg bg-white p-6 shadow">

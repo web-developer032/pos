@@ -4,11 +4,13 @@ import { useState } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { useGetSalesAnalyticsQuery } from "@/lib/api/salesApi";
+import { useGetExpensesQuery } from "@/lib/api/financeApi";
 import { useCurrency } from "@/lib/hooks/useCurrency";
 import {
   DateRangeSelector,
   type DateRange,
 } from "@/components/common/DateRangeSelector";
+import { ExpensesChart } from "@/components/dashboard/ExpensesChart";
 import { format } from "date-fns";
 import {
   BarChart,
@@ -39,9 +41,14 @@ export default function ReportsPage() {
     endDate: dateRange.endDate,
     groupBy: groupBy as "day" | "week" | "month",
   });
+  const { data: expensesData, isLoading: isLoadingExpenses } =
+    useGetExpensesQuery({
+      startDate: dateRange.startDate,
+      endDate: dateRange.endDate,
+    });
   const { format: formatCurrency } = useCurrency();
 
-  if (isLoading) {
+  if (isLoading || isLoadingExpenses) {
     return (
       <ProtectedRoute>
         <DashboardLayout>
@@ -106,7 +113,7 @@ export default function ReportsPage() {
           <DateRangeSelector value={dateRange} onChange={setDateRange} />
         </div>
 
-        <div className="mb-6 grid grid-cols-1 gap-6 md:grid-cols-4">
+        <div className="mb-6 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-5">
           <div className="rounded-lg bg-white p-6 shadow">
             <h3 className="text-sm font-medium text-gray-500">
               Total Revenue ({getDateRangeLabel()})
@@ -125,6 +132,14 @@ export default function ReportsPage() {
           </div>
           <div className="rounded-lg bg-white p-6 shadow">
             <h3 className="text-sm font-medium text-gray-500">
+              Total Expenses ({getDateRangeLabel()})
+            </h3>
+            <p className="mt-2 text-3xl font-bold text-red-600">
+              {formatCurrency(expensesData?.summary.total_expenses || 0)}
+            </p>
+          </div>
+          <div className="rounded-lg bg-white p-6 shadow">
+            <h3 className="text-sm font-medium text-gray-500">
               Total Sales ({getDateRangeLabel()})
             </h3>
             <p className="mt-2 text-3xl font-bold">{summary.totalSales}</p>
@@ -137,21 +152,24 @@ export default function ReportsPage() {
           </div>
         </div>
 
-        <div className="rounded-lg bg-white p-6 shadow">
-          <h3 className="mb-4 text-lg font-semibold">
-            Revenue & Profit Trend ({getDateRangeLabel()})
-          </h3>
-          <ResponsiveContainer width="100%" height={400}>
-            <BarChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="date" />
-              <YAxis />
-              <Tooltip />
-              <Legend />
-              <Bar dataKey="revenue" fill="#4f46e5" name="Revenue" />
-              <Bar dataKey="profit" fill="#10b981" name="Profit" />
-            </BarChart>
-          </ResponsiveContainer>
+        <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <div className="rounded-lg bg-white p-6 shadow">
+            <h3 className="mb-4 text-lg font-semibold">
+              Revenue & Profit Trend ({getDateRangeLabel()})
+            </h3>
+            <ResponsiveContainer width="100%" height={400}>
+              <BarChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="date" />
+                <YAxis />
+                <Tooltip />
+                <Legend />
+                <Bar dataKey="revenue" fill="#4f46e5" name="Revenue" />
+                <Bar dataKey="profit" fill="#10b981" name="Profit" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+          <ExpensesChart dateRange={dateRange} />
         </div>
       </DashboardLayout>
     </ProtectedRoute>

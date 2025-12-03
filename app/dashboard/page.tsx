@@ -5,7 +5,7 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { StatsCards } from "@/components/dashboard/StatsCards";
 import { SalesChart } from "@/components/dashboard/SalesChart";
-import { TopProducts } from "@/components/dashboard/TopProducts";
+import { ExpensesChart } from "@/components/dashboard/ExpensesChart";
 import { RecentSales } from "@/components/dashboard/RecentSales";
 import { LowStockAlerts } from "@/components/dashboard/LowStockAlerts";
 import { FinanceSummary } from "@/components/dashboard/FinanceSummary";
@@ -33,7 +33,7 @@ export default function DashboardPage() {
         <StatsCards dateRange={dateRange} />
         <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
           <SalesChart dateRange={dateRange} />
-          <TopProducts />
+          <ExpensesChart dateRange={dateRange} />
         </div>
         <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
           <RecentSales />
