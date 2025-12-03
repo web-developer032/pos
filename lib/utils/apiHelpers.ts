@@ -154,3 +154,11 @@ export async function executePaginatedQuery<T>(
     pagination: buildPaginationResponse(total, page, limit),
   };
 }
+
+/**
+ * Round price to 2 decimal places
+ * This ensures all prices are consistently formatted to 2 decimals in the backend
+ */
+export function roundPrice(price: number): number {
+  return Math.round(price * 100) / 100;
+}

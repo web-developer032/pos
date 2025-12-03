@@ -4,6 +4,7 @@ import { useState, useRef } from "react";
 import { useAppSelector, useAppDispatch } from "@/lib/hooks";
 import { useCurrency } from "@/lib/hooks/useCurrency";
 import { useCreateSaleMutation } from "@/lib/api/salesApi";
+import { roundPrice } from "@/lib/utils/formHelpers";
 import type { Sale, SaleItem } from "@/lib/api/salesApi";
 import { clearCart } from "@/lib/slices/cartSlice";
 import { Modal } from "@/components/ui/Modal";
@@ -39,11 +40,10 @@ export function PaymentModal({
   const receiptRef = useRef<ReceiptRef>(null);
   const { format: formatCurrency } = useCurrency();
 
-  const subtotal = items.reduce(
-    (sum, item) => sum + item.price * item.quantity,
-    0
+  const subtotal = roundPrice(
+    items.reduce((sum, item) => sum + item.price * item.quantity, 0)
   );
-  const finalTotal = subtotal - discount + tax;
+  const finalTotal = roundPrice(subtotal - discount + tax);
 
   const handlePayment = async () => {
     if (items.length === 0) {

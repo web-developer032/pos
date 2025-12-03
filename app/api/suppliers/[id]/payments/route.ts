@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireAuth, RouteContext, AuthRequest } from "@/lib/middleware/auth";
 import client from "@/lib/db";
 import { z } from "zod";
+import { roundPrice } from "@/lib/utils/apiHelpers";
 
 const paymentSchema = z.object({
   purchase_order_id: z.number().optional(),
@@ -70,7 +71,7 @@ async function postHandler(req: AuthRequest, context?: RouteContext) {
       args: [
         supplierId,
         validated.purchase_order_id || null,
-        validated.amount,
+        roundPrice(validated.amount),
         validated.payment_method,
         validated.reference_number || null,
         validated.notes || null,

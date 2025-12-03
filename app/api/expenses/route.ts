@@ -3,6 +3,7 @@ import { requireAuth, AuthRequest } from "@/lib/middleware/auth";
 import client from "@/lib/db";
 import { z } from "zod";
 import { getCurrentTimestamp } from "@/lib/utils/dateTime";
+import { roundPrice } from "@/lib/utils/apiHelpers";
 
 const expenseSchema = z.object({
   amount: z.number().min(0.01, "Amount must be greater than 0"),
@@ -98,7 +99,7 @@ async function postHandler(req: AuthRequest) {
       sql: `INSERT INTO expenses (amount, category, description, payment_method, reference_number, notes, user_id, created_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`,
       args: [
-        validated.amount,
+        roundPrice(validated.amount),
         validated.category,
         validated.description || null,
         validated.payment_method,

@@ -9,6 +9,7 @@ import {
   clearCart,
 } from "@/lib/slices/cartSlice";
 import { useCurrency } from "@/lib/hooks/useCurrency";
+import { formatPriceForInput, roundPrice } from "@/lib/utils/formHelpers";
 import { Button } from "@/components/ui/Button";
 
 interface CartProps {
@@ -35,7 +36,9 @@ export function Cart({ onCheckout, onHoldCart }: CartProps) {
     if (inputValue !== undefined) {
       const newPrice = parseFloat(inputValue);
       if (!isNaN(newPrice) && newPrice >= 0) {
-        dispatch(updatePrice({ product_id: productId, price: newPrice }));
+        dispatch(
+          updatePrice({ product_id: productId, price: roundPrice(newPrice) })
+        );
       }
       setPriceInputs((prev) => {
         const updated = { ...prev };
@@ -123,9 +126,10 @@ export function Cart({ onCheckout, onHoldCart }: CartProps) {
                         <input
                           type="number"
                           min="0"
+                          step="0.01"
                           value={
                             priceInputs[item.product_id] ??
-                            item.price.toString()
+                            formatPriceForInput(item.price)
                           }
                           onChange={(e) =>
                             handlePriceChange(item.product_id, e.target.value)

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/middleware/auth";
 import client from "@/lib/db";
 import { z } from "zod";
+import { roundPrice } from "@/lib/utils/apiHelpers";
 
 // Helper to normalize empty/whitespace strings to undefined
 const normalizeEmptyString = (val: unknown): string | undefined => {
@@ -201,8 +202,8 @@ async function postHandler(req: NextRequest) {
             description,
             categoryId,
             supplierId,
-            product.cost_price,
-            product.selling_price,
+            roundPrice(product.cost_price),
+            roundPrice(product.selling_price),
             product.stock_quantity || 0,
             product.min_stock_level || 0,
             product.unit || "piece",

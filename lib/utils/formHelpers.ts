@@ -62,3 +62,18 @@ export function toOptionalId(
   const num = Number(value);
   return isNaN(num) ? undefined : num;
 }
+
+/**
+ * Round price to 2 decimal places
+ * This ensures all prices are consistently formatted to 2 decimals
+ */
+export function roundPrice(price: number): number {
+  return Math.round(price * 100) / 100;
+}
+
+/**
+ * Format price for input field display (2 decimal places)
+ */
+export function formatPriceForInput(price: number): string {
+  return roundPrice(price).toFixed(2);
+}

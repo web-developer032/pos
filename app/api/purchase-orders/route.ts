@@ -7,6 +7,7 @@ import {
   executePaginatedQuery,
   handleApiError,
   handleValidationError,
+  roundPrice,
 } from "@/lib/utils/apiHelpers";
 
 const poSchema = z.object({
@@ -78,21 +79,23 @@ async function postHandler(req: AuthRequest) {
     }
 
     const poNumber = `PO-${Date.now()}`;
-    const subtotal = validated.items.reduce(
-      (sum, item) => sum + item.quantity * item.unit_cost,
-      0
+    const subtotal = roundPrice(
+      validated.items.reduce(
+        (sum, item) => sum + item.quantity * roundPrice(item.unit_cost),
+        0
+      )
     );
 
     // Calculate discount
     let discountAmount = 0;
     if (validated.discount_type && validated.discount_value) {
       if (validated.discount_type === "percentage") {
-        discountAmount = (subtotal * validated.discount_value) / 100;
+        discountAmount = roundPrice((subtotal * validated.discount_value) / 100);
       } else {
-        discountAmount = validated.discount_value;
+        discountAmount = roundPrice(validated.discount_value);
       }
     }
-    const totalAmount = Math.max(0, subtotal - discountAmount);
+    const totalAmount = roundPrice(Math.max(0, subtotal - discountAmount));
 
     const poResult = await client.execute({
       sql: `INSERT INTO purchase_orders (po_number, supplier_id, user_id, total_amount, discount_type, discount_value) 
@@ -110,6 +113,8 @@ async function postHandler(req: AuthRequest) {
     const poId = (poResult.rows[0] as unknown as { id: number }).id;
 
     for (const item of validated.items) {
+      const roundedUnitCost = roundPrice(item.unit_cost);
+      const itemSubtotal = roundPrice(item.quantity * roundedUnitCost);
       await client.execute({
         sql: `INSERT INTO purchase_order_items (po_id, product_id, quantity, unit_cost, subtotal) 
               VALUES (?, ?, ?, ?, ?)`,
@@ -117,8 +122,8 @@ async function postHandler(req: AuthRequest) {
           poId,
           item.product_id,
           item.quantity,
-          item.unit_cost,
-          item.quantity * item.unit_cost,
+          roundedUnitCost,
+          itemSubtotal,
         ],
       });
     }

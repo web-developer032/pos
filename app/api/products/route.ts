@@ -7,6 +7,7 @@ import {
   executePaginatedQuery,
   handleApiError,
   handleValidationError,
+  roundPrice,
 } from "@/lib/utils/apiHelpers";
 
 const productUnitEnum = z.enum([
@@ -103,8 +104,8 @@ async function postHandler(req: NextRequest) {
         validated.description || null,
         validated.category_id || null,
         validated.supplier_id || null,
-        validated.cost_price,
-        validated.selling_price,
+        roundPrice(validated.cost_price),
+        roundPrice(validated.selling_price),
         validated.stock_quantity,
         validated.min_stock_level,
         validated.unit || "piece",

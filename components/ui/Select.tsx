@@ -4,12 +4,18 @@ interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
   label?: string;
   error?: string;
   options: { value: string | number; label: string }[];
+  direction?: "row" | "column";
 }
 
 export const Select = forwardRef<HTMLSelectElement, SelectProps>(
-  ({ label, error, options, className = "", ...props }, ref) => {
+  (
+    { label, error, options, className = "", direction = "row", ...props },
+    ref
+  ) => {
     return (
-      <div className="flex w-full items-center gap-4">
+      <div
+        className={`flex w-full items-center gap-2 ${direction === "column" ? "flex-col" : "flex-row"}`}
+      >
         {label && (
           <label className="flex-shrink-0 text-sm font-medium text-gray-700">
             {label}

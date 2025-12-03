@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAuth, RouteContext, AuthRequest } from "@/lib/middleware/auth";
 import client from "@/lib/db";
 import { z } from "zod";
+import { roundPrice } from "@/lib/utils/apiHelpers";
 
 async function getHandler(req: NextRequest, context?: RouteContext) {
   try {
@@ -114,24 +115,30 @@ async function putHandler(req: AuthRequest, context?: RouteContext) {
         });
 
         // Calculate subtotal
-        const subtotal = validated.items.reduce(
-          (sum, item) => sum + item.quantity * item.unit_cost,
-          0
+        const subtotal = roundPrice(
+          validated.items.reduce(
+            (sum, item) => sum + item.quantity * roundPrice(item.unit_cost),
+            0
+          )
         );
 
         // Calculate discount
         let discountAmount = 0;
         if (validated.discount_type && validated.discount_value) {
           if (validated.discount_type === "percentage") {
-            discountAmount = (subtotal * validated.discount_value) / 100;
+            discountAmount = roundPrice(
+              (subtotal * validated.discount_value) / 100
+            );
           } else {
-            discountAmount = validated.discount_value;
+            discountAmount = roundPrice(validated.discount_value);
           }
         }
-        const totalAmount = Math.max(0, subtotal - discountAmount);
+        const totalAmount = roundPrice(Math.max(0, subtotal - discountAmount));
 
         // Insert new items
         for (const item of validated.items) {
+          const roundedUnitCost = roundPrice(item.unit_cost);
+          const itemSubtotal = roundPrice(item.quantity * roundedUnitCost);
           await client.execute({
             sql: `INSERT INTO purchase_order_items (po_id, product_id, quantity, unit_cost, subtotal) 
                   VALUES (?, ?, ?, ?, ?)`,
@@ -139,8 +146,8 @@ async function putHandler(req: AuthRequest, context?: RouteContext) {
               poId,
               item.product_id,
               item.quantity,
-              item.unit_cost,
-              item.quantity * item.unit_cost,
+              roundedUnitCost,
+              itemSubtotal,
             ],
           });
         }

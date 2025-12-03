@@ -26,6 +26,7 @@ import {
   toFloat,
   toOptionalId,
   validateNonNegative,
+  roundPrice,
 } from "@/lib/utils/formHelpers";
 import toast from "react-hot-toast";
 import { ProfitPercentage } from "@/components/common/ProfitPercentage";
@@ -338,8 +339,8 @@ export function ProductForm({ productId, onSuccess }: ProductFormProps) {
           description: data.description || undefined,
           category_id: categoryId,
           supplier_id: supplierId,
-          cost_price: costPrice,
-          selling_price: sellingPrice,
+          cost_price: roundPrice(costPrice),
+          selling_price: roundPrice(sellingPrice),
           stock_quantity: stockQuantity,
           min_stock_level: minStockLevel,
           unit: data.unit || "piece",

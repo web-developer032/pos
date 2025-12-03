@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAuth, RouteContext } from "@/lib/middleware/auth";
 import client from "@/lib/db";
 import { z } from "zod";
+import { roundPrice } from "@/lib/utils/apiHelpers";
 
 const productUnitEnum = z.enum([
   "piece",
@@ -86,8 +87,13 @@ async function putHandler(req: NextRequest, context?: RouteContext) {
     Object.entries(validated).forEach(([key, value]) => {
       if (key !== "additional_barcodes" && value !== undefined) {
         updates.push(`${key} = ?`);
-        // Type assertion needed because we've filtered out additional_barcodes
-        values.push(value as string | number | null);
+        // Round price fields to 2 decimals
+        if (key === "cost_price" || key === "selling_price") {
+          values.push(roundPrice(value as number));
+        } else {
+          // Type assertion needed because we've filtered out additional_barcodes
+          values.push(value as string | number | null);
+        }
       }
     });
 

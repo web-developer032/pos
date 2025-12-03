@@ -3,6 +3,7 @@ import { requireAuth, AuthRequest } from "@/lib/middleware/auth";
 import client from "@/lib/db";
 import { z } from "zod";
 import { getCurrentTimestamp } from "@/lib/utils/dateTime";
+import { roundPrice } from "@/lib/utils/apiHelpers";
 
 const returnSchema = z.object({
   sale_id: z.number(),
@@ -117,8 +118,9 @@ async function postHandler(req: AuthRequest) {
     // Calculate refund amount
     let totalRefund = 0;
     for (const item of validated.items) {
-      totalRefund += item.quantity * item.unit_price;
+      totalRefund += item.quantity * roundPrice(item.unit_price);
     }
+    totalRefund = roundPrice(totalRefund);
 
     const timestamp = getCurrentTimestamp();
 
@@ -143,7 +145,8 @@ async function postHandler(req: AuthRequest) {
 
     // Create return items and restore inventory
     for (const item of validated.items) {
-      const refundAmount = item.quantity * item.unit_price;
+      const roundedUnitPrice = roundPrice(item.unit_price);
+      const refundAmount = roundPrice(item.quantity * roundedUnitPrice);
 
       await client.execute({
         sql: `INSERT INTO return_items (return_id, sale_item_id, product_id, quantity, unit_price, refund_amount)
@@ -153,7 +156,7 @@ async function postHandler(req: AuthRequest) {
           item.sale_item_id,
           item.product_id,
           item.quantity,
-          item.unit_price,
+          roundedUnitPrice,
           refundAmount,
         ],
       });

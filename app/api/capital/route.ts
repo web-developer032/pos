@@ -3,6 +3,7 @@ import { requireAuth, AuthRequest } from "@/lib/middleware/auth";
 import client from "@/lib/db";
 import { z } from "zod";
 import { getCurrentTimestamp } from "@/lib/utils/dateTime";
+import { roundPrice } from "@/lib/utils/apiHelpers";
 
 const capitalSchema = z.object({
   amount: z.number().min(0.01, "Amount must be greater than 0"),
@@ -91,7 +92,7 @@ async function postHandler(req: AuthRequest) {
       sql: `INSERT INTO capital (amount, description, transaction_type, notes, user_id, created_at)
             VALUES (?, ?, ?, ?, ?, ?) RETURNING *`,
       args: [
-        validated.amount,
+        roundPrice(validated.amount),
         validated.description || null,
         validated.transaction_type,
         validated.notes || null,

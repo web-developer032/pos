@@ -3,6 +3,7 @@
 import { useAppSelector, useAppDispatch } from "@/lib/hooks";
 import { resumeCart, deleteHeldCart } from "@/lib/slices/cartSlice";
 import { useCurrency } from "@/lib/hooks/useCurrency";
+import { roundPrice } from "@/lib/utils/formHelpers";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/Button";
 
@@ -18,7 +19,9 @@ export function HeldCarts() {
   const calculateTotal = (
     items: Array<{ price: number; quantity: number }>
   ) => {
-    return items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    return roundPrice(
+      items.reduce((sum, item) => sum + item.price * item.quantity, 0)
+    );
   };
 
   return (
@@ -27,7 +30,7 @@ export function HeldCarts() {
       <div className="space-y-2">
         {heldCarts.map((cart) => {
           const subtotal = calculateTotal(cart.items);
-          const total = subtotal - cart.discount + cart.tax;
+          const total = roundPrice(subtotal - cart.discount + cart.tax);
           const itemCount = cart.items.length;
 
           return (

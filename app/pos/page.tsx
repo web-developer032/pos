@@ -18,6 +18,7 @@ import { Modal } from "@/components/ui/Modal";
 import { useGetCustomersQuery } from "@/lib/api/customersApi";
 import { useBarcodeScanner } from "@/lib/hooks/useBarcodeScanner";
 import { useCurrency } from "@/lib/hooks/useCurrency";
+import { roundPrice } from "@/lib/utils/formHelpers";
 import { Select } from "@/components/ui/Select";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
@@ -37,10 +38,12 @@ export default function POSPage() {
   const barcodeInputRef = useRef<HTMLInputElement>(null);
 
   // Calculate totals
-  const subtotal = items.reduce((sum, item) => {
-    return sum + item.price * item.quantity;
-  }, 0);
-  const finalTotal = subtotal - discount + tax;
+  const subtotal = roundPrice(
+    items.reduce((sum, item) => {
+      return sum + item.price * item.quantity;
+    }, 0)
+  );
+  const finalTotal = roundPrice(subtotal - discount + tax);
 
   // Use optimized barcode scanner hook
   const { scanBarcode } = useBarcodeScanner({
@@ -142,9 +145,10 @@ export default function POSPage() {
           </div>
         </div>
 
-        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:gap-4">
-          <div className="w-full sm:w-64">
+        <div className="mb-4 flex gap-4">
+          <div>
             <Select
+              direction="column"
               label="Customer (Optional)"
               options={[
                 { value: "", label: "Walk-in Customer" },
@@ -163,24 +167,27 @@ export default function POSPage() {
               }
             />
           </div>
-          <div className="w-full sm:w-32">
+          <div>
             <Input
               label="Discount"
               type="number"
+              step="0.01"
               value={discount}
               onChange={(e) =>
-                dispatch(setDiscount(parseFloat(e.target.value) || 0))
+                dispatch(
+                  setDiscount(roundPrice(parseFloat(e.target.value) || 0))
+                )
               }
             />
           </div>
-          <div className="w-full sm:w-32">
+          <div>
             <Input
               label="Tax"
               type="number"
-              step="0.1"
+              step="0.01"
               value={tax}
               onChange={(e) =>
-                dispatch(setTax(parseFloat(e.target.value) || 0))
+                dispatch(setTax(roundPrice(parseFloat(e.target.value) || 0)))
               }
             />
           </div>

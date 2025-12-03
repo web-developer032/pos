@@ -12,6 +12,7 @@ import { useDebounce } from "@/lib/hooks/useDebounce";
 import { useThrottledCallback } from "@/lib/hooks/useThrottledCallback";
 import { useBarcodeScanner } from "@/lib/hooks/useBarcodeScanner";
 import { addItem } from "@/lib/slices/cartSlice";
+import { formatPriceForInput, roundPrice } from "@/lib/utils/formHelpers";
 import { Select } from "@/components/ui/Select";
 import { Input } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
@@ -70,7 +71,7 @@ export function ProductGrid() {
   ) => {
     e.stopPropagation();
     setEditingProduct(product);
-    setNewPrice(product.selling_price.toString());
+    setNewPrice(formatPriceForInput(product.selling_price));
   };
 
   const handleCloseEditModal = useCallback(() => {
@@ -90,7 +91,7 @@ export function ProductGrid() {
     try {
       await updateProduct({
         id: editingProduct.id,
-        data: { selling_price: price },
+        data: { selling_price: roundPrice(price) },
       }).unwrap();
       toast.success("Price updated successfully");
       refetch();
@@ -228,6 +229,7 @@ export function ProductGrid() {
               label="New Selling Price"
               type="number"
               min="0"
+              step="0.01"
               value={newPrice}
               onChange={(e) => setNewPrice(e.target.value)}
               placeholder="Enter new price"

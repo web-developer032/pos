@@ -7,6 +7,7 @@ import {
   buildPaginationResponse,
   handleApiError,
   handleValidationError,
+  roundPrice,
 } from "@/lib/utils/apiHelpers";
 
 const saleSchema = z.object({
@@ -123,13 +124,17 @@ async function postHandler(req: AuthRequest) {
     // Calculate totals
     let totalAmount = 0;
     for (const item of validated.items) {
-      const subtotal = item.quantity * item.unit_price - (item.discount || 0);
+      const subtotal = roundPrice(
+        item.quantity * roundPrice(item.unit_price) -
+          roundPrice(item.discount || 0)
+      );
       totalAmount += subtotal;
     }
+    totalAmount = roundPrice(totalAmount);
 
-    const discountAmount = validated.discount_amount || 0;
-    const taxAmount = validated.tax_amount || 0;
-    const finalAmount = totalAmount - discountAmount + taxAmount;
+    const discountAmount = roundPrice(validated.discount_amount || 0);
+    const taxAmount = roundPrice(validated.tax_amount || 0);
+    const finalAmount = roundPrice(totalAmount - discountAmount + taxAmount);
 
     // Create sale with explicit timestamp to avoid timezone issues
     // Use getCurrentTimestamp from dateTime utility for consistency
@@ -157,7 +162,11 @@ async function postHandler(req: AuthRequest) {
 
     // Create sale items and update inventory
     for (const item of validated.items) {
-      const subtotal = item.quantity * item.unit_price - (item.discount || 0);
+      const roundedUnitPrice = roundPrice(item.unit_price);
+      const roundedDiscount = roundPrice(item.discount || 0);
+      const subtotal = roundPrice(
+        item.quantity * roundedUnitPrice - roundedDiscount
+      );
 
       // Get current cost_price from product to store with sale
       const productResult = await client.execute({
@@ -166,8 +175,10 @@ async function postHandler(req: AuthRequest) {
       });
       const costPrice =
         productResult.rows.length > 0
-          ? (productResult.rows[0] as unknown as { cost_price: number })
-              .cost_price || 0
+          ? roundPrice(
+              (productResult.rows[0] as unknown as { cost_price: number })
+                .cost_price || 0
+            )
           : 0;
 
       await client.execute({
@@ -176,9 +187,9 @@ async function postHandler(req: AuthRequest) {
           saleId,
           item.product_id,
           item.quantity,
-          item.unit_price,
+          roundedUnitPrice,
           costPrice,
-          item.discount || 0,
+          roundedDiscount,
           subtotal,
         ],
       });
@@ -199,7 +210,7 @@ async function postHandler(req: AuthRequest) {
     // Create payment record
     await client.execute({
       sql: "INSERT INTO payments (sale_id, payment_method, amount) VALUES (?, ?, ?)",
-      args: [saleId, validated.payment_method, finalAmount],
+      args: [saleId, validated.payment_method, roundPrice(finalAmount)],
     });
 
     // Get full sale details

@@ -1,4 +1,5 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
+import { roundPrice } from "@/lib/utils/formHelpers";
 
 export interface CartItem {
   product_id: number;
@@ -50,8 +51,11 @@ const cartSlice = createSlice({
         state.items.splice(existingItemIndex, 1);
         state.items.unshift(existingItem);
       } else {
-        // New item: add to beginning (top of cart)
-        state.items.unshift(action.payload);
+        // New item: add to beginning (top of cart) with rounded price
+        state.items.unshift({
+          ...action.payload,
+          price: roundPrice(action.payload.price),
+        });
       }
     },
     removeItem: (state, action: PayloadAction<number>) => {
@@ -78,17 +82,17 @@ const cartSlice = createSlice({
         (item) => item.product_id === action.payload.product_id
       );
       if (item) {
-        item.price = action.payload.price;
+        item.price = roundPrice(action.payload.price);
       }
     },
     setCustomer: (state, action: PayloadAction<number | undefined>) => {
       state.customerId = action.payload;
     },
     setDiscount: (state, action: PayloadAction<number>) => {
-      state.discount = action.payload;
+      state.discount = roundPrice(action.payload);
     },
     setTax: (state, action: PayloadAction<number>) => {
-      state.tax = action.payload;
+      state.tax = roundPrice(action.payload);
     },
     clearCart: (state) => {
       state.items = [];
