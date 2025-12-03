@@ -8,6 +8,7 @@ import { SalesChart } from "@/components/dashboard/SalesChart";
 import { TopProducts } from "@/components/dashboard/TopProducts";
 import { RecentSales } from "@/components/dashboard/RecentSales";
 import { LowStockAlerts } from "@/components/dashboard/LowStockAlerts";
+import { FinanceSummary } from "@/components/dashboard/FinanceSummary";
 import {
   DateRangeSelector,
   type DateRange,
@@ -23,10 +24,7 @@ export default function DashboardPage() {
   return (
     <ProtectedRoute>
       <DashboardLayout>
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold">Dashboard</h1>
-          <p className="mt-2 text-gray-600">Overview of your store</p>
-        </div>
+        <FinanceSummary />
 
         <div className="mb-6">
           <DateRangeSelector value={dateRange} onChange={setDateRange} />

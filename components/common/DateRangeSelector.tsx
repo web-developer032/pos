@@ -115,7 +115,7 @@ export function DateRangeSelector({
     <div
       className={`flex flex-col gap-3 sm:flex-row sm:items-end ${className}`}
     >
-      <div className="w-full sm:w-48">
+      <div>
         <Select
           label="Date Range"
           value={type}
@@ -128,6 +128,7 @@ export function DateRangeSelector({
           ]}
         />
       </div>
+
       {type === "custom" && (
         <>
           <div className="w-full sm:w-40">

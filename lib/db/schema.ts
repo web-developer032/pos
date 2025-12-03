@@ -373,4 +373,51 @@ export async function initializeDatabase() {
   await client.execute(
     `CREATE INDEX IF NOT EXISTS idx_product_barcodes_barcode ON product_barcodes(barcode)`
   );
+
+  // Capital/Investment table
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS capital (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      amount REAL NOT NULL,
+      description TEXT,
+      transaction_type TEXT NOT NULL CHECK(transaction_type IN ('investment', 'withdrawal')),
+      notes TEXT,
+      user_id INTEGER NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    )
+  `);
+
+  // Expenses table
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS expenses (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      amount REAL NOT NULL,
+      category TEXT NOT NULL,
+      description TEXT,
+      payment_method TEXT NOT NULL CHECK(payment_method IN ('cash', 'card', 'bank_transfer', 'other')),
+      reference_number TEXT,
+      notes TEXT,
+      user_id INTEGER NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    )
+  `);
+
+  // Create indexes
+  await client.execute(
+    `CREATE INDEX IF NOT EXISTS idx_capital_user ON capital(user_id)`
+  );
+  await client.execute(
+    `CREATE INDEX IF NOT EXISTS idx_capital_date ON capital(created_at)`
+  );
+  await client.execute(
+    `CREATE INDEX IF NOT EXISTS idx_expenses_user ON expenses(user_id)`
+  );
+  await client.execute(
+    `CREATE INDEX IF NOT EXISTS idx_expenses_date ON expenses(created_at)`
+  );
+  await client.execute(
+    `CREATE INDEX IF NOT EXISTS idx_expenses_category ON expenses(category)`
+  );
 }
