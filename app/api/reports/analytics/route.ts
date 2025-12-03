@@ -34,13 +34,25 @@ async function getHandler(req: NextRequest) {
       dateGrouping = "strftime('%Y-%m', s.created_at)";
     }
 
-    // Optimized query: Get aggregated sales and profit data grouped by date
+    // Optimized query: Get aggregated sales and net profit (after returns) data grouped by date
     const sql = `
       SELECT 
         ${dateGrouping} as date,
         COUNT(DISTINCT s.id) as total_sales,
         COALESCE(SUM(s.final_amount), 0) as total_revenue,
-        COALESCE(SUM((si.unit_price - si.cost_price) * si.quantity), 0) as total_profit,
+        COALESCE(
+          SUM((si.unit_price - si.cost_price) * si.quantity)
+          -
+          COALESCE(
+            (SELECT SUM((ri.unit_price - si2.cost_price) * ri.quantity)
+             FROM return_items ri
+             JOIN returns r ON ri.return_id = r.id
+             JOIN sale_items si2 ON ri.sale_item_id = si2.id
+             WHERE r.sale_id = s.id),
+            0
+          ),
+          0
+        ) as total_profit,
         COALESCE(AVG(s.final_amount), 0) as average_order_value
       FROM sales s
       LEFT JOIN sale_items si ON s.id = si.sale_id
@@ -51,12 +63,24 @@ async function getHandler(req: NextRequest) {
 
     const result = await client.execute({ sql, args });
 
-    // Calculate summary totals
+    // Calculate summary totals with net profit (after returns)
     const summarySql = `
       SELECT 
         COUNT(DISTINCT s.id) as total_sales,
         COALESCE(SUM(s.final_amount), 0) as total_revenue,
-        COALESCE(SUM((si.unit_price - si.cost_price) * si.quantity), 0) as total_profit,
+        COALESCE(
+          SUM((si.unit_price - si.cost_price) * si.quantity)
+          -
+          COALESCE(
+            (SELECT SUM((ri.unit_price - si2.cost_price) * ri.quantity)
+             FROM return_items ri
+             JOIN returns r ON ri.return_id = r.id
+             JOIN sale_items si2 ON ri.sale_item_id = si2.id
+             WHERE r.sale_id = s.id),
+            0
+          ),
+          0
+        ) as total_profit,
         COALESCE(AVG(s.final_amount), 0) as average_order_value
       FROM sales s
       LEFT JOIN sale_items si ON s.id = si.sale_id

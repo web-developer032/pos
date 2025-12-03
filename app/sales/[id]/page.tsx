@@ -196,7 +196,6 @@ export default function SaleDetailPage() {
                     {items.map((item) => {
                       const costPrice = item.cost_price || 0;
                       const profitPerUnit = item.unit_price - costPrice;
-                      const totalProfit = profitPerUnit * item.quantity;
 
                       // Get return status for this item
                       const itemStatus = returnsData?.sale_items_status?.find(
@@ -253,8 +252,35 @@ export default function SaleDetailPage() {
                           <td className="whitespace-nowrap px-6 py-4 text-right text-sm font-semibold">
                             {formatCurrency(item.subtotal)}
                           </td>
-                          <td className="whitespace-nowrap px-6 py-4 text-right text-sm font-semibold text-green-600">
-                            {formatCurrency(totalProfit)}
+                          <td className="whitespace-nowrap px-6 py-4 text-right text-sm font-semibold">
+                            <div className="flex flex-col items-end">
+                              {(() => {
+                                const originalProfit =
+                                  profitPerUnit * item.quantity;
+                                const returnedProfit =
+                                  profitPerUnit * returnedQty;
+                                const netProfit =
+                                  originalProfit - returnedProfit;
+                                return (
+                                  <>
+                                    <span
+                                      className={
+                                        netProfit >= 0
+                                          ? "text-green-600"
+                                          : "text-red-600"
+                                      }
+                                    >
+                                      {formatCurrency(netProfit)}
+                                    </span>
+                                    {returnedQty > 0 && (
+                                      <span className="text-xs text-gray-500">
+                                        (was {formatCurrency(originalProfit)})
+                                      </span>
+                                    )}
+                                  </>
+                                );
+                              })()}
+                            </div>
                           </td>
                         </tr>
                       );
@@ -306,18 +332,45 @@ export default function SaleDetailPage() {
                   <div className="border-t border-gray-200 pt-3">
                     <div className="flex justify-between">
                       <dt className="text-base font-semibold text-green-600">
-                        Total Profit
+                        Net Profit
                       </dt>
                       <dd className="text-base font-bold text-green-600">
                         {formatCurrency(
-                          items.reduce((sum, item) => {
-                            const costPrice = item.cost_price || 0;
-                            const profitPerUnit = item.unit_price - costPrice;
-                            return sum + profitPerUnit * item.quantity;
-                          }, 0)
+                          (() => {
+                            const originalProfit = items.reduce((sum, item) => {
+                              const costPrice = item.cost_price || 0;
+                              const profitPerUnit = item.unit_price - costPrice;
+                              return sum + profitPerUnit * item.quantity;
+                            }, 0);
+
+                            const returnedProfit =
+                              returnsData?.return_items?.reduce(
+                                (sum, returnItem) => {
+                                  const saleItem = items.find(
+                                    (si) => si.id === returnItem.sale_item_id
+                                  );
+                                  if (!saleItem) return sum;
+                                  const costPrice = saleItem.cost_price || 0;
+                                  const profitPerUnit =
+                                    returnItem.unit_price - costPrice;
+                                  return (
+                                    sum + profitPerUnit * returnItem.quantity
+                                  );
+                                },
+                                0
+                              ) || 0;
+
+                            return originalProfit - returnedProfit;
+                          })()
                         )}
                       </dd>
                     </div>
+                    {returnsData && returnsData.returns.length > 0 && (
+                      <div className="mt-2 text-xs text-gray-500">
+                        After {returnsData.returns.length} return
+                        {returnsData.returns.length > 1 ? "s" : ""}
+                      </div>
+                    )}
                   </div>
                 </dl>
               </div>

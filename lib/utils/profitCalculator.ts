@@ -1,12 +1,8 @@
 /**
- * Utility functions for profit calculations
- */
-
-/**
  * Calculate profit percentage from cost and selling price
- * @param costPrice - Cost price
- * @param sellingPrice - Selling price
- * @returns Profit percentage (e.g., 25.5 for 25.5%) or null if invalid
+ * @param costPrice - Cost price per unit
+ * @param sellingPrice - Selling price per unit
+ * @returns Profit percentage or null if invalid
  */
 export function calculateProfitPercentage(
   costPrice: number | string | null | undefined,
@@ -34,10 +30,10 @@ export function calculateProfitPercentage(
 }
 
 /**
- * Format profit percentage number to string
- * @param profitPercentage - Profit percentage as number (e.g., 25.5 for 25.5%)
- * @param decimals - Number of decimal places (default: 2)
- * @returns Formatted percentage string (e.g., "+25.50%")
+ * Format profit percentage for display
+ * @param profitPercentage - Profit percentage value
+ * @param decimals - Number of decimal places
+ * @returns Formatted string with sign
  */
 export function formatProfitPercentage(
   profitPercentage: number,
@@ -93,4 +89,52 @@ export function calculateProfitMargin(profit: number, revenue: number): string {
   if (revenue === 0) return "0.00%";
   const percentage = (profit / revenue) * 100;
   return `${percentage.toFixed(2)}%`;
+}
+
+/**
+ * Calculate net profit for a sale after accounting for returns
+ * This is the SQL expression to calculate net profit considering returns
+ * @returns SQL expression string
+ */
+export function getNetProfitSQLExpression(): string {
+  return `
+    COALESCE(
+      (SELECT SUM((si.unit_price - si.cost_price) * si.quantity)
+       FROM sale_items si
+       WHERE si.sale_id = s.id)
+      -
+      COALESCE(
+        (SELECT SUM((ri.unit_price - si.cost_price) * ri.quantity)
+         FROM return_items ri
+         JOIN returns r ON ri.return_id = r.id
+         JOIN sale_items si ON ri.sale_item_id = si.id
+         WHERE r.sale_id = s.id),
+        0
+      ),
+      0
+    )
+  `;
+}
+
+/**
+ * Calculate net profit for analytics/reports after accounting for returns
+ * This is the SQL expression for aggregated profit calculations
+ * @returns SQL expression string
+ */
+export function getNetProfitAggregateSQLExpression(): string {
+  return `
+    COALESCE(
+      SUM((si.unit_price - si.cost_price) * si.quantity)
+      -
+      COALESCE(
+        (SELECT SUM((ri.unit_price - si2.cost_price) * ri.quantity)
+         FROM return_items ri
+         JOIN returns r ON ri.return_id = r.id
+         JOIN sale_items si2 ON ri.sale_item_id = si2.id
+         WHERE r.sale_id = s.id),
+        0
+      ),
+      0
+    )
+  `;
 }

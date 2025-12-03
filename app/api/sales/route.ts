@@ -31,7 +31,7 @@ async function getHandler(req: NextRequest) {
     const endDate = searchParams.get("end_date");
     const { page, limit, offset } = getPaginationParams(req);
 
-    // Optimized query: Calculate profit using subquery for better performance
+    // Optimized query: Calculate net profit (after returns) using subquery
     let sql = `
       SELECT s.*, 
              u.username as user_name, 
@@ -39,7 +39,16 @@ async function getHandler(req: NextRequest) {
              COALESCE(
                (SELECT SUM((si.unit_price - si.cost_price) * si.quantity)
                 FROM sale_items si
-                WHERE si.sale_id = s.id),
+                WHERE si.sale_id = s.id)
+               -
+               COALESCE(
+                 (SELECT SUM((ri.unit_price - si2.cost_price) * ri.quantity)
+                  FROM return_items ri
+                  JOIN returns r ON ri.return_id = r.id
+                  JOIN sale_items si2 ON ri.sale_item_id = si2.id
+                  WHERE r.sale_id = s.id),
+                 0
+               ),
                0
              ) as total_profit
       FROM sales s
