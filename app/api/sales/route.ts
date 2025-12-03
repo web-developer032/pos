@@ -236,7 +236,37 @@ async function deleteHandler(req: NextRequest) {
     const deleteAll = searchParams.get("delete_all") === "true";
 
     if (deleteAll) {
+      // Delete all related records first to avoid foreign key constraints
+      // Delete return items
+      await client.execute(`
+        DELETE FROM return_items 
+        WHERE return_id IN (SELECT id FROM returns)
+      `);
+
+      // Delete inventory transactions for returns
+      await client.execute(`
+        DELETE FROM inventory_transactions 
+        WHERE transaction_type = 'return'
+      `);
+
+      // Delete returns
+      await client.execute("DELETE FROM returns");
+
+      // Delete inventory transactions for sales
+      await client.execute(`
+        DELETE FROM inventory_transactions 
+        WHERE transaction_type = 'sale'
+      `);
+
+      // Delete payments
+      await client.execute("DELETE FROM payments");
+
+      // Delete sale items
+      await client.execute("DELETE FROM sale_items");
+
+      // Finally delete sales
       await client.execute("DELETE FROM sales");
+
       return NextResponse.json({ message: "All sales deleted successfully" });
     }
 

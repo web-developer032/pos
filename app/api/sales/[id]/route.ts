@@ -67,6 +67,59 @@ async function deleteHandler(req: NextRequest, context?: RouteContext) {
       return NextResponse.json({ error: "Sale not found" }, { status: 404 });
     }
 
+    // Check if there are returns for this sale
+    const returnsCheck = await client.execute({
+      sql: "SELECT id FROM returns WHERE sale_id = ?",
+      args: [saleId],
+    });
+
+    if (returnsCheck.rows.length > 0) {
+      // If there are returns, we need to reverse their inventory adjustments first
+      // Get return items to reverse inventory adjustments
+      const returnItemsResult = await client.execute({
+        sql: `SELECT ri.product_id, ri.quantity 
+              FROM return_items ri
+              JOIN returns r ON ri.return_id = r.id
+              WHERE r.sale_id = ?`,
+        args: [saleId],
+      });
+
+      // Reverse inventory adjustments from returns (subtract the returned quantities)
+      // This undoes the inventory restoration that happened when items were returned
+      for (const item of returnItemsResult.rows) {
+        const productId = item.product_id as number;
+        const quantity = item.quantity as number;
+
+        await client.execute({
+          sql: `UPDATE products 
+                SET stock_quantity = stock_quantity - ? 
+                WHERE id = ? AND deleted_at IS NULL`,
+          args: [quantity, productId],
+        });
+      }
+
+      // Delete return items (will be cascaded when returns are deleted, but being explicit)
+      await client.execute({
+        sql: `DELETE FROM return_items 
+              WHERE return_id IN (SELECT id FROM returns WHERE sale_id = ?)`,
+        args: [saleId],
+      });
+
+      // Delete inventory transactions related to returns
+      await client.execute({
+        sql: `DELETE FROM inventory_transactions 
+              WHERE reference_id IN (SELECT id FROM returns WHERE sale_id = ?) 
+              AND transaction_type = 'return'`,
+        args: [saleId],
+      });
+
+      // Delete returns (will cascade from sale deletion, but being explicit for clarity)
+      await client.execute({
+        sql: "DELETE FROM returns WHERE sale_id = ?",
+        args: [saleId],
+      });
+    }
+
     // Get sale items to restore inventory
     const itemsResult = await client.execute({
       sql: "SELECT product_id, quantity FROM sale_items WHERE sale_id = ?",
@@ -74,6 +127,8 @@ async function deleteHandler(req: NextRequest, context?: RouteContext) {
     });
 
     // Restore inventory for each item
+    // This restores the full sale quantity, which is correct because we've already
+    // reversed any return adjustments above
     for (const item of itemsResult.rows) {
       const productId = item.product_id as number;
       const quantity = item.quantity as number;

@@ -5,18 +5,24 @@ import { useRef } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { useGetSaleQuery } from "@/lib/api/salesApi";
+import { useGetSaleReturnsQuery } from "@/lib/api/returnsApi";
 import { useCurrency } from "@/lib/hooks/useCurrency";
 import { Button } from "@/components/ui/Button";
+import { Modal } from "@/components/ui/Modal";
 import { Receipt, type ReceiptRef } from "@/components/pos/Receipt";
+import { ReturnForm } from "@/components/sales/ReturnForm";
 import { formatDateTime } from "@/lib/utils/dateTime";
 import Link from "next/link";
+import { useState } from "react";
 
 export default function SaleDetailPage() {
   const params = useParams();
   const saleId = parseInt(params.id as string);
   const { data, isLoading, error } = useGetSaleQuery(saleId);
+  const { data: returnsData } = useGetSaleReturnsQuery(saleId);
   const { format: formatCurrency } = useCurrency();
   const receiptRef = useRef<ReceiptRef>(null);
+  const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
 
   if (isLoading) {
     return (
@@ -70,6 +76,13 @@ export default function SaleDetailPage() {
                 Back to Sales
               </Button>
             </Link>
+            <Button
+              onClick={() => setIsReturnModalOpen(true)}
+              variant="outline"
+              className="border-orange-500 text-orange-600 hover:bg-orange-50"
+            >
+              Process Return
+            </Button>
             <Button
               onClick={() => receiptRef.current?.print()}
               className="bg-indigo-600 hover:bg-indigo-700"
@@ -184,16 +197,50 @@ export default function SaleDetailPage() {
                       const costPrice = item.cost_price || 0;
                       const profitPerUnit = item.unit_price - costPrice;
                       const totalProfit = profitPerUnit * item.quantity;
+
+                      // Get return status for this item
+                      const itemStatus = returnsData?.sale_items_status?.find(
+                        (status) => status.id === item.id
+                      );
+                      const returnedQty = itemStatus?.returned_quantity || 0;
+                      const isFullyReturned = returnedQty >= item.quantity;
+                      const isPartiallyReturned =
+                        returnedQty > 0 && !isFullyReturned;
+
                       return (
-                        <tr key={item.id}>
+                        <tr
+                          key={item.id}
+                          className={
+                            isFullyReturned ? "bg-gray-50 opacity-75" : ""
+                          }
+                        >
                           <td className="whitespace-nowrap px-6 py-4 text-sm font-medium">
-                            {item.product_name}
+                            <div className="flex items-center gap-2">
+                              {item.product_name}
+                              {isFullyReturned && (
+                                <span className="rounded bg-red-100 px-2 py-0.5 text-xs text-red-800">
+                                  Returned
+                                </span>
+                              )}
+                              {isPartiallyReturned && (
+                                <span className="rounded bg-orange-100 px-2 py-0.5 text-xs text-orange-800">
+                                  Partial Return
+                                </span>
+                              )}
+                            </div>
                           </td>
                           <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-500">
                             {item.barcode || "N/A"}
                           </td>
                           <td className="whitespace-nowrap px-6 py-4 text-right text-sm">
-                            {item.quantity}
+                            <div>
+                              {item.quantity}
+                              {returnedQty > 0 && (
+                                <span className="ml-1 text-xs text-red-600">
+                                  (-{returnedQty})
+                                </span>
+                              )}
+                            </div>
                           </td>
                           <td className="whitespace-nowrap px-6 py-4 text-right text-sm">
                             {formatCurrency(item.unit_price)}
@@ -277,6 +324,91 @@ export default function SaleDetailPage() {
             </div>
           </div>
         </div>
+
+        {/* Returns History */}
+        {returnsData && returnsData.returns.length > 0 && (
+          <div className="mt-6 rounded-lg bg-white shadow">
+            <div className="border-b border-gray-200 px-6 py-4">
+              <h2 className="text-lg font-semibold">Return History</h2>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                      Return Number
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                      Date
+                    </th>
+                    <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">
+                      Refund Amount
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                      Method
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                      Reason
+                    </th>
+                    <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200 bg-white">
+                  {returnsData.returns.map((returnRecord) => (
+                    <tr key={returnRecord.id}>
+                      <td className="whitespace-nowrap px-6 py-4 text-sm font-medium">
+                        <Link
+                          href={`/returns/${returnRecord.id}`}
+                          className="text-indigo-600 hover:text-indigo-900"
+                        >
+                          {returnRecord.return_number}
+                        </Link>
+                      </td>
+                      <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-500">
+                        {formatDateTime(returnRecord.created_at)}
+                      </td>
+                      <td className="whitespace-nowrap px-6 py-4 text-right text-sm font-semibold text-red-600">
+                        {formatCurrency(returnRecord.refund_amount)}
+                      </td>
+                      <td className="whitespace-nowrap px-6 py-4 text-sm capitalize text-gray-500">
+                        {returnRecord.refund_method.replace("_", " ")}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-500">
+                        {returnRecord.reason || "-"}
+                      </td>
+                      <td className="whitespace-nowrap px-6 py-4 text-right text-sm font-medium">
+                        <Link
+                          href={`/returns/${returnRecord.id}`}
+                          className="text-indigo-600 hover:text-indigo-900"
+                        >
+                          View Details
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* Return Modal */}
+        <Modal
+          isOpen={isReturnModalOpen}
+          onClose={() => setIsReturnModalOpen(false)}
+          title="Process Return"
+          size="lg"
+        >
+          <ReturnForm
+            saleId={saleId}
+            saleItems={items}
+            onSuccess={() => {
+              setIsReturnModalOpen(false);
+            }}
+          />
+        </Modal>
 
         {/* Hidden receipt for printing */}
         <div className="hidden">

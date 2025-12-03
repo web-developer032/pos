@@ -278,7 +278,7 @@ export async function initializeDatabase() {
     CREATE TABLE IF NOT EXISTS inventory_transactions (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       product_id INTEGER NOT NULL,
-      transaction_type TEXT NOT NULL CHECK(transaction_type IN ('sale', 'purchase', 'adjustment')),
+      transaction_type TEXT NOT NULL CHECK(transaction_type IN ('sale', 'purchase', 'adjustment', 'return')),
       quantity INTEGER NOT NULL,
       reference_id INTEGER,
       notes TEXT,
@@ -286,6 +286,83 @@ export async function initializeDatabase() {
       FOREIGN KEY (product_id) REFERENCES products(id)
     )
   `);
+
+  // Migration: Update inventory_transactions CHECK constraint to include 'return'
+  try {
+    // SQLite doesn't support ALTER TABLE to modify CHECK constraints
+    // So we need to recreate the table if the constraint doesn't include 'return'
+    const tableInfo = await client.execute(
+      `PRAGMA table_info(inventory_transactions)`
+    );
+    const hasTable = tableInfo.rows.length > 0;
+
+    if (hasTable) {
+      // Try to insert a test record to see if 'return' is allowed
+      // We'll use a transaction to rollback if it fails
+      try {
+        // Check if we can insert 'return' type (test with invalid product_id that won't exist)
+        await client.execute({
+          sql: `INSERT INTO inventory_transactions (product_id, transaction_type, quantity) VALUES (?, ?, ?)`,
+          args: [999999, "return", 0],
+        });
+        // If successful, delete the test record
+        await client.execute({
+          sql: `DELETE FROM inventory_transactions WHERE product_id = 999999 AND transaction_type = 'return'`,
+        });
+        // Table already supports 'return', no migration needed
+      } catch (error: unknown) {
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        console.warn(
+          "Migration warning: Failed to insert test record for 'return' type:",
+          errorMessage
+        );
+
+        // Create new table with updated constraint
+        await client.execute(`
+          CREATE TABLE inventory_transactions_new (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            product_id INTEGER NOT NULL,
+            transaction_type TEXT NOT NULL CHECK(transaction_type IN ('sale', 'purchase', 'adjustment', 'return')),
+            quantity INTEGER NOT NULL,
+            reference_id INTEGER,
+            notes TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (product_id) REFERENCES products(id)
+          )
+        `);
+
+        // Copy existing data
+        await client.execute(`
+          INSERT INTO inventory_transactions_new 
+          SELECT * FROM inventory_transactions
+        `);
+
+        // Drop old table
+        await client.execute(`DROP TABLE inventory_transactions`);
+
+        // Rename new table
+        await client.execute(
+          `ALTER TABLE inventory_transactions_new RENAME TO inventory_transactions`
+        );
+
+        // Recreate indexes
+        await client.execute(
+          `CREATE INDEX IF NOT EXISTS idx_inventory_product ON inventory_transactions(product_id)`
+        );
+
+        console.log(
+          "Migration: Successfully updated inventory_transactions to support 'return' type"
+        );
+      }
+    }
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.warn(
+      "Migration warning: Failed to update inventory_transactions constraint:",
+      errorMessage
+    );
+  }
 
   // Discounts table
   await client.execute(`
@@ -372,6 +449,125 @@ export async function initializeDatabase() {
   );
   await client.execute(
     `CREATE INDEX IF NOT EXISTS idx_product_barcodes_barcode ON product_barcodes(barcode)`
+  );
+
+  // Returns table
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS returns (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      return_number TEXT UNIQUE NOT NULL,
+      sale_id INTEGER NOT NULL,
+      user_id INTEGER NOT NULL,
+      total_amount REAL NOT NULL DEFAULT 0,
+      refund_amount REAL NOT NULL DEFAULT 0,
+      refund_method TEXT NOT NULL CHECK(refund_method IN ('cash', 'card', 'digital', 'store_credit')),
+      reason TEXT,
+      notes TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (sale_id) REFERENCES sales(id) ON DELETE CASCADE,
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    )
+  `);
+
+  // Return items table
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS return_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      return_id INTEGER NOT NULL,
+      sale_item_id INTEGER NOT NULL,
+      product_id INTEGER NOT NULL,
+      quantity REAL NOT NULL,
+      unit_price REAL NOT NULL,
+      refund_amount REAL NOT NULL,
+      FOREIGN KEY (return_id) REFERENCES returns(id) ON DELETE CASCADE,
+      FOREIGN KEY (sale_item_id) REFERENCES sale_items(id),
+      FOREIGN KEY (product_id) REFERENCES products(id)
+    )
+  `);
+
+  // Migration: Update returns table to add ON DELETE CASCADE to sale_id foreign key
+  try {
+    const tableInfo = await client.execute(`PRAGMA table_info(returns)`);
+    const hasTable = tableInfo.rows.length > 0;
+
+    if (hasTable) {
+      // Check if we need to migrate by checking foreign key info
+      // SQLite doesn't expose foreign key constraints easily, so we'll try to recreate
+      // First, check if there are any returns
+      const returnsCount = await client.execute({
+        sql: `SELECT COUNT(*) as count FROM returns`,
+      });
+      const count =
+        (returnsCount.rows[0] as unknown as { count: number })?.count || 0;
+
+      if (count > 0) {
+        console.log(
+          "Migration: Updating returns table to add ON DELETE CASCADE..."
+        );
+
+        // Create new table with updated foreign key
+        await client.execute(`
+          CREATE TABLE returns_new (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            return_number TEXT UNIQUE NOT NULL,
+            sale_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            total_amount REAL NOT NULL DEFAULT 0,
+            refund_amount REAL NOT NULL DEFAULT 0,
+            refund_method TEXT NOT NULL CHECK(refund_method IN ('cash', 'card', 'digital', 'store_credit')),
+            reason TEXT,
+            notes TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (sale_id) REFERENCES sales(id) ON DELETE CASCADE,
+            FOREIGN KEY (user_id) REFERENCES users(id)
+          )
+        `);
+
+        // Copy existing data
+        await client.execute(`
+          INSERT INTO returns_new 
+          SELECT * FROM returns
+        `);
+
+        // Drop old table
+        await client.execute(`DROP TABLE returns`);
+
+        // Rename new table
+        await client.execute(`ALTER TABLE returns_new RENAME TO returns`);
+
+        // Recreate indexes
+        await client.execute(
+          `CREATE INDEX IF NOT EXISTS idx_returns_sale ON returns(sale_id)`
+        );
+        await client.execute(
+          `CREATE INDEX IF NOT EXISTS idx_returns_date ON returns(created_at)`
+        );
+
+        console.log(
+          "Migration: Successfully updated returns table with ON DELETE CASCADE"
+        );
+      }
+    }
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.warn(
+      "Migration warning: Failed to update returns table foreign key:",
+      errorMessage
+    );
+  }
+
+  // Create indexes for returns
+  await client.execute(
+    `CREATE INDEX IF NOT EXISTS idx_returns_sale ON returns(sale_id)`
+  );
+  await client.execute(
+    `CREATE INDEX IF NOT EXISTS idx_returns_date ON returns(created_at)`
+  );
+  await client.execute(
+    `CREATE INDEX IF NOT EXISTS idx_return_items_return ON return_items(return_id)`
+  );
+  await client.execute(
+    `CREATE INDEX IF NOT EXISTS idx_return_items_sale_item ON return_items(sale_item_id)`
   );
 
   // Capital/Investment table
