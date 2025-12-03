@@ -22,6 +22,8 @@ import {
   ResponsiveContainer,
   Legend,
 } from "recharts";
+import { formatChartDate } from "@/lib/utils/chartHelpers";
+import { ChartTooltip } from "@/components/common/ChartTooltip";
 
 export default function ReportsPage() {
   const [dateRange, setDateRange] = useState<DateRange>({
@@ -60,20 +62,8 @@ export default function ReportsPage() {
 
   const chartData = (data?.data || []).map((item) => {
     const dateStr = item.date as string;
-    let formattedDate = dateStr;
-    try {
-      if (dateStr.includes("-W")) {
-        formattedDate = dateStr;
-      } else if (dateStr.match(/^\d{4}-\d{2}$/)) {
-        formattedDate = format(new Date(dateStr + "-01"), "MMM yyyy");
-      } else {
-        formattedDate = format(new Date(dateStr), "MMM dd");
-      }
-    } catch {
-      formattedDate = dateStr;
-    }
     return {
-      date: formattedDate,
+      date: formatChartDate(dateStr),
       revenue: parseFloat((item.total_revenue as number).toFixed(2)),
       profit: parseFloat((item.total_profit as number).toFixed(2)),
     };
@@ -162,7 +152,7 @@ export default function ReportsPage() {
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="date" />
                 <YAxis />
-                <Tooltip />
+                <Tooltip content={<ChartTooltip />} />
                 <Legend />
                 <Bar dataKey="revenue" fill="#4f46e5" name="Revenue" />
                 <Bar dataKey="profit" fill="#10b981" name="Profit" />
