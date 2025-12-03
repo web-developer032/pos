@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, forwardRef } from "react";
+import { useState, useRef, useEffect, useMemo, forwardRef } from "react";
 import { createPortal } from "react-dom";
 
 interface SearchableSelectProps {
@@ -59,18 +59,40 @@ export const SearchableSelect = forwardRef<
 
     const selectedOption = options.find((opt) => opt.value === value);
 
-    // Filter options based on search term
-    const filteredOptions = options.filter((option) => {
+    // Clear search term and close dropdown when a product is selected (value changes to non-zero)
+    // Optimized to only run when value actually changes to a valid selection
+    const prevValueRef = useRef(value);
+    useEffect(() => {
+      const valueChanged = prevValueRef.current !== value;
+      const isValidSelection = value && value !== 0 && value !== "";
+
+      if (valueChanged && isValidSelection) {
+        prevValueRef.current = value;
+        if (searchTerm !== "") {
+          setSearchTerm("");
+          onSearch?.("");
+        }
+        setIsOpen(false);
+      } else {
+        prevValueRef.current = value;
+      }
+    }, [value, searchTerm, onSearch]);
+
+    // Memoized filtered options for performance
+    const filteredOptions = useMemo(() => {
       // If search is empty, show all options
       if (searchTerm === "") {
-        return true;
+        return options;
       }
+      const searchLower = searchTerm.toLowerCase();
       // When searching, exclude placeholder options (value 0 or empty)
-      if (option.value === 0 || option.value === "") {
-        return false;
-      }
-      return option.label.toLowerCase().includes(searchTerm.toLowerCase());
-    });
+      return options.filter((option) => {
+        if (option.value === 0 || option.value === "") {
+          return false;
+        }
+        return option.label.toLowerCase().includes(searchLower);
+      });
+    }, [options, searchTerm]);
 
     // Close dropdown when clicking outside
     useEffect(() => {

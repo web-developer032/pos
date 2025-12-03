@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { useForm, useFieldArray, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -153,10 +153,12 @@ export function PurchaseOrderForm({
     {}
   );
   const productsCache = useRef<Map<number, Product>>(new Map());
+  const processedBarcodesRef = useRef<Set<string>>(new Set());
 
   const { data: suppliersData, refetch: refetchSuppliers } =
     useGetSuppliersQuery();
-  const debouncedProductSearch = useDebounce(productSearch, 300);
+  // Reduced debounce delay for faster search response
+  const debouncedProductSearch = useDebounce(productSearch, 200);
 
   // Single query for products with search - more efficient
   const { data: productsData } = useGetProductsQuery({
@@ -240,38 +242,97 @@ export function PurchaseOrderForm({
     }
   }, [purchaseOrderData, isEditMode, reset]);
 
-  // Handle barcode scan - auto-select product when found
+  // Optimized barcode scan handler - combines success and error handling
   useEffect(() => {
-    if (!barcodeToScan || !barcodeProductData?.product) return;
+    if (!barcodeToScan) return;
 
     const { index, barcode } = barcodeToScan;
-    const product = barcodeProductData.product;
 
-    // Verify barcode matches
-    const matchesPrimaryBarcode = product.barcode === barcode;
-    const matchesAdditionalBarcode =
-      product.additional_barcodes?.includes(barcode) || false;
-
-    if (matchesPrimaryBarcode || matchesAdditionalBarcode) {
-      // Cache and select product
-      productsCache.current.set(product.id, product);
-      setValue(`items.${index}.product_id`, product.id, {
-        shouldValidate: true,
-      });
-      setValue(`items.${index}.unit_cost`, product.cost_price);
-      setProductSearch("");
-      toast.success(`${product.name} selected`);
-      setBarcodeToScan(null);
+    // Skip if already processed (prevents duplicate processing)
+    if (processedBarcodesRef.current.has(barcode)) {
+      return;
     }
-  }, [barcodeToScan, barcodeProductData, setValue]);
 
-  // Handle barcode error
-  useEffect(() => {
-    if (barcodeToScan && barcodeError && !isBarcodeLoading) {
+    // Handle successful product found
+    if (barcodeProductData?.product) {
+      const product = barcodeProductData.product;
+
+      // Verify barcode matches
+      const matchesPrimaryBarcode = product.barcode === barcode;
+      const matchesAdditionalBarcode =
+        product.additional_barcodes?.includes(barcode) || false;
+
+      if (matchesPrimaryBarcode || matchesAdditionalBarcode) {
+        // Mark as processed immediately to prevent duplicates
+        processedBarcodesRef.current.add(barcode);
+
+        // Cache product
+        productsCache.current.set(product.id, product);
+
+        // Batch state updates
+        setValue(`items.${index}.product_id`, product.id, {
+          shouldValidate: true,
+        });
+        setValue(`items.${index}.unit_cost`, product.cost_price);
+
+        // Clear search and reset barcode state
+        setProductSearch("");
+        setBarcodeToScan(null);
+
+        // Clear input and blur in next tick to avoid blocking
+        requestAnimationFrame(() => {
+          const productInput = productInputRefs.current[index];
+          if (productInput) {
+            productInput.value = "";
+            const event = new Event("input", { bubbles: true });
+            productInput.dispatchEvent(event);
+            productInput.blur();
+          }
+        });
+
+        toast.success(`${product.name} selected`);
+
+        // Clean up processed barcode after delay
+        setTimeout(() => {
+          processedBarcodesRef.current.delete(barcode);
+        }, 200);
+      }
+      return;
+    }
+
+    // Handle error case
+    if (barcodeError && !isBarcodeLoading) {
+      // Mark as processed even on error
+      processedBarcodesRef.current.add(barcode);
+
       toast.error("Product not found");
+
+      // Clear input and blur
+      requestAnimationFrame(() => {
+        const productInput = productInputRefs.current[index];
+        if (productInput) {
+          productInput.value = "";
+          const event = new Event("input", { bubbles: true });
+          productInput.dispatchEvent(event);
+          productInput.blur();
+        }
+      });
+
+      setProductSearch("");
       setBarcodeToScan(null);
+
+      // Clean up after delay
+      setTimeout(() => {
+        processedBarcodesRef.current.delete(barcode);
+      }, 1);
     }
-  }, [barcodeToScan, barcodeError, isBarcodeLoading]);
+  }, [
+    barcodeToScan,
+    barcodeProductData,
+    barcodeError,
+    isBarcodeLoading,
+    setValue,
+  ]);
 
   const handleAddItem = () => {
     prepend({ product_id: 0, quantity: 1, unit_cost: 0 });
@@ -281,58 +342,92 @@ export function PurchaseOrderForm({
         productInput.focus();
         productInput.click();
       }
-    }, 100);
+    }, 200);
   };
 
-  const handleProductChange = (index: number, productId: number) => {
-    const product =
-      productsData?.products.find((p) => p.id === productId) ||
-      productsCache.current.get(productId);
+  const handleProductChange = useCallback(
+    (index: number, productId: number) => {
+      const product =
+        productsData?.products.find((p) => p.id === productId) ||
+        productsCache.current.get(productId);
 
-    if (product) {
-      productsCache.current.set(productId, product);
-      setValue(`items.${index}.unit_cost`, product.cost_price);
-      setProductSearch("");
-    }
-  };
-
-  // Handle barcode keydown - detect barcode scan
-  const handleBarcodeKeyDown = (
-    index: number,
-    e: React.KeyboardEvent<HTMLInputElement>
-  ) => {
-    if (e.key === "Enter") {
-      const value = e.currentTarget.value.trim();
-      const isBarcode =
-        (value.length >= 8 && /^[0-9A-Za-z]+$/.test(value)) ||
-        (value.length >= 6 && /^[0-9]+$/.test(value));
-
-      if (isBarcode && value) {
-        e.preventDefault();
-        setBarcodeToScan({ index, barcode: value });
+      if (product) {
+        productsCache.current.set(productId, product);
+        setValue(`items.${index}.unit_cost`, product.cost_price);
+        setProductSearch("");
       }
-    }
-  };
+    },
+    [productsData?.products, setValue]
+  );
 
-  // Memoized product options - optimized
+  // Optimized barcode detection - useCallback to prevent recreation
+  const handleBarcodeKeyDown = useCallback(
+    (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === "Enter") {
+        const value = e.currentTarget.value.trim();
+        // Optimized barcode detection regex
+        const isBarcode =
+          (value.length >= 8 && /^[0-9A-Za-z]+$/.test(value)) ||
+          (value.length >= 6 && /^[0-9]+$/.test(value));
+
+        if (isBarcode && value) {
+          e.preventDefault();
+          // Only set if not already processing this barcode
+          if (!processedBarcodesRef.current.has(value)) {
+            setBarcodeToScan({ index, barcode: value });
+          }
+        }
+      }
+    },
+    []
+  );
+
+  // Optimized memoized product options - only recalculates when dependencies change
   const getProductOptions = useMemo(() => {
     const searchResults = productsData?.products || [];
+    if (searchResults.length === 0) {
+      // Return cached products for selected items if no search results
+      const selectedProductIds = watchedItems
+        .map((item) => item.product_id)
+        .filter((id): id is number => id > 0 && id !== null);
+
+      return selectedProductIds
+        .map((productId) => {
+          const cachedProduct = productsCache.current.get(productId);
+          return cachedProduct
+            ? {
+                value: cachedProduct.id,
+                label: `${cachedProduct.name} - ${formatCurrency(
+                  cachedProduct.cost_price
+                )}`,
+              }
+            : null;
+        })
+        .filter((opt): opt is { value: number; label: string } => opt !== null);
+    }
+
+    const searchResultIds = new Set(searchResults.map((p) => p.id));
     const selectedProductIds = watchedItems
       .map((item) => item.product_id)
       .filter((id): id is number => id > 0 && id !== null);
 
-    const searchResultIds = new Set(searchResults.map((p) => p.id));
-    const options = searchResults.map((p) => ({
-      value: p.id,
-      label: `${p.name} - ${formatCurrency(p.cost_price)}`,
-    }));
+    // Use Map for O(1) lookups and automatic deduplication
+    const optionsMap = new Map<number, { value: number; label: string }>();
+
+    // Add search results first
+    searchResults.forEach((p) => {
+      optionsMap.set(p.id, {
+        value: p.id,
+        label: `${p.name} - ${formatCurrency(p.cost_price)}`,
+      });
+    });
 
     // Add cached products for selected items not in search results
     selectedProductIds.forEach((productId) => {
       if (!searchResultIds.has(productId)) {
         const cachedProduct = productsCache.current.get(productId);
         if (cachedProduct) {
-          options.push({
+          optionsMap.set(productId, {
             value: cachedProduct.id,
             label: `${cachedProduct.name} - ${formatCurrency(
               cachedProduct.cost_price
@@ -342,8 +437,7 @@ export function PurchaseOrderForm({
       }
     });
 
-    // Remove duplicates
-    return Array.from(new Map(options.map((opt) => [opt.value, opt])).values());
+    return Array.from(optionsMap.values());
   }, [productsData?.products, watchedItems, formatCurrency]);
 
   const calculateTotal = () => {
