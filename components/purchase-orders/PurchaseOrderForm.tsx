@@ -18,6 +18,7 @@ import {
   useGetProductByBarcodeQuery,
   type Product,
 } from "@/lib/api/productsApi";
+import { ProductForm } from "@/components/products/ProductForm";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
@@ -144,6 +145,10 @@ export function PurchaseOrderForm({
 }: PurchaseOrderFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSupplierModal, setShowSupplierModal] = useState(false);
+  const [showProductModal, setShowProductModal] = useState(false);
+  const [productModalIndex, setProductModalIndex] = useState<number | null>(
+    null
+  );
   const [productSearch, setProductSearch] = useState("");
   const [barcodeToScan, setBarcodeToScan] = useState<{
     index: number;
@@ -161,7 +166,7 @@ export function PurchaseOrderForm({
   const debouncedProductSearch = useDebounce(productSearch, 200);
 
   // Single query for products with search - more efficient
-  const { data: productsData } = useGetProductsQuery({
+  const { data: productsData, refetch: refetchProducts } = useGetProductsQuery({
     search: debouncedProductSearch || undefined,
     limit: 1000,
   });
@@ -594,33 +599,45 @@ export function PurchaseOrderForm({
                 </div>
 
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                  <SearchableSelect
-                    ref={(el) => {
-                      productInputRefs.current[index] = el;
-                    }}
-                    label="Product *"
-                    options={[
-                      { value: 0, label: "Select Product" },
-                      ...getProductOptions,
-                    ]}
-                    value={watch(`items.${index}.product_id`) || 0}
-                    onChange={(val) => {
-                      const productId = Number(val);
-                      if (productId > 0) {
-                        setValue(`items.${index}.product_id`, productId, {
-                          shouldValidate: true,
-                        });
-                        handleProductChange(index, productId);
+                  <div>
+                    <SearchableSelect
+                      ref={(el) => {
+                        productInputRefs.current[index] = el;
+                      }}
+                      label="Product *"
+                      options={[
+                        { value: 0, label: "Select Product" },
+                        ...getProductOptions,
+                      ]}
+                      value={watch(`items.${index}.product_id`) || 0}
+                      onChange={(val) => {
+                        const productId = Number(val);
+                        if (productId > 0) {
+                          setValue(`items.${index}.product_id`, productId, {
+                            shouldValidate: true,
+                          });
+                          handleProductChange(index, productId);
+                        }
+                      }}
+                      onSearch={setProductSearch}
+                      onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) =>
+                        handleBarcodeKeyDown(index, e)
                       }
-                    }}
-                    onSearch={setProductSearch}
-                    onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) =>
-                      handleBarcodeKeyDown(index, e)
-                    }
-                    placeholder="Search and select product..."
-                    searchPlaceholder="Type product name, barcode, or scan barcode..."
-                    error={errors.items?.[index]?.product_id?.message}
-                  />
+                      placeholder="Search and select product..."
+                      searchPlaceholder="Type product name, barcode, or scan barcode..."
+                      error={errors.items?.[index]?.product_id?.message}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setProductModalIndex(index);
+                        setShowProductModal(true);
+                      }}
+                      className="mt-1 text-sm text-indigo-600 hover:text-indigo-800"
+                    >
+                      + Add New Product
+                    </button>
+                  </div>
 
                   <Input
                     label="Quantity *"
@@ -788,6 +805,48 @@ export function PurchaseOrderForm({
             setValue("supplier_id", supplierId);
             setShowSupplierModal(false);
             toast.success("Supplier created and selected");
+          }}
+        />
+      </Modal>
+
+      <Modal
+        isOpen={showProductModal}
+        onClose={() => {
+          setShowProductModal(false);
+          setProductModalIndex(null);
+        }}
+        title="Add New Product"
+        size="lg"
+      >
+        <ProductForm
+          onProductCreated={(product) => {
+            if (productModalIndex !== null) {
+              // Cache the new product
+              productsCache.current.set(product.id, product as Product);
+
+              // Select the product in the form
+              setValue(`items.${productModalIndex}.product_id`, product.id, {
+                shouldValidate: true,
+              });
+              setValue(
+                `items.${productModalIndex}.unit_cost`,
+                product.cost_price
+              );
+
+              // Clear search
+              setProductSearch("");
+
+              // Refetch products to update the list
+              refetchProducts();
+
+              toast.success(`${product.name} created and selected`);
+            }
+
+            setShowProductModal(false);
+            setProductModalIndex(null);
+          }}
+          onSuccess={() => {
+            // Additional success handling if needed
           }}
         />
       </Modal>

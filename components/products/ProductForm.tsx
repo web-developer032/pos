@@ -220,9 +220,18 @@ interface ProductFormData {
 interface ProductFormProps {
   productId?: number | null;
   onSuccess?: () => void;
+  onProductCreated?: (product: {
+    id: number;
+    name: string;
+    cost_price: number;
+  }) => void;
 }
 
-export function ProductForm({ productId, onSuccess }: ProductFormProps) {
+export function ProductForm({
+  productId,
+  onSuccess,
+  onProductCreated,
+}: ProductFormProps) {
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [showSupplierModal, setShowSupplierModal] = useState(false);
 
@@ -356,7 +365,14 @@ export function ProductForm({ productId, onSuccess }: ProductFormProps) {
           return await createProduct(submitData).unwrap();
         }
       },
-      onSuccess: () => {
+      onSuccess: (result: unknown) => {
+        // If creating a new product and onProductCreated is provided, pass the product
+        if (!productId && onProductCreated && result) {
+          const productResult = result as {
+            product: { id: number; name: string; cost_price: number };
+          };
+          onProductCreated(productResult.product);
+        }
         onSuccess?.();
       },
       successMessage: productId
