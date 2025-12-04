@@ -70,10 +70,7 @@ async function postHandler(req: AuthRequest) {
     });
 
     if (saleCheck.rows.length === 0) {
-      return NextResponse.json(
-        { error: "Sale not found" },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "Sale not found" }, { status: 404 });
     }
 
     // Verify sale items and check quantities
@@ -218,4 +215,3 @@ async function postHandler(req: AuthRequest) {
 
 export const GET = requireAuth(getHandler);
 export const POST = requireAuth(postHandler);
-
