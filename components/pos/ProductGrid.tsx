@@ -30,10 +30,16 @@ export function ProductGrid() {
   const [newPrice, setNewPrice] = useState("");
   const searchInputRef = useRef<HTMLInputElement>(null);
   const debouncedSearch = useDebounce(search, 500);
-  const { data, isLoading, refetch } = useGetProductsQuery({
-    search: debouncedSearch || undefined,
-    categoryId,
-  });
+  const { data, isLoading, refetch } = useGetProductsQuery(
+    {
+      search: debouncedSearch || undefined,
+      categoryId,
+    },
+    {
+      // Refetch when component becomes visible (e.g., when switching tabs)
+      refetchOnMountOrArgChange: true,
+    }
+  );
   const { data: categoriesData } = useGetCategoriesQuery();
   const [updateProduct, { isLoading: isUpdatingPrice }] =
     useUpdateProductMutation();

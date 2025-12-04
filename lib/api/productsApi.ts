@@ -95,7 +95,13 @@ export const productsApi = apiSlice.injectEndpoints({
         const query = searchParams.toString();
         return `/products${query ? `?${query}` : ""}`;
       },
-      providesTags: ["Product"],
+      providesTags: (result) =>
+        result
+          ? [
+              ...result.products.map(({ id }) => ({ type: "Product" as const, id })),
+              "Product",
+            ]
+          : ["Product"],
     }),
     getProduct: builder.query<{ product: Product }, number>({
       query: (id) => `/products/${id}`,
@@ -131,6 +137,7 @@ export const productsApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: (result, error, { id }) => [
         { type: "Product", id },
+        "Product",
         "Inventory",
       ],
     }),
