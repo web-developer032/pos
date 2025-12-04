@@ -15,7 +15,6 @@ export interface Product {
   sku?: string;
   description?: string;
   category_id?: number;
-  supplier_id?: number;
   cost_price: number;
   selling_price: number;
   stock_quantity: number;
@@ -25,7 +24,6 @@ export interface Product {
   created_at?: string;
   updated_at?: string;
   category_name?: string;
-  supplier_name?: string;
 }
 
 export interface CreateProductRequest {
@@ -35,7 +33,6 @@ export interface CreateProductRequest {
   sku?: string;
   description?: string;
   category_id?: number;
-  supplier_id?: number;
   cost_price: number;
   selling_price: number;
   stock_quantity: number;
@@ -51,7 +48,6 @@ export interface UpdateProductRequest {
   sku?: string;
   description?: string;
   category_id?: number;
-  supplier_id?: number;
   cost_price?: number;
   selling_price?: number;
   stock_quantity?: number;

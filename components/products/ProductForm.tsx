@@ -13,10 +13,6 @@ import {
   useGetCategoriesQuery,
   useCreateCategoryMutation,
 } from "@/lib/api/categoriesApi";
-import {
-  useGetSuppliersQuery,
-  useCreateSupplierMutation,
-} from "@/lib/api/suppliersApi";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Button } from "@/components/ui/Button";
@@ -83,89 +79,6 @@ function InlineCategoryForm({
   );
 }
 
-// Inline Supplier Form Component
-function InlineSupplierForm({
-  onSuccess,
-}: {
-  onSuccess: (supplierId: number) => void;
-}) {
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-  } = useForm({
-    defaultValues: {
-      name: "",
-      contact_person: "",
-      email: "",
-      phone: "",
-      address: "",
-    },
-  });
-  const [createSupplier] = useCreateSupplierMutation();
-
-  const { handleSubmit: handleFormSubmit, isSubmitting } = useFormSubmission({
-    onSubmit: async (data: {
-      name: string;
-      contact_person?: string;
-      email?: string;
-      phone?: string;
-      address?: string;
-    }) => {
-      const result = await createSupplier({
-        name: data.name,
-        contact_person: data.contact_person || undefined,
-        email: data.email || undefined,
-        phone: data.phone || undefined,
-        address: data.address || undefined,
-      }).unwrap();
-      return result;
-    },
-    onSuccess: (result: unknown) => {
-      const supplierResult = result as { supplier: { id: number } };
-      onSuccess(supplierResult.supplier.id);
-    },
-    successMessage: "Supplier created successfully",
-    errorMessage: "Failed to create supplier",
-  });
-
-  return (
-    <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4">
-      <Input
-        label="Name *"
-        {...register("name", { required: "Name is required" })}
-        error={errors.name?.message as string}
-      />
-      <Input
-        label="Contact Person"
-        {...register("contact_person")}
-        error={errors.contact_person?.message as string}
-      />
-      <Input
-        label="Email"
-        type="email"
-        {...register("email")}
-        error={errors.email?.message as string}
-      />
-      <Input
-        label="Phone"
-        {...register("phone")}
-        error={errors.phone?.message as string}
-      />
-      <Input
-        label="Address"
-        {...register("address")}
-        error={errors.address?.message as string}
-      />
-      <div className="flex justify-end space-x-2">
-        <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? "Creating..." : "Create"}
-        </Button>
-      </div>
-    </form>
-  );
-}
-
 const productUnitEnum = z.enum([
   "piece",
   "gram",
@@ -181,7 +94,6 @@ const productSchema = z.object({
   sku: z.string().optional(),
   description: z.string().optional(),
   category_id: z.union([z.number(), z.string(), z.undefined()]).optional(),
-  supplier_id: z.union([z.number(), z.string(), z.undefined()]).optional(),
   cost_price: z.union([z.number(), z.string()]),
   selling_price: z.union([z.number(), z.string()]).refine(
     (val) => {
@@ -208,7 +120,6 @@ interface ProductFormData {
   sku?: string;
   description?: string;
   category_id?: number;
-  supplier_id?: number;
   cost_price: number;
   selling_price: number;
   stock_quantity: number;
@@ -233,15 +144,12 @@ export function ProductForm({
   onProductCreated,
 }: ProductFormProps) {
   const [showCategoryModal, setShowCategoryModal] = useState(false);
-  const [showSupplierModal, setShowSupplierModal] = useState(false);
 
   const { data: productData } = useGetProductQuery(productId!, {
     skip: !productId,
   });
   const { data: categoriesData, refetch: refetchCategories } =
     useGetCategoriesQuery();
-  const { data: suppliersData, refetch: refetchSuppliers } =
-    useGetSuppliersQuery();
   const [createProduct] = useCreateProductMutation();
   const [updateProduct] = useUpdateProductMutation();
 
@@ -262,7 +170,6 @@ export function ProductForm({
       sku: "",
       description: "",
       category_id: undefined,
-      supplier_id: undefined,
       cost_price: "",
       selling_price: "",
       stock_quantity: "",
@@ -281,7 +188,6 @@ export function ProductForm({
         sku: productData.product.sku || "",
         description: productData.product.description || "",
         category_id: productData.product.category_id || undefined,
-        supplier_id: productData.product.supplier_id || undefined,
         cost_price: productData.product.cost_price.toString(),
         selling_price: productData.product.selling_price.toString(),
         stock_quantity: productData.product.stock_quantity.toString(),
@@ -335,9 +241,8 @@ export function ProductForm({
           throw new Error(minStockLevelValidation.error);
         }
 
-        // Convert category_id and supplier_id using formHelpers
+        // Convert category_id using formHelpers
         const categoryId = toOptionalId(data.category_id);
-        const supplierId = toOptionalId(data.supplier_id);
 
         const submitData: ProductFormData = {
           name: data.name,
@@ -347,7 +252,6 @@ export function ProductForm({
           sku: data.sku || undefined,
           description: data.description || undefined,
           category_id: categoryId,
-          supplier_id: supplierId,
           cost_price: roundPrice(costPrice),
           selling_price: roundPrice(sellingPrice),
           stock_quantity: stockQuantity,
@@ -493,42 +397,6 @@ export function ProductForm({
               )}
             />
           </div>
-          <div>
-            <Controller
-              name="supplier_id"
-              control={control}
-              render={({ field }) => (
-                <div>
-                  <Select
-                    label="Supplier"
-                    options={[
-                      { value: "", label: "Select Supplier" },
-                      ...(suppliersData?.suppliers.map((s) => ({
-                        value: s.id.toString(),
-                        label: s.name,
-                      })) || []),
-                    ]}
-                    value={field.value?.toString() || ""}
-                    onChange={(e) => {
-                      field.onChange(
-                        e.target.value === ""
-                          ? undefined
-                          : Number(e.target.value)
-                      );
-                    }}
-                    error={errors.supplier_id?.message}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowSupplierModal(true)}
-                    className="mt-1 text-sm text-indigo-600 hover:text-indigo-800"
-                  >
-                    + Add New Supplier
-                  </button>
-                </div>
-              )}
-            />
-          </div>
         </div>
         <Input
           label="Description"
@@ -613,21 +481,6 @@ export function ProductForm({
             setValue("category_id", categoryId);
             setShowCategoryModal(false);
             toast.success("Category created and selected");
-          }}
-        />
-      </Modal>
-
-      <Modal
-        isOpen={showSupplierModal}
-        onClose={() => setShowSupplierModal(false)}
-        title="Add New Supplier"
-      >
-        <InlineSupplierForm
-          onSuccess={async (supplierId: number) => {
-            await refetchSuppliers();
-            setValue("supplier_id", supplierId);
-            setShowSupplierModal(false);
-            toast.success("Supplier created and selected");
           }}
         />
       </Modal>

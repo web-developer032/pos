@@ -12,10 +12,9 @@ async function getHandler(req: NextRequest, context?: RouteContext) {
 
     // Search in both products.barcode and product_barcodes table
     const result = await client.execute({
-      sql: `SELECT DISTINCT p.*, c.name as category_name, s.name as supplier_name
+      sql: `SELECT DISTINCT p.*, c.name as category_name
             FROM products p
             LEFT JOIN categories c ON p.category_id = c.id
-            LEFT JOIN suppliers s ON p.supplier_id = s.id
             LEFT JOIN product_barcodes pb ON p.id = pb.product_id
             WHERE (p.barcode = ? OR pb.barcode = ?) 
               AND p.deleted_at IS NULL

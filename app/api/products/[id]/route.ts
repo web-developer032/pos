@@ -19,7 +19,6 @@ const productSchema = z.object({
   sku: z.string().optional(),
   description: z.string().optional(),
   category_id: z.number().optional(),
-  supplier_id: z.number().optional(),
   cost_price: z.number().min(0).optional(),
   selling_price: z.number().min(0).optional(),
   stock_quantity: z.number().min(0).optional(),
@@ -35,10 +34,9 @@ async function getHandler(req: NextRequest, context?: RouteContext) {
     }
     const params = await context.params;
     const result = await client.execute({
-      sql: `SELECT p.*, c.name as category_name, s.name as supplier_name
+      sql: `SELECT p.*, c.name as category_name
             FROM products p
             LEFT JOIN categories c ON p.category_id = c.id
-            LEFT JOIN suppliers s ON p.supplier_id = s.id
             WHERE p.id = ? AND p.deleted_at IS NULL`,
       args: [params.id],
     });
@@ -142,10 +140,9 @@ async function putHandler(req: NextRequest, context?: RouteContext) {
 
     // Fetch updated product with barcodes
     const result = await client.execute({
-      sql: `SELECT p.*, c.name as category_name, s.name as supplier_name
+      sql: `SELECT p.*, c.name as category_name
             FROM products p
             LEFT JOIN categories c ON p.category_id = c.id
-            LEFT JOIN suppliers s ON p.supplier_id = s.id
             WHERE p.id = ? AND p.deleted_at IS NULL`,
       args: [params.id],
     });

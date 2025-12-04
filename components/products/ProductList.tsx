@@ -191,15 +191,6 @@ export function ProductList() {
               );
               return val ? parseIntSafe(val) : undefined;
             })(),
-            supplier_id: (() => {
-              const val = getField(
-                item,
-                "supplier_id",
-                "Supplier ID",
-                "supplier_id"
-              );
-              return val ? parseIntSafe(val) : undefined;
-            })(),
             cost_price: parseNumber(
               getField(item, "cost_price", "Cost Price", "cost_price"),
               0
@@ -278,7 +269,6 @@ export function ProductList() {
     sku: p.sku || "",
     description: p.description || "",
     category_id: p.category_id || "",
-    supplier_id: p.supplier_id || "",
     cost_price: p.cost_price,
     selling_price: p.selling_price,
     stock_quantity: p.stock_quantity,
@@ -293,7 +283,6 @@ export function ProductList() {
     "sku",
     "description",
     "category_id",
-    "supplier_id",
     "cost_price",
     "selling_price",
     "stock_quantity",
@@ -310,7 +299,6 @@ export function ProductList() {
       sku: "SKU-001",
       description: "Product description",
       category_id: "1",
-      supplier_id: "1",
       cost_price: "10.00",
       selling_price: "15.00",
       stock_quantity: "100",

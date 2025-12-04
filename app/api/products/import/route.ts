@@ -21,11 +21,6 @@ const productSchema = z.object({
       val === "" || val === null || val === undefined ? undefined : Number(val),
     z.number().optional()
   ),
-  supplier_id: z.preprocess(
-    (val) =>
-      val === "" || val === null || val === undefined ? undefined : Number(val),
-    z.number().optional()
-  ),
   cost_price: z.preprocess((val) => {
     if (val === "" || val === null || val === undefined) return 0;
     // Remove commas from string before parsing
@@ -74,9 +69,8 @@ async function postHandler(req: NextRequest) {
     const body = await req.json();
     const validated = importSchema.parse(body);
 
-    // Get "Other" category and supplier IDs (create if they don't exist)
+    // Get "Other" category ID (create if it doesn't exist)
     let otherCategoryId: number | null = null;
-    let otherSupplierId: number | null = null;
 
     try {
       // Get or create "Other" category
@@ -98,28 +92,8 @@ async function postHandler(req: NextRequest) {
         });
         otherCategoryId = newCategoryResult.rows[0]?.id as number;
       }
-
-      // Get or create "Other" supplier
-      const supplierResult = await client.execute({
-        sql: "SELECT id FROM suppliers WHERE name = ?",
-        args: ["Other"],
-      });
-      if (supplierResult.rows.length > 0) {
-        otherSupplierId = supplierResult.rows[0].id as number;
-      } else {
-        await client.execute({
-          sql: "INSERT INTO suppliers (name, contact_person, email) VALUES (?, ?, ?)",
-          args: ["Other", "Default Supplier", "other@pos.com"],
-        });
-        // Get the inserted ID
-        const newSupplierResult = await client.execute({
-          sql: "SELECT id FROM suppliers WHERE name = ?",
-          args: ["Other"],
-        });
-        otherSupplierId = newSupplierResult.rows[0]?.id as number;
-      }
     } catch (error) {
-      console.warn("Error getting/creating Other category/supplier:", error);
+      console.warn("Error getting/creating Other category:", error);
     }
 
     // Clean up any existing products with empty string barcodes/skus (convert to NULL)
@@ -161,9 +135,8 @@ async function postHandler(req: NextRequest) {
             ? product.image_url.trim()
             : null;
 
-        // Use "Other" category/supplier if not provided
+        // Use "Other" category if not provided
         let categoryId = product.category_id || null;
-        let supplierId = product.supplier_id || null;
 
         // If category_id is provided, verify it exists, otherwise use "Other"
         if (categoryId) {
@@ -178,30 +151,16 @@ async function postHandler(req: NextRequest) {
           categoryId = otherCategoryId;
         }
 
-        // If supplier_id is provided, verify it exists, otherwise use "Other"
-        if (supplierId) {
-          const supplierCheck = await client.execute({
-            sql: "SELECT id FROM suppliers WHERE id = ?",
-            args: [supplierId],
-          });
-          if (supplierCheck.rows.length === 0) {
-            supplierId = otherSupplierId;
-          }
-        } else {
-          supplierId = otherSupplierId;
-        }
-
         await client.execute({
-          sql: `INSERT INTO products (name, barcode, sku, description, category_id, supplier_id, 
+          sql: `INSERT INTO products (name, barcode, sku, description, category_id, 
                 cost_price, selling_price, stock_quantity, min_stock_level, unit, image_url) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           args: [
             product.name.trim(),
             barcode,
             sku,
             description,
             categoryId,
-            supplierId,
             roundPrice(product.cost_price),
             roundPrice(product.selling_price),
             product.stock_quantity || 0,

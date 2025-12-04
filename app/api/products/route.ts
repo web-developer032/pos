@@ -25,7 +25,6 @@ const productSchema = z.object({
   sku: z.string().optional(),
   description: z.string().optional(),
   category_id: z.number().optional(),
-  supplier_id: z.number().optional(),
   cost_price: z.number().min(0),
   selling_price: z.number().min(0),
   stock_quantity: z.number().min(0),
@@ -42,10 +41,9 @@ async function getHandler(req: NextRequest) {
     const { page, limit, offset } = getPaginationParams(req);
 
     let sql = `
-      SELECT p.*, c.name as category_name, s.name as supplier_name
+      SELECT p.*, c.name as category_name
       FROM products p
       LEFT JOIN categories c ON p.category_id = c.id
-      LEFT JOIN suppliers s ON p.supplier_id = s.id
       WHERE p.deleted_at IS NULL
     `;
     const args: (string | number)[] = [];
@@ -94,16 +92,15 @@ async function postHandler(req: NextRequest) {
     const validated = productSchema.parse(body);
 
     const result = await client.execute({
-      sql: `INSERT INTO products (name, barcode, sku, description, category_id, supplier_id, 
+      sql: `INSERT INTO products (name, barcode, sku, description, category_id, 
             cost_price, selling_price, stock_quantity, min_stock_level, unit, image_url) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`,
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`,
       args: [
         validated.name,
         validated.barcode || null,
         validated.sku || null,
         validated.description || null,
         validated.category_id || null,
-        validated.supplier_id || null,
         roundPrice(validated.cost_price),
         roundPrice(validated.selling_price),
         validated.stock_quantity,
