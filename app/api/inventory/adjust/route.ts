@@ -16,9 +16,10 @@ async function postHandler(req: NextRequest) {
     const body = await req.json();
     const validated = adjustSchema.parse(body);
 
-    // Update product stock (only for non-deleted products)
+    // Get product details including type and relationships
     const productResult = await client.execute({
-      sql: "SELECT stock_quantity FROM products WHERE id = ? AND deleted_at IS NULL",
+      sql: `SELECT product_type, base_product_id, composite_product_id, stock_quantity 
+            FROM products WHERE id = ? AND deleted_at IS NULL`,
       args: [validated.product_id],
     });
 
@@ -26,9 +27,35 @@ async function postHandler(req: NextRequest) {
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
     }
 
-    const currentStock = (
-      productResult.rows[0] as unknown as { stock_quantity: number }
-    ).stock_quantity;
+    const product = productResult.rows[0] as unknown as {
+      product_type: string;
+      base_product_id: number | null;
+      composite_product_id: number | null;
+      stock_quantity: number;
+    };
+
+    // Prevent direct adjustments for packings and composites
+    if (product.product_type === "packing" && product.base_product_id) {
+      return NextResponse.json(
+        {
+          error: "Cannot adjust packing product directly. Please adjust the base product instead.",
+          base_product_id: product.base_product_id,
+        },
+        { status: 400 }
+      );
+    }
+
+    if (product.product_type === "composite" && product.composite_product_id) {
+      return NextResponse.json(
+        {
+          error: "Cannot adjust composite product directly. Please adjust the base product instead.",
+          base_product_id: product.composite_product_id,
+        },
+        { status: 400 }
+      );
+    }
+
+    const currentStock = product.stock_quantity;
     
     let adjustmentQuantity = validated.quantity;
     let operation: 'add' | 'subtract' = 'add';

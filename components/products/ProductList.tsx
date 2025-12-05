@@ -12,6 +12,11 @@ import { useGetCategoriesQuery } from "@/lib/api/categoriesApi";
 import { useCurrency } from "@/lib/hooks/useCurrency";
 import { useListManagement } from "@/lib/hooks/useListManagement";
 import { ProfitPercentage } from "@/components/common/ProfitPercentage";
+import {
+  calculateEffectiveStock,
+  formatStockDisplay,
+  isStockLow,
+} from "@/lib/utils/productRelations";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
@@ -433,15 +438,26 @@ export function ProductList() {
                   />
                 </td>
                 <td className="px-3 py-4 text-sm sm:px-6">
-                  <span
-                    className={
-                      product.stock_quantity <= product.min_stock_level
-                        ? "font-semibold text-red-600"
-                        : ""
-                    }
-                  >
-                    {product.stock_quantity} {product.unit || "pcs"}
-                  </span>
+                  {(() => {
+                    const { effectiveStock, effectiveMinStock, isComposite } =
+                      calculateEffectiveStock(product);
+                    const stockDisplay = formatStockDisplay(
+                      effectiveStock,
+                      isComposite
+                    );
+
+                    return (
+                      <span
+                        className={
+                          isStockLow(effectiveStock, effectiveMinStock)
+                            ? "font-semibold text-red-600"
+                            : ""
+                        }
+                      >
+                        {stockDisplay} {product.unit || "pcs"}
+                      </span>
+                    );
+                  })()}
                 </td>
                 <td className="whitespace-nowrap px-3 py-4 text-right text-sm font-medium sm:px-6">
                   <div className="flex flex-col gap-1 sm:flex-row sm:justify-end">

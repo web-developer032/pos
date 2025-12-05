@@ -14,7 +14,12 @@ import { useThrottledCallback } from "@/lib/hooks/useThrottledCallback";
 import { useBarcodeScanner } from "@/lib/hooks/useBarcodeScanner";
 import { addItem } from "@/lib/slices/cartSlice";
 import { formatPriceForInput, roundPrice } from "@/lib/utils/formHelpers";
-import { calculateVariablePrice } from "@/lib/utils/productRelations";
+import {
+  calculateVariablePrice,
+  calculateEffectiveStock,
+  formatStockDisplay,
+  isStockLow,
+} from "@/lib/utils/productRelations";
 import { Select } from "@/components/ui/Select";
 import { Input } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
@@ -249,55 +254,19 @@ export function ProductGrid() {
               {formatCurrency(product.selling_price)}
             </p>
             {(() => {
-              // Calculate effective stock for packings and composites
-              let effectiveStock = product.stock_quantity;
-              let effectiveMinStock = product.min_stock_level;
-              let isComposite = false;
-
-              if (
-                product.product_type === "packing" &&
-                product.base_product_id &&
-                product.base_product_stock !== undefined
-              ) {
-                // For packings: convert base stock to packing units
-                effectiveStock =
-                  product.base_product_stock /
-                  (product.base_unit_quantity || 1);
-                // Min stock for packing is also calculated from base
-                effectiveMinStock =
-                  (product.min_stock_level || 0) /
-                  (product.base_unit_quantity || 1);
-              } else if (
-                product.product_type === "composite" &&
-                product.composite_product_id &&
-                product.composite_base_stock !== undefined
-              ) {
-                // For composites: calculate how many composite units can be made
-                isComposite = true;
-                effectiveStock = Math.floor(
-                  product.composite_base_stock /
-                    (product.composite_quantity || 1)
-                );
-                // Min stock for composite is also calculated from base
-                effectiveMinStock = Math.floor(
-                  (product.min_stock_level || 0) /
-                    (product.composite_quantity || 1)
-                );
-              }
-
-              // Format stock display - whole numbers for composites, decimals for others
-              const stockDisplay = isComposite
-                ? Math.floor(effectiveStock).toString()
-                : effectiveStock % 1 === 0
-                  ? effectiveStock.toString()
-                  : effectiveStock.toFixed(2);
+              const { effectiveStock, effectiveMinStock, isComposite } =
+                calculateEffectiveStock(product);
+              const stockDisplay = formatStockDisplay(
+                effectiveStock,
+                isComposite
+              );
 
               return (
                 <>
                   <p className="text-xs text-gray-700 sm:text-sm">
                     Stock: {stockDisplay} {product.unit || "pcs"}
                   </p>
-                  {effectiveStock <= effectiveMinStock && (
+                  {isStockLow(effectiveStock, effectiveMinStock) && (
                     <p className="mt-1 text-xs font-semibold text-red-600">
                       Low Stock!
                     </p>

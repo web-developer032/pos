@@ -5,6 +5,11 @@ import { useGetInventoryQuery } from "@/lib/api/inventoryApi";
 import { Modal } from "@/components/ui/Modal";
 import { Pagination } from "@/components/ui/Pagination";
 import { StockAdjustmentForm } from "./StockAdjustmentForm";
+import {
+  calculateEffectiveStock,
+  formatStockDisplay,
+  isStockLow,
+} from "@/lib/utils/productRelations";
 
 export function InventoryList() {
   const [page, setPage] = useState(1);
@@ -55,29 +60,64 @@ export function InventoryList() {
                   {item.category_name || "-"}
                 </td>
                 <td className="px-3 py-4 text-sm sm:px-6">
-                  <span
-                    className={
-                      item.stock_quantity <= item.min_stock_level
-                        ? "font-semibold text-red-600"
-                        : ""
-                    }
-                  >
-                    {item.stock_quantity} {item.unit || "pcs"}
-                  </span>
+                  {(() => {
+                    const { effectiveStock, effectiveMinStock, isComposite } =
+                      calculateEffectiveStock({
+                        stock_quantity: item.stock_quantity,
+                        min_stock_level: item.min_stock_level,
+                        product_type: item.product_type,
+                        base_product_id: item.base_product_id,
+                        base_unit_quantity: item.base_unit_quantity,
+                        composite_product_id: item.composite_product_id,
+                        composite_quantity: item.composite_quantity,
+                        base_product_stock: item.base_product_stock,
+                        composite_base_stock: item.composite_base_stock,
+                        unit: item.unit,
+                      });
+                    const stockDisplay = formatStockDisplay(
+                      effectiveStock,
+                      isComposite
+                    );
+
+                    return (
+                      <span
+                        className={
+                          isStockLow(effectiveStock, effectiveMinStock)
+                            ? "font-semibold text-red-600"
+                            : ""
+                        }
+                      >
+                        {stockDisplay} {item.unit || "pcs"}
+                        {(item.product_type === "packing" ||
+                          item.product_type === "composite") && (
+                          <span className="ml-1 text-xs text-gray-400">
+                            (from base)
+                          </span>
+                        )}
+                      </span>
+                    );
+                  })()}
                 </td>
                 <td className="hidden px-3 py-4 text-sm text-gray-500 sm:table-cell sm:px-6">
                   {item.min_stock_level} {item.unit || "pcs"}
                 </td>
                 <td className="whitespace-nowrap px-3 py-4 text-right text-sm font-medium sm:px-6">
-                  <button
-                    onClick={() => {
-                      setSelectedProduct(item.id);
-                      setIsModalOpen(true);
-                    }}
-                    className="text-indigo-600 hover:text-indigo-900"
-                  >
-                    Adjust
-                  </button>
+                  {item.product_type === "packing" ||
+                  item.product_type === "composite" ? (
+                    <span className="text-xs italic text-gray-400">
+                      Adjust base product
+                    </span>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        setSelectedProduct(item.id);
+                        setIsModalOpen(true);
+                      }}
+                      className="text-indigo-600 hover:text-indigo-900"
+                    >
+                      Adjust
+                    </button>
+                  )}
                 </td>
               </tr>
             ))}
