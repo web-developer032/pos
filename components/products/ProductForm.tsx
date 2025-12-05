@@ -684,7 +684,7 @@ export function ProductForm({
               />
             )}
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="my-2 grid grid-cols-2 gap-4">
             <Input
               label="Barcode"
               {...register("barcode")}
@@ -696,8 +696,8 @@ export function ProductForm({
               error={errors.image_url?.message}
             />
           </div>
-          <div>
-            <label className="mb-2 block text-sm font-medium text-gray-700">
+          <div className="my-2">
+            <label className="my-2 block text-sm font-medium text-gray-700">
               Additional Barcodes
             </label>
             <Controller
@@ -779,11 +779,12 @@ export function ProductForm({
               )}
             />
           </div>
+
           <Input
             label="Description"
             {...register("description")}
             error={errors.description?.message}
-            className="col-span-2"
+            className="col-span-2 mt-2"
           />
         </div>
 

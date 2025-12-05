@@ -59,6 +59,16 @@ export const SearchableSelect = forwardRef<
 
     const selectedOption = options.find((opt) => opt.value === value);
 
+    // Check if current input value is a placeholder
+    const isPlaceholderText = (text: string): boolean => {
+      return (
+        text === placeholder ||
+        text === "Select Base Product" ||
+        text === "Select Category" ||
+        text.trim() === ""
+      );
+    };
+
     // Clear search term and close dropdown when a product is selected (value changes to non-zero)
     // Optimized to only run when value actually changes to a valid selection
     const prevValueRef = useRef(value);
@@ -147,9 +157,15 @@ export const SearchableSelect = forwardRef<
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       const term = e.target.value;
-      setSearchTerm(term);
+      // Ignore if the term is just the placeholder text
+      if (isPlaceholderText(term)) {
+        setSearchTerm("");
+        onSearch?.("");
+      } else {
+        setSearchTerm(term);
+        onSearch?.(term);
+      }
       setHighlightedIndex(-1);
-      onSearch?.(term);
       if (!isOpen) {
         setIsOpen(true);
       }
@@ -166,12 +182,32 @@ export const SearchableSelect = forwardRef<
       setHighlightedIndex(-1);
     };
 
-    const handleInputFocus = () => {
+    const handleInputFocus = (e: React.FocusEvent<HTMLInputElement>) => {
       setIsOpen(true);
-      if (selectedOption && selectedOption.value !== 0) {
+      const currentValue = e.target.value;
+
+      if (
+        selectedOption &&
+        selectedOption.value !== 0 &&
+        selectedOption.value !== ""
+      ) {
+        // If a valid option is selected, use its label as search term
         setSearchTerm(selectedOption.label);
-      } else {
+        // Select all text so user can immediately start typing to replace it
+        setTimeout(() => {
+          e.target.select();
+        }, 0);
+      } else if (isPlaceholderText(currentValue)) {
+        // If input shows placeholder text, clear it immediately so user can type
         setSearchTerm("");
+        e.target.value = "";
+      } else {
+        // If input has some value, use it as search term
+        setSearchTerm(currentValue);
+        // Select all text so user can immediately start typing to replace it
+        setTimeout(() => {
+          e.target.select();
+        }, 0);
       }
     };
 
