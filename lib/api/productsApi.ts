@@ -30,6 +30,8 @@ export interface Product {
   created_at?: string;
   updated_at?: string;
   category_name?: string;
+  base_product_stock?: number; // Stock from base product (for packings)
+  composite_base_stock?: number; // Stock from linked product (for composites)
 }
 
 export interface CreateProductRequest {

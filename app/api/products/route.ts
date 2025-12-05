@@ -100,9 +100,14 @@ async function getHandler(req: NextRequest) {
     const { page, limit, offset } = getPaginationParams(req);
 
     let sql = `
-      SELECT p.*, c.name as category_name
+      SELECT p.*, 
+             c.name as category_name,
+             bp.stock_quantity as base_product_stock,
+             cp.stock_quantity as composite_base_stock
       FROM products p
       LEFT JOIN categories c ON p.category_id = c.id
+      LEFT JOIN products bp ON p.base_product_id = bp.id AND p.product_type = 'packing'
+      LEFT JOIN products cp ON p.composite_product_id = cp.id AND p.product_type = 'composite'
       WHERE p.deleted_at IS NULL
     `;
     const args: (string | number)[] = [];
