@@ -283,8 +283,18 @@ export function ProductForm({
         // Convert and validate number fields using formHelpers
         const costPrice = toFloat(data.cost_price);
         const sellingPrice = toFloat(data.selling_price);
-        const stockQuantity = toFloat(data.stock_quantity);
-        const minStockLevel = toFloat(data.min_stock_level);
+        const productType = data.product_type || "simple";
+
+        // Stock fields are only required for simple and base products
+        // Packings and composites use base product stock, so set to 0
+        const stockQuantity =
+          productType === "packing" || productType === "composite"
+            ? 0
+            : toFloat(data.stock_quantity);
+        const minStockLevel =
+          productType === "packing" || productType === "composite"
+            ? 0
+            : toFloat(data.min_stock_level);
 
         // Validate required number fields
         const costPriceValidation = validateNonNegative(
@@ -303,20 +313,23 @@ export function ProductForm({
           throw new Error(sellingPriceValidation.error);
         }
 
-        const stockQuantityValidation = validateNonNegative(
-          stockQuantity,
-          "Stock quantity"
-        );
-        if (!stockQuantityValidation.valid) {
-          throw new Error(stockQuantityValidation.error);
-        }
+        // Only validate stock fields for simple and base products
+        if (productType === "simple" || productType === "base") {
+          const stockQuantityValidation = validateNonNegative(
+            stockQuantity,
+            "Stock quantity"
+          );
+          if (!stockQuantityValidation.valid) {
+            throw new Error(stockQuantityValidation.error);
+          }
 
-        const minStockLevelValidation = validateNonNegative(
-          minStockLevel,
-          "Min stock level"
-        );
-        if (!minStockLevelValidation.valid) {
-          throw new Error(minStockLevelValidation.error);
+          const minStockLevelValidation = validateNonNegative(
+            minStockLevel,
+            "Min stock level"
+          );
+          if (!minStockLevelValidation.valid) {
+            throw new Error(minStockLevelValidation.error);
+          }
         }
 
         // Convert category_id using formHelpers
@@ -385,74 +398,226 @@ export function ProductForm({
         )}
         className="space-y-4"
       >
-        <div className="grid grid-cols-2 gap-4">
-          <Input
-            label="Name *"
-            {...register("name")}
-            error={errors.name?.message}
-          />
-          <Input label="SKU" {...register("sku")} error={errors.sku?.message} />
-        </div>
-        <div className="grid grid-cols-2 gap-4">
-          <Input
-            label="Barcode"
-            {...register("barcode")}
-            error={errors.barcode?.message}
-          />
-          <Input
-            label="Image URL"
-            {...register("image_url")}
-            error={errors.image_url?.message}
-          />
-        </div>
-        <div>
-          <label className="mb-2 block text-sm font-medium text-gray-700">
-            Additional Barcodes
-          </label>
+        {/* Product Type Selector - At the top */}
+        <div className="mb-4 rounded-lg border border-indigo-200 bg-indigo-50 p-4">
           <Controller
-            name="additional_barcodes"
+            name="product_type"
             control={control}
             render={({ field }) => (
-              <div className="space-y-2">
-                {field.value?.map((barcode, index) => (
-                  <div key={index} className="flex gap-2">
-                    <Input
-                      value={barcode}
-                      onChange={(e) => {
-                        const newBarcodes = [...(field.value || [])];
-                        newBarcodes[index] = e.target.value;
-                        field.onChange(newBarcodes);
-                      }}
-                      placeholder="Enter barcode"
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => {
-                        const newBarcodes =
-                          field.value?.filter((_, i) => i !== index) || [];
-                        field.onChange(newBarcodes);
-                      }}
-                      className="text-red-600 hover:text-red-700"
-                    >
-                      Remove
-                    </Button>
-                  </div>
-                ))}
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    field.onChange([...(field.value || []), ""]);
-                  }}
-                >
-                  Add Barcode
-                </Button>
-              </div>
+              <Select
+                label="Product Type *"
+                options={[
+                  { value: "simple", label: "Simple" },
+                  { value: "base", label: "Base" },
+                  { value: "packing", label: "Packing" },
+                  { value: "composite", label: "Composite" },
+                ]}
+                value={field.value || "simple"}
+                onChange={(e) => field.onChange(e.target.value)}
+                error={errors.product_type?.message}
+              />
             )}
           />
         </div>
-        <div className="grid grid-cols-2 gap-4">
+
+        {/* Product Relationship Fields - Right after type selector */}
+        {(productType === "packing" ||
+          productType === "composite" ||
+          productType === "base") && (
+          <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 p-4">
+            <h3 className="mb-4 text-lg font-semibold text-gray-800">
+              Product Relationships
+            </h3>
+
+            {/* Base Product Fields (for packings) */}
+            {productType === "packing" && (
+              <div className="space-y-4">
+                <Controller
+                  name="base_product_id"
+                  control={control}
+                  render={({ field }) => (
+                    <Select
+                      label="Base Product *"
+                      options={[
+                        { value: "", label: "Select Base Product" },
+                        ...baseProducts.map((p) => ({
+                          value: p.id.toString(),
+                          label: `${p.name} (${p.barcode || "No barcode"})`,
+                        })),
+                      ]}
+                      value={field.value?.toString() || ""}
+                      onChange={(e) => {
+                        field.onChange(
+                          e.target.value === ""
+                            ? undefined
+                            : Number(e.target.value)
+                        );
+                      }}
+                      error={errors.base_product_id?.message}
+                    />
+                  )}
+                />
+                <Input
+                  label="Base Unit Quantity *"
+                  type="number"
+                  step="0.01"
+                  {...register("base_unit_quantity")}
+                  error={errors.base_unit_quantity?.message}
+                  placeholder="e.g., 0.75 for 750g of 1kg base"
+                />
+                <p className="text-xs text-gray-600">
+                  💡 This packing will share stock with the base product
+                </p>
+              </div>
+            )}
+
+            {/* Composite Product Fields */}
+            {productType === "composite" && (
+              <div className="space-y-4">
+                <Controller
+                  name="composite_product_id"
+                  control={control}
+                  render={({ field }) => (
+                    <Select
+                      label="Base Product *"
+                      options={[
+                        { value: "", label: "Select Base Product" },
+                        ...compositeBaseProducts.map((p) => ({
+                          value: p.id.toString(),
+                          label: `${p.name} (${p.barcode || "No barcode"})`,
+                        })),
+                      ]}
+                      value={field.value?.toString() || ""}
+                      onChange={(e) => {
+                        field.onChange(
+                          e.target.value === ""
+                            ? undefined
+                            : Number(e.target.value)
+                        );
+                      }}
+                      error={errors.composite_product_id?.message}
+                    />
+                  )}
+                />
+                <Input
+                  label="Composite Quantity *"
+                  type="number"
+                  step="0.01"
+                  {...register("composite_quantity")}
+                  error={errors.composite_quantity?.message}
+                  placeholder="e.g., 12 for 12 biscuits per box"
+                />
+                <p className="text-xs text-gray-600">
+                  💡 Selling this composite will reduce the base product stock
+                </p>
+              </div>
+            )}
+
+            {/* Variable Quantity Option (for base products) */}
+            {productType === "base" && (
+              <div>
+                <Controller
+                  name="is_variable_quantity"
+                  control={control}
+                  render={({ field }) => (
+                    <label className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        checked={field.value || false}
+                        onChange={(e) => field.onChange(e.target.checked)}
+                        className="rounded border-gray-300"
+                      />
+                      <span className="text-sm font-medium text-gray-700">
+                        Allow variable quantity sales (e.g., 700g of 1kg sugar)
+                      </span>
+                    </label>
+                  )}
+                />
+                <p className="mt-2 text-xs text-gray-600">
+                  💡 When enabled, customers can purchase any quantity of this
+                  product
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Basic Product Information */}
+        <div className="mb-4 border-t pt-4">
+          <h3 className="mb-4 text-lg font-semibold text-gray-800">
+            Basic Information
+          </h3>
+          <div className="grid grid-cols-2 gap-4">
+            <Input
+              label="Name *"
+              {...register("name")}
+              error={errors.name?.message}
+            />
+            <Input
+              label="SKU"
+              {...register("sku")}
+              error={errors.sku?.message}
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <Input
+              label="Barcode"
+              {...register("barcode")}
+              error={errors.barcode?.message}
+            />
+            <Input
+              label="Image URL"
+              {...register("image_url")}
+              error={errors.image_url?.message}
+            />
+          </div>
+          <div>
+            <label className="mb-2 block text-sm font-medium text-gray-700">
+              Additional Barcodes
+            </label>
+            <Controller
+              name="additional_barcodes"
+              control={control}
+              render={({ field }) => (
+                <div className="space-y-2">
+                  {field.value?.map((barcode, index) => (
+                    <div key={index} className="flex gap-2">
+                      <Input
+                        value={barcode}
+                        onChange={(e) => {
+                          const newBarcodes = [...(field.value || [])];
+                          newBarcodes[index] = e.target.value;
+                          field.onChange(newBarcodes);
+                        }}
+                        placeholder="Enter barcode"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          const newBarcodes =
+                            field.value?.filter((_, i) => i !== index) || [];
+                          field.onChange(newBarcodes);
+                        }}
+                        className="text-red-600 hover:text-red-700"
+                      >
+                        Remove
+                      </Button>
+                    </div>
+                  ))}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      field.onChange([...(field.value || []), ""]);
+                    }}
+                  >
+                    Add Barcode
+                  </Button>
+                </div>
+              )}
+            />
+          </div>
           <div>
             <Controller
               name="category_id"
@@ -489,199 +654,117 @@ export function ProductForm({
               )}
             />
           </div>
-        </div>
-        <Input
-          label="Description"
-          {...register("description")}
-          error={errors.description?.message}
-        />
-        <div className="grid grid-cols-2 gap-4">
           <Input
-            label="Cost Price *"
-            type="number"
-            step="0.01"
-            {...register("cost_price")}
-            error={errors.cost_price?.message}
-          />
-          <Input
-            label="Selling Price *"
-            type="number"
-            step="0.01"
-            required
-            {...register("selling_price")}
-            error={errors.selling_price?.message}
-          />
-        </div>
-        <ProfitPercentage
-          costPrice={watch("cost_price")}
-          sellingPrice={watch("selling_price")}
-          variant="card"
-          showLabel={true}
-        />
-        <div className="grid grid-cols-2 gap-4">
-          <Input
-            label="Stock Quantity *"
-            type="number"
-            step="any"
-            {...register("stock_quantity")}
-            error={errors.stock_quantity?.message}
-          />
-          <Input
-            label="Min Stock Level *"
-            type="number"
-            step="any"
-            {...register("min_stock_level")}
-            error={errors.min_stock_level?.message}
-          />
-        </div>
-        <div>
-          <Controller
-            name="unit"
-            control={control}
-            render={({ field }) => (
-              <Select
-                label="Measuring Unit *"
-                options={[
-                  { value: "piece", label: "Piece" },
-                  { value: "gram", label: "Gram (g)" },
-                  { value: "kilogram", label: "Kilogram (kg)" },
-                  { value: "liter", label: "Liter (L)" },
-                  { value: "milliliter", label: "Milliliter (mL)" },
-                ]}
-                value={field.value || "piece"}
-                onChange={(e) => field.onChange(e.target.value)}
-                error={errors.unit?.message}
-              />
-            )}
+            label="Description"
+            {...register("description")}
+            error={errors.description?.message}
+            className="col-span-2"
           />
         </div>
 
-        {/* Product Type and Relationship Fields */}
-        <div className="mt-4 border-t pt-4">
-          <h3 className="mb-4 text-lg font-medium">Product Relationships</h3>
-
-          <div className="mb-4">
-            <Controller
-              name="product_type"
-              control={control}
-              render={({ field }) => (
-                <Select
-                  label="Product Type *"
-                  options={[
-                    { value: "simple", label: "Simple" },
-                    { value: "base", label: "Base" },
-                    { value: "packing", label: "Packing" },
-                    { value: "composite", label: "Composite" },
-                  ]}
-                  value={field.value || "simple"}
-                  onChange={(e) => field.onChange(e.target.value)}
-                  error={errors.product_type?.message}
-                />
-              )}
+        {/* Pricing Information */}
+        <div className="mb-4 border-t pt-4">
+          <h3 className="mb-4 text-lg font-semibold text-gray-800">Pricing</h3>
+          <div className="grid grid-cols-2 gap-4">
+            <Input
+              label="Cost Price *"
+              type="number"
+              step="0.01"
+              {...register("cost_price")}
+              error={errors.cost_price?.message}
+            />
+            <Input
+              label="Selling Price *"
+              type="number"
+              step="0.01"
+              required
+              {...register("selling_price")}
+              error={errors.selling_price?.message}
             />
           </div>
-
-          {/* Base Product Fields (for packings) */}
-          {productType === "packing" && (
-            <div className="mb-4 space-y-4 rounded bg-gray-50 p-4">
-              <Controller
-                name="base_product_id"
-                control={control}
-                render={({ field }) => (
-                  <Select
-                    label="Base Product *"
-                    options={[
-                      { value: "", label: "Select Base Product" },
-                      ...baseProducts.map((p) => ({
-                        value: p.id.toString(),
-                        label: `${p.name} (${p.barcode || "No barcode"})`,
-                      })),
-                    ]}
-                    value={field.value?.toString() || ""}
-                    onChange={(e) => {
-                      field.onChange(
-                        e.target.value === ""
-                          ? undefined
-                          : Number(e.target.value)
-                      );
-                    }}
-                    error={errors.base_product_id?.message}
-                  />
-                )}
-              />
-              <Input
-                label="Base Unit Quantity *"
-                type="number"
-                step="0.01"
-                {...register("base_unit_quantity")}
-                error={errors.base_unit_quantity?.message}
-                placeholder="e.g., 0.75 for 750g of 1kg base"
-              />
-            </div>
-          )}
-
-          {/* Composite Product Fields */}
-          {productType === "composite" && (
-            <div className="mb-4 space-y-4 rounded bg-gray-50 p-4">
-              <Controller
-                name="composite_product_id"
-                control={control}
-                render={({ field }) => (
-                  <Select
-                    label="Base Product *"
-                    options={[
-                      { value: "", label: "Select Base Product" },
-                      ...compositeBaseProducts.map((p) => ({
-                        value: p.id.toString(),
-                        label: `${p.name} (${p.barcode || "No barcode"})`,
-                      })),
-                    ]}
-                    value={field.value?.toString() || ""}
-                    onChange={(e) => {
-                      field.onChange(
-                        e.target.value === ""
-                          ? undefined
-                          : Number(e.target.value)
-                      );
-                    }}
-                    error={errors.composite_product_id?.message}
-                  />
-                )}
-              />
-              <Input
-                label="Composite Quantity *"
-                type="number"
-                step="0.01"
-                {...register("composite_quantity")}
-                error={errors.composite_quantity?.message}
-                placeholder="e.g., 12 for 12 biscuits per box"
-              />
-            </div>
-          )}
-
-          {/* Variable Quantity Option (for base products) */}
-          {productType === "base" && (
-            <div className="mb-4">
-              <Controller
-                name="is_variable_quantity"
-                control={control}
-                render={({ field }) => (
-                  <label className="flex items-center space-x-2">
-                    <input
-                      type="checkbox"
-                      checked={field.value || false}
-                      onChange={(e) => field.onChange(e.target.checked)}
-                      className="rounded border-gray-300"
-                    />
-                    <span className="text-sm font-medium text-gray-700">
-                      Allow variable quantity sales (e.g., 700g of 1kg sugar)
-                    </span>
-                  </label>
-                )}
-              />
-            </div>
-          )}
+          <ProfitPercentage
+            costPrice={watch("cost_price")}
+            sellingPrice={watch("selling_price")}
+            variant="card"
+            showLabel={true}
+          />
         </div>
+
+        {/* Stock & Inventory Information - Only for simple and base products */}
+        {(productType === "simple" || productType === "base") && (
+          <div className="mb-4 border-t pt-4">
+            <h3 className="mb-4 text-lg font-semibold text-gray-800">
+              Stock & Inventory
+            </h3>
+            <div className="grid grid-cols-2 gap-4">
+              <Input
+                label="Stock Quantity *"
+                type="number"
+                step="any"
+                {...register("stock_quantity")}
+                error={errors.stock_quantity?.message}
+              />
+              <Input
+                label="Min Stock Level *"
+                type="number"
+                step="any"
+                {...register("min_stock_level")}
+                error={errors.min_stock_level?.message}
+              />
+              <div className="col-span-2">
+                <Controller
+                  name="unit"
+                  control={control}
+                  render={({ field }) => (
+                    <Select
+                      label="Measuring Unit *"
+                      options={[
+                        { value: "piece", label: "Piece" },
+                        { value: "gram", label: "Gram (g)" },
+                        { value: "kilogram", label: "Kilogram (kg)" },
+                        { value: "liter", label: "Liter (L)" },
+                        { value: "milliliter", label: "Milliliter (mL)" },
+                      ]}
+                      value={field.value || "piece"}
+                      onChange={(e) => field.onChange(e.target.value)}
+                      error={errors.unit?.message}
+                    />
+                  )}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Unit field for packings and composites (they still need a unit for display) */}
+        {(productType === "packing" || productType === "composite") && (
+          <div className="mb-4 border-t pt-4">
+            <h3 className="mb-4 text-lg font-semibold text-gray-800">
+              Display Settings
+            </h3>
+            <div>
+              <Controller
+                name="unit"
+                control={control}
+                render={({ field }) => (
+                  <Select
+                    label="Measuring Unit *"
+                    options={[
+                      { value: "piece", label: "Piece" },
+                      { value: "gram", label: "Gram (g)" },
+                      { value: "kilogram", label: "Kilogram (kg)" },
+                      { value: "liter", label: "Liter (L)" },
+                      { value: "milliliter", label: "Milliliter (mL)" },
+                    ]}
+                    value={field.value || "piece"}
+                    onChange={(e) => field.onChange(e.target.value)}
+                    error={errors.unit?.message}
+                  />
+                )}
+              />
+            </div>
+          </div>
+        )}
 
         <div className="flex justify-end space-x-2">
           <Button type="submit" disabled={isSubmitting}>
