@@ -6,7 +6,7 @@ import { createPortal } from "react-dom";
 interface SearchableSelectProps {
   label?: string;
   error?: string;
-  options: { value: string | number; label: string }[];
+  options: { value: string | number; label: string; searchText?: string }[];
   value?: string | number;
   onChange?: (value: string | number) => void;
   placeholder?: string;
@@ -90,7 +90,12 @@ export const SearchableSelect = forwardRef<
         if (option.value === 0 || option.value === "") {
           return false;
         }
-        return option.label.toLowerCase().includes(searchLower);
+        // Search by label or searchText if available
+        const labelMatch = option.label.toLowerCase().includes(searchLower);
+        const searchTextMatch = option.searchText
+          ? option.searchText.includes(searchLower)
+          : false;
+        return labelMatch || searchTextMatch;
       });
     }, [options, searchTerm]);
 

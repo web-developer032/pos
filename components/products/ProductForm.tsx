@@ -16,6 +16,7 @@ import {
 } from "@/lib/api/categoriesApi";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
+import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { useFormSubmission } from "@/lib/hooks/useFormSubmission";
@@ -27,6 +28,8 @@ import {
 } from "@/lib/utils/formHelpers";
 import toast from "react-hot-toast";
 import { ProfitPercentage } from "@/components/common/ProfitPercentage";
+import { useBarcodeScanner } from "@/lib/hooks/useBarcodeScanner";
+import { useDebounce } from "@/lib/hooks/useDebounce";
 
 // Inline Category Form Component
 function InlineCategoryForm({
@@ -204,15 +207,36 @@ export function ProductForm({
 
   const productType = watch("product_type") || "simple";
 
+  // Search state for base products (packings)
+  const [baseProductSearchTerm, setBaseProductSearchTerm] = useState("");
+  const debouncedBaseProductSearch = useDebounce(baseProductSearchTerm, 300);
+
+  // Search state for composite base products
+  const [compositeBaseSearchTerm, setCompositeBaseSearchTerm] = useState("");
+  const debouncedCompositeBaseSearch = useDebounce(
+    compositeBaseSearchTerm,
+    300
+  );
+
   // Fetch base products for packing selection (only when product type is packing)
+  // Use debounced search to trigger API calls
   const { data: baseProductsData } = useGetProductsQuery(
-    { search: undefined, categoryId: undefined },
+    {
+      search: debouncedBaseProductSearch || undefined,
+      categoryId: undefined,
+      limit: 50, // Limit results for better performance
+    },
     { skip: productType !== "packing" }
   );
 
   // Fetch all products for composite selection (only when product type is composite)
+  // Use debounced search to trigger API calls
   const { data: allProductsData } = useGetProductsQuery(
-    { search: undefined, categoryId: undefined },
+    {
+      search: debouncedCompositeBaseSearch || undefined,
+      categoryId: undefined,
+      limit: 50, // Limit results for better performance
+    },
     { skip: productType !== "composite" }
   );
 
@@ -225,6 +249,76 @@ export function ProductForm({
     allProductsData?.products.filter(
       (p) => p.product_type === "simple" || p.product_type === "base"
     ) || [];
+
+  // Barcode scanner for base product selection
+  const { isBarcodePattern } = useBarcodeScanner();
+
+  // Handle barcode scan for base product (packings)
+  const handleBaseProductBarcodeScan = (
+    e: React.KeyboardEvent<HTMLInputElement>
+  ) => {
+    if (e.key === "Enter") {
+      const currentValue = (e.target as HTMLInputElement).value.trim();
+      if (currentValue && isBarcodePattern(currentValue)) {
+        e.preventDefault();
+        // Find product by barcode
+        const foundProduct = baseProducts.find(
+          (p) =>
+            p.barcode === currentValue ||
+            p.additional_barcodes?.includes(currentValue)
+        );
+        if (foundProduct) {
+          setValue("base_product_id", foundProduct.id);
+          toast.success(`Selected: ${foundProduct.name}`);
+        } else {
+          toast.error("Product not found with this barcode");
+        }
+      }
+    }
+  };
+
+  // Handle barcode scan for composite base product
+  const handleCompositeBaseBarcodeScan = (
+    e: React.KeyboardEvent<HTMLInputElement>
+  ) => {
+    if (e.key === "Enter") {
+      const currentValue = (e.target as HTMLInputElement).value.trim();
+      if (currentValue && isBarcodePattern(currentValue)) {
+        e.preventDefault();
+        // Find product by barcode
+        const foundProduct = compositeBaseProducts.find(
+          (p) =>
+            p.barcode === currentValue ||
+            p.additional_barcodes?.includes(currentValue)
+        );
+        if (foundProduct) {
+          setValue("composite_product_id", foundProduct.id);
+          toast.success(`Selected: ${foundProduct.name}`);
+        } else {
+          toast.error("Product not found with this barcode");
+        }
+      }
+    }
+  };
+
+  // Create searchable options with barcode in label for better search
+  const baseProductOptions = [
+    { value: "", label: "Select Base Product" },
+    ...baseProducts.map((p) => ({
+      value: p.id,
+      label: `${p.name}${p.barcode ? ` (${p.barcode})` : ""}`,
+      searchText: `${p.name} ${p.barcode || ""} ${p.sku || ""}`.toLowerCase(),
+    })),
+  ];
+
+  const compositeBaseProductOptions = [
+    { value: "", label: "Select Base Product" },
+    ...compositeBaseProducts.map((p) => ({
+      value: p.id,
+      label: `${p.name}${p.barcode ? ` (${p.barcode})` : ""}`,
+      searchText: `${p.name} ${p.barcode || ""} ${p.sku || ""}`.toLowerCase(),
+    })),
+  ];
 
   useEffect(() => {
     if (productData?.product) {
@@ -256,7 +350,7 @@ export function ProductForm({
     }
   }, [productData, reset]);
 
-  // Clear relationship fields when product type changes
+  // Clear relationship fields and search terms when product type changes
   useEffect(() => {
     if (productType === "simple" || productType === "base") {
       setValue("base_product_id", undefined);
@@ -270,10 +364,12 @@ export function ProductForm({
     if (productType !== "packing") {
       setValue("base_product_id", undefined);
       setValue("base_unit_quantity", "");
+      setBaseProductSearchTerm(""); // Clear search when switching away from packing
     }
     if (productType !== "composite") {
       setValue("composite_product_id", undefined);
       setValue("composite_quantity", "");
+      setCompositeBaseSearchTerm(""); // Clear search when switching away from composite
     }
   }, [productType, setValue]);
 
@@ -436,24 +532,22 @@ export function ProductForm({
                   name="base_product_id"
                   control={control}
                   render={({ field }) => (
-                    <Select
+                    <SearchableSelect
                       label="Base Product *"
-                      options={[
-                        { value: "", label: "Select Base Product" },
-                        ...baseProducts.map((p) => ({
-                          value: p.id.toString(),
-                          label: `${p.name} (${p.barcode || "No barcode"})`,
-                        })),
-                      ]}
-                      value={field.value?.toString() || ""}
-                      onChange={(e) => {
+                      options={baseProductOptions}
+                      value={field.value || ""}
+                      onChange={(value) => {
                         field.onChange(
-                          e.target.value === ""
+                          value === "" || value === 0
                             ? undefined
-                            : Number(e.target.value)
+                            : Number(value)
                         );
                       }}
-                      error={errors.base_product_id?.message}
+                      placeholder="Search by name or scan barcode..."
+                      searchPlaceholder="Type name or scan barcode..."
+                      onKeyDown={handleBaseProductBarcodeScan}
+                      onSearch={(term) => setBaseProductSearchTerm(term)}
+                      error={errors.base_product_id?.message as string}
                     />
                   )}
                 />
@@ -478,24 +572,22 @@ export function ProductForm({
                   name="composite_product_id"
                   control={control}
                   render={({ field }) => (
-                    <Select
+                    <SearchableSelect
                       label="Base Product *"
-                      options={[
-                        { value: "", label: "Select Base Product" },
-                        ...compositeBaseProducts.map((p) => ({
-                          value: p.id.toString(),
-                          label: `${p.name} (${p.barcode || "No barcode"})`,
-                        })),
-                      ]}
-                      value={field.value?.toString() || ""}
-                      onChange={(e) => {
+                      options={compositeBaseProductOptions}
+                      value={field.value || ""}
+                      onChange={(value) => {
                         field.onChange(
-                          e.target.value === ""
+                          value === "" || value === 0
                             ? undefined
-                            : Number(e.target.value)
+                            : Number(value)
                         );
                       }}
-                      error={errors.composite_product_id?.message}
+                      placeholder="Search by name or scan barcode..."
+                      searchPlaceholder="Type name or scan barcode..."
+                      onKeyDown={handleCompositeBaseBarcodeScan}
+                      onSearch={(term) => setCompositeBaseSearchTerm(term)}
+                      error={errors.composite_product_id?.message as string}
                     />
                   )}
                 />
