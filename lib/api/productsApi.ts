@@ -172,6 +172,9 @@ export const productsApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ["Product", "Inventory"],
     }),
+    generateSKU: builder.query<{ sku: string }, void>({
+      query: () => "/products/generate-sku",
+    }),
   }),
 });
 
@@ -184,4 +187,5 @@ export const {
   useDeleteProductMutation,
   useImportProductsMutation,
   useDeleteAllProductsMutation,
+  useLazyGenerateSKUQuery,
 } = productsApi;

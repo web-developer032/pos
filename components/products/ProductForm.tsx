@@ -9,6 +9,7 @@ import {
   useUpdateProductMutation,
   useGetProductQuery,
   useGetProductsQuery,
+  useLazyGenerateSKUQuery,
 } from "@/lib/api/productsApi";
 import {
   useGetCategoriesQuery,
@@ -160,6 +161,8 @@ export function ProductForm({
     useGetCategoriesQuery();
   const [createProduct] = useCreateProductMutation();
   const [updateProduct] = useUpdateProductMutation();
+  const [triggerGenerateSKU, { isLoading: isGeneratingSKU }] =
+    useLazyGenerateSKUQuery();
 
   const {
     register,
@@ -292,6 +295,19 @@ export function ProductForm({
       setBaseProductSearchTerm("");
     }
   }, [baseProductId, setValue]);
+
+  // Handle SKU generation
+  const handleGenerateSKU = async () => {
+    try {
+      const result = await triggerGenerateSKU().unwrap();
+      if (result.sku) {
+        setValue("sku", result.sku);
+        toast.success("SKU generated successfully");
+      }
+    } catch {
+      toast.error("Failed to generate SKU");
+    }
+  };
 
   const { handleSubmit: handleFormSubmit, isSubmitting } =
     useFormSubmission<ProductFormDataRaw>({
@@ -482,11 +498,30 @@ export function ProductForm({
             />
             {/* Hide SKU for related products - they use base product's SKU */}
             {!isRelatedProduct && (
-              <Input
-                label="SKU"
-                {...register("sku")}
-                error={errors.sku?.message}
-              />
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">
+                  SKU
+                </label>
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <Input
+                      {...register("sku")}
+                      error={errors.sku?.message}
+                      label=""
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    onClick={handleGenerateSKU}
+                    disabled={isGeneratingSKU}
+                    variant="outline"
+                    className="self-end whitespace-nowrap"
+                    title="Generate unique SKU"
+                  >
+                    {isGeneratingSKU ? "..." : "Generate"}
+                  </Button>
+                </div>
+              </div>
             )}
           </div>
           <div className="my-2 grid grid-cols-2 gap-4">
