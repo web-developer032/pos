@@ -46,75 +46,79 @@ export function InventoryList() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200 bg-white">
-            {data?.inventory.map((item) => (
-              <tr
-                key={item.id}
-                className={
-                  item.stock_quantity <= item.min_stock_level ? "bg-red-50" : ""
-                }
-              >
-                <td className="whitespace-nowrap px-3 py-4 text-sm font-medium sm:px-6">
-                  {item.name}
-                </td>
-                <td className="hidden px-3 py-4 text-sm text-gray-500 sm:table-cell sm:px-6">
-                  {item.category_name || "-"}
-                </td>
-                <td className="px-3 py-4 text-sm sm:px-6">
-                  {(() => {
-                    const { effectiveStock, effectiveMinStock, isComposite } =
-                      calculateEffectiveStock({
-                        stock_quantity: item.stock_quantity,
-                        min_stock_level: item.min_stock_level,
-                        base_product_id: item.base_product_id,
-                        quantity_multiplier: item.quantity_multiplier,
-                        base_product_stock: item.base_product_stock,
-                        unit: item.unit,
-                      });
-                    const stockDisplay = formatStockDisplay(
-                      effectiveStock,
-                      isComposite
-                    );
+            {data?.inventory.map((item) => {
+              const { effectiveStock, effectiveMinStock, isComposite } =
+                calculateEffectiveStock({
+                  stock_quantity: item.stock_quantity,
+                  min_stock_level: item.min_stock_level,
+                  base_product_id: item.base_product_id,
+                  quantity_multiplier: item.quantity_multiplier,
+                  base_product_stock: item.base_product_stock,
+                  unit: item.unit,
+                });
+              const stockDisplay = formatStockDisplay(
+                effectiveStock,
+                isComposite
+              );
+              const minStockDisplay = formatStockDisplay(
+                effectiveMinStock,
+                isComposite
+              );
 
-                    return (
-                      <span
-                        className={
-                          isStockLow(effectiveStock, effectiveMinStock)
-                            ? "font-semibold text-red-600"
-                            : ""
-                        }
-                      >
-                        {stockDisplay} {item.unit || "pcs"}
-                        {item.base_product_id && (
-                          <span className="ml-1 text-xs text-gray-400">
-                            (from base)
-                          </span>
-                        )}
-                      </span>
-                    );
-                  })()}
-                </td>
-                <td className="hidden px-3 py-4 text-sm text-gray-500 sm:table-cell sm:px-6">
-                  {item.min_stock_level} {item.unit || "pcs"}
-                </td>
-                <td className="whitespace-nowrap px-3 py-4 text-right text-sm font-medium sm:px-6">
-                  {item.base_product_id ? (
-                    <span className="text-xs italic text-gray-400">
-                      Adjust base product
-                    </span>
-                  ) : (
-                    <button
-                      onClick={() => {
-                        setSelectedProduct(item.id);
-                        setIsModalOpen(true);
-                      }}
-                      className="text-indigo-600 hover:text-indigo-900"
+              return (
+                <tr
+                  key={item.id}
+                  className={
+                    isStockLow(effectiveStock, effectiveMinStock)
+                      ? "bg-red-50"
+                      : ""
+                  }
+                >
+                  <td className="whitespace-nowrap px-3 py-4 text-sm font-medium sm:px-6">
+                    {item.name}
+                  </td>
+                  <td className="hidden px-3 py-4 text-sm text-gray-500 sm:table-cell sm:px-6">
+                    {item.category_name || "-"}
+                  </td>
+                  <td className="px-3 py-4 text-sm sm:px-6">
+                    <span
+                      className={
+                        isStockLow(effectiveStock, effectiveMinStock)
+                          ? "font-semibold text-red-600"
+                          : ""
+                      }
                     >
-                      Adjust
-                    </button>
-                  )}
-                </td>
-              </tr>
-            ))}
+                      {stockDisplay} {item.unit || "pcs"}
+                      {item.base_product_id && (
+                        <span className="ml-1 text-xs text-gray-400">
+                          (from base)
+                        </span>
+                      )}
+                    </span>
+                  </td>
+                  <td className="hidden px-3 py-4 text-sm text-gray-500 sm:table-cell sm:px-6">
+                    {minStockDisplay} {item.unit || "pcs"}
+                  </td>
+                  <td className="whitespace-nowrap px-3 py-4 text-right text-sm font-medium sm:px-6">
+                    {item.base_product_id ? (
+                      <span className="text-xs italic text-gray-400">
+                        Adjust base product
+                      </span>
+                    ) : (
+                      <button
+                        onClick={() => {
+                          setSelectedProduct(item.id);
+                          setIsModalOpen(true);
+                        }}
+                        className="text-indigo-600 hover:text-indigo-900"
+                      >
+                        Adjust
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
