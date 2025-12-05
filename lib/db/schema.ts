@@ -43,7 +43,7 @@ export async function initializeDatabase() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
       barcode TEXT UNIQUE,
-      sku TEXT UNIQUE,
+      sku TEXT,
       description TEXT,
       category_id INTEGER,
       cost_price REAL NOT NULL DEFAULT 0,

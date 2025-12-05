@@ -12,79 +12,103 @@ const productUnitEnum = z.enum([
   "milliliter",
 ]);
 
-const productTypeEnum = z.enum(['simple', 'base', 'packing', 'composite']);
+const productTypeEnum = z.enum(["simple", "base", "packing", "composite"]);
 
-const productSchema = z.object({
-  name: z.string().min(1).optional(),
-  barcode: z.string().optional(),
-  additional_barcodes: z.array(z.string()).optional(),
-  sku: z.string().optional(),
-  description: z.string().optional(),
-  category_id: z.number().optional(),
-  cost_price: z.number().min(0).optional(),
-  selling_price: z.number().min(0).optional(),
-  stock_quantity: z.number().min(0).optional(),
-  min_stock_level: z.number().min(0).optional(),
-  unit: productUnitEnum.optional(),
-  image_url: z.string().optional(),
-  product_type: productTypeEnum.optional(),
-  base_product_id: z.number().nullable().optional(),
-  base_unit_quantity: z.number().nullable().optional(),
-  composite_product_id: z.number().nullable().optional(),
-  composite_quantity: z.number().nullable().optional(),
-  is_variable_quantity: z.boolean().optional(),
-}).refine((data) => {
-  // Validation based on product_type
-  if (data.product_type === 'packing') {
-    // Packings must have base_product_id and base_unit_quantity
-    if (data.base_product_id === null || data.base_unit_quantity === null || (data.base_unit_quantity !== undefined && data.base_unit_quantity <= 0)) {
-      return false;
+const productSchema = z
+  .object({
+    name: z.string().min(1).optional(),
+    barcode: z.string().optional(),
+    additional_barcodes: z.array(z.string()).optional(),
+    sku: z.string().optional(),
+    description: z.string().optional(),
+    category_id: z.number().optional(),
+    cost_price: z.number().min(0).optional(),
+    selling_price: z.number().min(0).optional(),
+    stock_quantity: z.number().min(0).optional(),
+    min_stock_level: z.number().min(0).optional(),
+    unit: productUnitEnum.optional(),
+    image_url: z.string().optional(),
+    product_type: productTypeEnum.optional(),
+    base_product_id: z.number().nullable().optional(),
+    base_unit_quantity: z.number().nullable().optional(),
+    composite_product_id: z.number().nullable().optional(),
+    composite_quantity: z.number().nullable().optional(),
+    is_variable_quantity: z.boolean().optional(),
+  })
+  .refine(
+    (data) => {
+      // Validation based on product_type
+      if (data.product_type === "packing") {
+        // Packings must have base_product_id and base_unit_quantity
+        if (
+          data.base_product_id === null ||
+          data.base_unit_quantity === null ||
+          (data.base_unit_quantity !== undefined &&
+            data.base_unit_quantity <= 0)
+        ) {
+          return false;
+        }
+        // Packings cannot have composite fields
+        if (
+          data.composite_product_id !== null ||
+          data.composite_quantity !== null
+        ) {
+          return false;
+        }
+        // Packings cannot have is_variable_quantity
+        if (data.is_variable_quantity === true) {
+          return false;
+        }
+      } else if (data.product_type === "composite") {
+        // Composites must have composite_product_id and composite_quantity
+        if (
+          data.composite_product_id === null ||
+          data.composite_quantity === null ||
+          (data.composite_quantity !== undefined &&
+            data.composite_quantity <= 0)
+        ) {
+          return false;
+        }
+        // Composites cannot have base fields
+        if (data.base_product_id !== null || data.base_unit_quantity !== null) {
+          return false;
+        }
+        // Composites cannot have is_variable_quantity
+        if (data.is_variable_quantity === true) {
+          return false;
+        }
+      } else if (data.product_type === "base") {
+        // Base products cannot have relationship fields
+        if (data.base_product_id !== null || data.base_unit_quantity !== null) {
+          return false;
+        }
+        if (
+          data.composite_product_id !== null ||
+          data.composite_quantity !== null
+        ) {
+          return false;
+        }
+      } else if (data.product_type === "simple" || !data.product_type) {
+        // Simple products cannot have any relationship fields
+        if (data.base_product_id !== null || data.base_unit_quantity !== null) {
+          return false;
+        }
+        if (
+          data.composite_product_id !== null ||
+          data.composite_quantity !== null
+        ) {
+          return false;
+        }
+        if (data.is_variable_quantity === true) {
+          return false;
+        }
+      }
+      return true;
+    },
+    {
+      message: "Invalid product relationship configuration",
     }
-    // Packings cannot have composite fields
-    if (data.composite_product_id !== null || data.composite_quantity !== null) {
-      return false;
-    }
-    // Packings cannot have is_variable_quantity
-    if (data.is_variable_quantity === true) {
-      return false;
-    }
-  } else if (data.product_type === 'composite') {
-    // Composites must have composite_product_id and composite_quantity
-    if (data.composite_product_id === null || data.composite_quantity === null || (data.composite_quantity !== undefined && data.composite_quantity <= 0)) {
-      return false;
-    }
-    // Composites cannot have base fields
-    if (data.base_product_id !== null || data.base_unit_quantity !== null) {
-      return false;
-    }
-    // Composites cannot have is_variable_quantity
-    if (data.is_variable_quantity === true) {
-      return false;
-    }
-  } else if (data.product_type === 'base') {
-    // Base products cannot have relationship fields
-    if (data.base_product_id !== null || data.base_unit_quantity !== null) {
-      return false;
-    }
-    if (data.composite_product_id !== null || data.composite_quantity !== null) {
-      return false;
-    }
-  } else if (data.product_type === 'simple' || !data.product_type) {
-    // Simple products cannot have any relationship fields
-    if (data.base_product_id !== null || data.base_unit_quantity !== null) {
-      return false;
-    }
-    if (data.composite_product_id !== null || data.composite_quantity !== null) {
-      return false;
-    }
-    if (data.is_variable_quantity === true) {
-      return false;
-    }
-  }
-  return true;
-}, {
-  message: "Invalid product relationship configuration",
-});
+  );
 
 async function getHandler(req: NextRequest, context?: RouteContext) {
   try {
@@ -137,9 +161,9 @@ async function putHandler(req: NextRequest, context?: RouteContext) {
     const validated = productSchema.parse(body);
 
     // Additional validation: Check if base_product_id exists and is of type 'base'
-    if (validated.product_type === 'packing' && validated.base_product_id) {
+    if (validated.product_type === "packing" && validated.base_product_id) {
       const baseProduct = await client.execute({
-        sql: "SELECT product_type FROM products WHERE id = ? AND deleted_at IS NULL",
+        sql: "SELECT product_type, sku FROM products WHERE id = ? AND deleted_at IS NULL",
         args: [validated.base_product_id],
       });
       if (baseProduct.rows.length === 0) {
@@ -148,19 +172,29 @@ async function putHandler(req: NextRequest, context?: RouteContext) {
           { status: 400 }
         );
       }
-      const baseProductType = (baseProduct.rows[0] as unknown as { product_type: string }).product_type;
-      if (baseProductType !== 'base') {
+      const baseProductData = baseProduct.rows[0] as unknown as {
+        product_type: string;
+        sku: string | null;
+      };
+      if (baseProductData.product_type !== "base") {
         return NextResponse.json(
           { error: "Base product must be of type 'base'" },
           { status: 400 }
         );
       }
+      // For packing products, use the base product's SKU if not provided
+      if (!validated.sku && baseProductData.sku) {
+        validated.sku = baseProductData.sku;
+      }
     }
 
     // Additional validation: Check if composite_product_id exists
-    if (validated.product_type === 'composite' && validated.composite_product_id) {
+    if (
+      validated.product_type === "composite" &&
+      validated.composite_product_id
+    ) {
       const compositeBase = await client.execute({
-        sql: "SELECT id FROM products WHERE id = ? AND deleted_at IS NULL",
+        sql: "SELECT id, sku FROM products WHERE id = ? AND deleted_at IS NULL",
         args: [validated.composite_product_id],
       });
       if (compositeBase.rows.length === 0) {
@@ -168,6 +202,14 @@ async function putHandler(req: NextRequest, context?: RouteContext) {
           { error: "Composite base product not found" },
           { status: 400 }
         );
+      }
+      const baseProductData = compositeBase.rows[0] as unknown as {
+        id: number;
+        sku: string | null;
+      };
+      // For composite products, use the base product's SKU if not provided
+      if (!validated.sku && baseProductData.sku) {
+        validated.sku = baseProductData.sku;
       }
     }
 

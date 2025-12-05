@@ -158,7 +158,7 @@ async function postHandler(req: NextRequest) {
     // Additional validation: Check if base_product_id exists and is of type 'base'
     if (validated.product_type === 'packing' && validated.base_product_id) {
       const baseProduct = await client.execute({
-        sql: "SELECT product_type FROM products WHERE id = ? AND deleted_at IS NULL",
+        sql: "SELECT product_type, sku FROM products WHERE id = ? AND deleted_at IS NULL",
         args: [validated.base_product_id],
       });
       if (baseProduct.rows.length === 0) {
@@ -167,19 +167,23 @@ async function postHandler(req: NextRequest) {
           { status: 400 }
         );
       }
-      const baseProductType = (baseProduct.rows[0] as unknown as { product_type: string }).product_type;
-      if (baseProductType !== 'base') {
+      const baseProductData = baseProduct.rows[0] as unknown as { product_type: string; sku: string | null };
+      if (baseProductData.product_type !== 'base') {
         return NextResponse.json(
           { error: "Base product must be of type 'base'" },
           { status: 400 }
         );
+      }
+      // For packing products, use the base product's SKU if not provided
+      if (!validated.sku && baseProductData.sku) {
+        validated.sku = baseProductData.sku;
       }
     }
 
     // Additional validation: Check if composite_product_id exists
     if (validated.product_type === 'composite' && validated.composite_product_id) {
       const compositeBase = await client.execute({
-        sql: "SELECT id FROM products WHERE id = ? AND deleted_at IS NULL",
+        sql: "SELECT id, sku FROM products WHERE id = ? AND deleted_at IS NULL",
         args: [validated.composite_product_id],
       });
       if (compositeBase.rows.length === 0) {
@@ -187,6 +191,11 @@ async function postHandler(req: NextRequest) {
           { error: "Composite base product not found" },
           { status: 400 }
         );
+      }
+      const baseProductData = compositeBase.rows[0] as unknown as { id: number; sku: string | null };
+      // For composite products, use the base product's SKU if not provided
+      if (!validated.sku && baseProductData.sku) {
+        validated.sku = baseProductData.sku;
       }
     }
 

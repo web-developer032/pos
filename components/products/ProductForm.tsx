@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -241,14 +241,20 @@ export function ProductForm({
   );
 
   // Filter base products (product_type = 'base')
-  const baseProducts =
-    baseProductsData?.products.filter((p) => p.product_type === "base") || [];
+  const baseProducts = useMemo(
+    () =>
+      baseProductsData?.products.filter((p) => p.product_type === "base") || [],
+    [baseProductsData?.products]
+  );
 
   // Filter products for composite (simple or base)
-  const compositeBaseProducts =
-    allProductsData?.products.filter(
-      (p) => p.product_type === "simple" || p.product_type === "base"
-    ) || [];
+  const compositeBaseProducts = useMemo(
+    () =>
+      allProductsData?.products.filter(
+        (p) => p.product_type === "simple" || p.product_type === "base"
+      ) || [],
+    [allProductsData?.products]
+  );
 
   // Barcode scanner for base product selection
   const { isBarcodePattern } = useBarcodeScanner();
@@ -349,6 +355,30 @@ export function ProductForm({
       });
     }
   }, [productData, reset]);
+
+  // Auto-populate SKU from base product when base product is selected (for packings)
+  const baseProductId = watch("base_product_id");
+  useEffect(() => {
+    if (productType === "packing" && baseProductId) {
+      const baseProduct = baseProducts.find((p) => p.id === baseProductId);
+      if (baseProduct?.sku) {
+        setValue("sku", baseProduct.sku);
+      }
+    }
+  }, [baseProductId, productType, baseProducts, setValue]);
+
+  // Auto-populate SKU from composite base product when selected (for composites)
+  const compositeProductId = watch("composite_product_id");
+  useEffect(() => {
+    if (productType === "composite" && compositeProductId) {
+      const baseProduct = compositeBaseProducts.find(
+        (p) => p.id === compositeProductId
+      );
+      if (baseProduct?.sku) {
+        setValue("sku", baseProduct.sku);
+      }
+    }
+  }, [compositeProductId, productType, compositeBaseProducts, setValue]);
 
   // Clear relationship fields and search terms when product type changes
   useEffect(() => {
@@ -645,11 +675,14 @@ export function ProductForm({
               {...register("name")}
               error={errors.name?.message}
             />
-            <Input
-              label="SKU"
-              {...register("sku")}
-              error={errors.sku?.message}
-            />
+            {/* Hide SKU for packing and composite products - they use base product's SKU */}
+            {productType !== "packing" && productType !== "composite" && (
+              <Input
+                label="SKU"
+                {...register("sku")}
+                error={errors.sku?.message}
+              />
+            )}
           </div>
           <div className="grid grid-cols-2 gap-4">
             <Input
