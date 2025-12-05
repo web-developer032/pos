@@ -21,17 +21,12 @@ export interface Product {
   min_stock_level: number;
   unit: ProductUnit;
   image_url?: string;
-  product_type?: "simple" | "base" | "packing" | "composite";
   base_product_id?: number;
-  base_unit_quantity?: number;
-  composite_product_id?: number;
-  composite_quantity?: number;
-  is_variable_quantity?: boolean;
+  quantity_multiplier?: number;
   created_at?: string;
   updated_at?: string;
   category_name?: string;
-  base_product_stock?: number; // Stock from base product (for packings)
-  composite_base_stock?: number; // Stock from linked product (for composites)
+  base_product_stock?: number; // Stock from base product (for related products)
 }
 
 export interface CreateProductRequest {
@@ -47,12 +42,8 @@ export interface CreateProductRequest {
   min_stock_level: number;
   unit: ProductUnit;
   image_url?: string;
-  product_type?: "simple" | "base" | "packing" | "composite";
   base_product_id?: number;
-  base_unit_quantity?: number;
-  composite_product_id?: number;
-  composite_quantity?: number;
-  is_variable_quantity?: boolean;
+  quantity_multiplier?: number;
 }
 
 export interface UpdateProductRequest {
@@ -68,12 +59,8 @@ export interface UpdateProductRequest {
   min_stock_level?: number;
   unit?: ProductUnit;
   image_url?: string;
-  product_type?: "simple" | "base" | "packing" | "composite";
   base_product_id?: number;
-  base_unit_quantity?: number;
-  composite_product_id?: number;
-  composite_quantity?: number;
-  is_variable_quantity?: boolean;
+  quantity_multiplier?: number;
 }
 
 export interface PaginationInfo {

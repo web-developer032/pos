@@ -18,8 +18,6 @@ const productUnitEnum = z.enum([
   "milliliter",
 ]);
 
-const productTypeEnum = z.enum(['simple', 'base', 'packing', 'composite']);
-
 const productSchema = z.object({
   name: z.string().min(1),
   barcode: z.string().optional(),
@@ -33,63 +31,24 @@ const productSchema = z.object({
   min_stock_level: z.number().min(0),
   unit: productUnitEnum.default("piece"),
   image_url: z.string().optional(),
-  product_type: productTypeEnum.optional(),
   base_product_id: z.number().optional(),
-  base_unit_quantity: z.number().optional(),
-  composite_product_id: z.number().optional(),
-  composite_quantity: z.number().optional(),
-  is_variable_quantity: z.boolean().optional(),
+  quantity_multiplier: z.number().optional(),
 }).refine((data) => {
-  // Validation based on product_type
-  if (data.product_type === 'packing') {
-    // Packings must have base_product_id and base_unit_quantity
-    if (!data.base_product_id || data.base_unit_quantity === undefined || data.base_unit_quantity <= 0) {
+  // If base_product_id is set, quantity_multiplier must be > 0
+  if (data.base_product_id !== undefined && data.base_product_id !== null) {
+    if (data.quantity_multiplier === undefined || data.quantity_multiplier === null || data.quantity_multiplier <= 0) {
       return false;
     }
-    // Packings cannot have composite fields
-    if (data.composite_product_id !== undefined || data.composite_quantity !== undefined) {
-      return false;
-    }
-    // Packings cannot have is_variable_quantity
-    if (data.is_variable_quantity === true) {
-      return false;
-    }
-  } else if (data.product_type === 'composite') {
-    // Composites must have composite_product_id and composite_quantity
-    if (!data.composite_product_id || data.composite_quantity === undefined || data.composite_quantity <= 0) {
-      return false;
-    }
-    // Composites cannot have base fields
-    if (data.base_product_id !== undefined || data.base_unit_quantity !== undefined) {
-      return false;
-    }
-    // Composites cannot have is_variable_quantity
-    if (data.is_variable_quantity === true) {
-      return false;
-    }
-  } else if (data.product_type === 'base') {
-    // Base products cannot have relationship fields
-    if (data.base_product_id !== undefined || data.base_unit_quantity !== undefined) {
-      return false;
-    }
-    if (data.composite_product_id !== undefined || data.composite_quantity !== undefined) {
-      return false;
-    }
-  } else if (data.product_type === 'simple' || !data.product_type) {
-    // Simple products cannot have any relationship fields
-    if (data.base_product_id !== undefined || data.base_unit_quantity !== undefined) {
-      return false;
-    }
-    if (data.composite_product_id !== undefined || data.composite_quantity !== undefined) {
-      return false;
-    }
-    if (data.is_variable_quantity === true) {
+  }
+  // If base_product_id is not set, quantity_multiplier should not be set
+  if (data.base_product_id === undefined || data.base_product_id === null) {
+    if (data.quantity_multiplier !== undefined && data.quantity_multiplier !== null) {
       return false;
     }
   }
   return true;
 }, {
-  message: "Invalid product relationship configuration",
+  message: "If base_product_id is set, quantity_multiplier must be > 0. If base_product_id is not set, quantity_multiplier should not be set.",
 });
 
 async function getHandler(req: NextRequest) {
@@ -102,12 +61,10 @@ async function getHandler(req: NextRequest) {
     let sql = `
       SELECT p.*, 
              c.name as category_name,
-             bp.stock_quantity as base_product_stock,
-             cp.stock_quantity as composite_base_stock
+             bp.stock_quantity as base_product_stock
       FROM products p
       LEFT JOIN categories c ON p.category_id = c.id
-      LEFT JOIN products bp ON p.base_product_id = bp.id AND p.product_type = 'packing'
-      LEFT JOIN products cp ON p.composite_product_id = cp.id AND p.product_type = 'composite'
+      LEFT JOIN products bp ON p.base_product_id = bp.id
       WHERE p.deleted_at IS NULL
     `;
     const args: (string | number)[] = [];
@@ -155,10 +112,10 @@ async function postHandler(req: NextRequest) {
     const body = await req.json();
     const validated = productSchema.parse(body);
 
-    // Additional validation: Check if base_product_id exists and is of type 'base'
-    if (validated.product_type === 'packing' && validated.base_product_id) {
+    // Additional validation: Check if base_product_id exists (for related products)
+    if (validated.base_product_id) {
       const baseProduct = await client.execute({
-        sql: "SELECT product_type, sku FROM products WHERE id = ? AND deleted_at IS NULL",
+        sql: "SELECT id, sku, base_product_id FROM products WHERE id = ? AND deleted_at IS NULL",
         args: [validated.base_product_id],
       });
       if (baseProduct.rows.length === 0) {
@@ -167,44 +124,32 @@ async function postHandler(req: NextRequest) {
           { status: 400 }
         );
       }
-      const baseProductData = baseProduct.rows[0] as unknown as { product_type: string; sku: string | null };
-      if (baseProductData.product_type !== 'base') {
+      const baseProductData = baseProduct.rows[0] as unknown as { 
+        id: number; 
+        sku: string | null; 
+        base_product_id: number | null;
+      };
+      // Prevent nested relationships - base product cannot itself be a related product
+      if (baseProductData.base_product_id !== null) {
         return NextResponse.json(
-          { error: "Base product must be of type 'base'" },
+          { error: "Base product cannot be a related product itself" },
           { status: 400 }
         );
       }
-      // For packing products, use the base product's SKU if not provided
+      // For related products, use the base product's SKU if not provided
       if (!validated.sku && baseProductData.sku) {
         validated.sku = baseProductData.sku;
       }
-    }
-
-    // Additional validation: Check if composite_product_id exists
-    if (validated.product_type === 'composite' && validated.composite_product_id) {
-      const compositeBase = await client.execute({
-        sql: "SELECT id, sku FROM products WHERE id = ? AND deleted_at IS NULL",
-        args: [validated.composite_product_id],
-      });
-      if (compositeBase.rows.length === 0) {
-        return NextResponse.json(
-          { error: "Composite base product not found" },
-          { status: 400 }
-        );
-      }
-      const baseProductData = compositeBase.rows[0] as unknown as { id: number; sku: string | null };
-      // For composite products, use the base product's SKU if not provided
-      if (!validated.sku && baseProductData.sku) {
-        validated.sku = baseProductData.sku;
-      }
+      // Related products should have stock_quantity = 0 (they use base product's stock)
+      validated.stock_quantity = 0;
+      validated.min_stock_level = 0;
     }
 
     const result = await client.execute({
       sql: `INSERT INTO products (name, barcode, sku, description, category_id, 
             cost_price, selling_price, stock_quantity, min_stock_level, unit, image_url,
-            product_type, base_product_id, base_unit_quantity, composite_product_id, 
-            composite_quantity, is_variable_quantity) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`,
+            base_product_id, quantity_multiplier) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`,
       args: [
         validated.name,
         validated.barcode || null,
@@ -217,12 +162,8 @@ async function postHandler(req: NextRequest) {
         validated.min_stock_level,
         validated.unit || "piece",
         validated.image_url || null,
-        validated.product_type || 'simple',
         validated.base_product_id || null,
-        validated.base_unit_quantity || null,
-        validated.composite_product_id || null,
-        validated.composite_quantity || null,
-        validated.is_variable_quantity ? 1 : 0,
+        validated.quantity_multiplier || null,
       ],
     });
 

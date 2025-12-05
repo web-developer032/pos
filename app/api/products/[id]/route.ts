@@ -12,8 +12,6 @@ const productUnitEnum = z.enum([
   "milliliter",
 ]);
 
-const productTypeEnum = z.enum(["simple", "base", "packing", "composite"]);
-
 const productSchema = z
   .object({
     name: z.string().min(1).optional(),
@@ -28,85 +26,35 @@ const productSchema = z
     min_stock_level: z.number().min(0).optional(),
     unit: productUnitEnum.optional(),
     image_url: z.string().optional(),
-    product_type: productTypeEnum.optional(),
     base_product_id: z.number().nullable().optional(),
-    base_unit_quantity: z.number().nullable().optional(),
-    composite_product_id: z.number().nullable().optional(),
-    composite_quantity: z.number().nullable().optional(),
-    is_variable_quantity: z.boolean().optional(),
+    quantity_multiplier: z.number().nullable().optional(),
   })
   .refine(
     (data) => {
-      // Validation based on product_type
-      if (data.product_type === "packing") {
-        // Packings must have base_product_id and base_unit_quantity
+      // If base_product_id is set, quantity_multiplier must be > 0
+      if (data.base_product_id !== undefined && data.base_product_id !== null) {
         if (
-          data.base_product_id === null ||
-          data.base_unit_quantity === null ||
-          (data.base_unit_quantity !== undefined &&
-            data.base_unit_quantity <= 0)
+          data.quantity_multiplier === undefined ||
+          data.quantity_multiplier === null ||
+          data.quantity_multiplier <= 0
         ) {
           return false;
         }
-        // Packings cannot have composite fields
+      }
+      // If base_product_id is not set, quantity_multiplier should not be set
+      if (data.base_product_id === undefined || data.base_product_id === null) {
         if (
-          data.composite_product_id !== null ||
-          data.composite_quantity !== null
+          data.quantity_multiplier !== undefined &&
+          data.quantity_multiplier !== null
         ) {
-          return false;
-        }
-        // Packings cannot have is_variable_quantity
-        if (data.is_variable_quantity === true) {
-          return false;
-        }
-      } else if (data.product_type === "composite") {
-        // Composites must have composite_product_id and composite_quantity
-        if (
-          data.composite_product_id === null ||
-          data.composite_quantity === null ||
-          (data.composite_quantity !== undefined &&
-            data.composite_quantity <= 0)
-        ) {
-          return false;
-        }
-        // Composites cannot have base fields
-        if (data.base_product_id !== null || data.base_unit_quantity !== null) {
-          return false;
-        }
-        // Composites cannot have is_variable_quantity
-        if (data.is_variable_quantity === true) {
-          return false;
-        }
-      } else if (data.product_type === "base") {
-        // Base products cannot have relationship fields
-        if (data.base_product_id !== null || data.base_unit_quantity !== null) {
-          return false;
-        }
-        if (
-          data.composite_product_id !== null ||
-          data.composite_quantity !== null
-        ) {
-          return false;
-        }
-      } else if (data.product_type === "simple" || !data.product_type) {
-        // Simple products cannot have any relationship fields
-        if (data.base_product_id !== null || data.base_unit_quantity !== null) {
-          return false;
-        }
-        if (
-          data.composite_product_id !== null ||
-          data.composite_quantity !== null
-        ) {
-          return false;
-        }
-        if (data.is_variable_quantity === true) {
           return false;
         }
       }
       return true;
     },
     {
-      message: "Invalid product relationship configuration",
+      message:
+        "If base_product_id is set, quantity_multiplier must be > 0. If base_product_id is not set, quantity_multiplier should not be set.",
     }
   );
 
@@ -117,9 +65,11 @@ async function getHandler(req: NextRequest, context?: RouteContext) {
     }
     const params = await context.params;
     const result = await client.execute({
-      sql: `SELECT p.*, c.name as category_name
+      sql: `SELECT p.*, c.name as category_name,
+                   bp.stock_quantity as base_product_stock
             FROM products p
             LEFT JOIN categories c ON p.category_id = c.id
+            LEFT JOIN products bp ON p.base_product_id = bp.id
             WHERE p.id = ? AND p.deleted_at IS NULL`,
       args: [params.id],
     });
@@ -160,10 +110,13 @@ async function putHandler(req: NextRequest, context?: RouteContext) {
     const body = await req.json();
     const validated = productSchema.parse(body);
 
-    // Additional validation: Check if base_product_id exists and is of type 'base'
-    if (validated.product_type === "packing" && validated.base_product_id) {
+    // Additional validation: Check if base_product_id exists (for related products)
+    if (
+      validated.base_product_id !== undefined &&
+      validated.base_product_id !== null
+    ) {
       const baseProduct = await client.execute({
-        sql: "SELECT product_type, sku FROM products WHERE id = ? AND deleted_at IS NULL",
+        sql: "SELECT id, sku, base_product_id FROM products WHERE id = ? AND deleted_at IS NULL",
         args: [validated.base_product_id],
       });
       if (baseProduct.rows.length === 0) {
@@ -173,43 +126,27 @@ async function putHandler(req: NextRequest, context?: RouteContext) {
         );
       }
       const baseProductData = baseProduct.rows[0] as unknown as {
-        product_type: string;
-        sku: string | null;
-      };
-      if (baseProductData.product_type !== "base") {
-        return NextResponse.json(
-          { error: "Base product must be of type 'base'" },
-          { status: 400 }
-        );
-      }
-      // For packing products, use the base product's SKU if not provided
-      if (!validated.sku && baseProductData.sku) {
-        validated.sku = baseProductData.sku;
-      }
-    }
-
-    // Additional validation: Check if composite_product_id exists
-    if (
-      validated.product_type === "composite" &&
-      validated.composite_product_id
-    ) {
-      const compositeBase = await client.execute({
-        sql: "SELECT id, sku FROM products WHERE id = ? AND deleted_at IS NULL",
-        args: [validated.composite_product_id],
-      });
-      if (compositeBase.rows.length === 0) {
-        return NextResponse.json(
-          { error: "Composite base product not found" },
-          { status: 400 }
-        );
-      }
-      const baseProductData = compositeBase.rows[0] as unknown as {
         id: number;
         sku: string | null;
+        base_product_id: number | null;
       };
-      // For composite products, use the base product's SKU if not provided
+      // Prevent nested relationships - base product cannot itself be a related product
+      if (baseProductData.base_product_id !== null) {
+        return NextResponse.json(
+          { error: "Base product cannot be a related product itself" },
+          { status: 400 }
+        );
+      }
+      // For related products, use the base product's SKU if not provided
       if (!validated.sku && baseProductData.sku) {
         validated.sku = baseProductData.sku;
+      }
+      // Related products should have stock_quantity = 0 (they use base product's stock)
+      if (validated.stock_quantity !== undefined) {
+        validated.stock_quantity = 0;
+      }
+      if (validated.min_stock_level !== undefined) {
+        validated.min_stock_level = 0;
       }
     }
 
@@ -224,9 +161,6 @@ async function putHandler(req: NextRequest, context?: RouteContext) {
         // Round price fields to 2 decimals
         if (key === "cost_price" || key === "selling_price") {
           values.push(roundPrice(value as number));
-        } else if (key === "is_variable_quantity") {
-          // Convert boolean to integer for database
-          values.push((value as boolean) ? 1 : 0);
         } else {
           // Type assertion needed because we've filtered out additional_barcodes
           values.push(value as string | number | null);

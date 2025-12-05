@@ -394,30 +394,12 @@ export function ProductList() {
                 <td className="whitespace-nowrap px-3 py-4 text-sm font-medium sm:px-6">
                   <div className="flex flex-col gap-1">
                     <span>{product.name}</span>
-                    {product.product_type && product.product_type !== 'simple' && (
-                      <span className="text-xs">
-                        <span className={`inline-block rounded px-2 py-0.5 text-xs font-semibold ${
-                          product.product_type === 'base' ? 'bg-blue-100 text-blue-800' :
-                          product.product_type === 'packing' ? 'bg-purple-100 text-purple-800' :
-                          product.product_type === 'composite' ? 'bg-green-100 text-green-800' :
-                          'bg-gray-100 text-gray-800'
-                        }`}>
-                          {product.product_type}
-                        </span>
-                        {product.product_type === 'base' && product.is_variable_quantity && (
-                          <span className="ml-1 text-xs text-blue-600">(Variable Qty)</span>
-                        )}
-                        {product.product_type === 'packing' && product.base_product_id && (
-                          <span className="ml-1 text-xs text-gray-500">
-                            (Base: {product.base_unit_quantity || 0}x)
-                          </span>
-                        )}
-                        {product.product_type === 'composite' && product.composite_product_id && (
-                          <span className="ml-1 text-xs text-gray-500">
-                            (Contains {product.composite_quantity || 0})
-                          </span>
-                        )}
+                    {product.base_product_id ? (
+                      <span className="text-xs text-gray-500">
+                        Related to base product (x{product.quantity_multiplier || 0})
                       </span>
+                    ) : (
+                      <span className="text-xs text-gray-500">Base Product</span>
                     )}
                   </div>
                 </td>

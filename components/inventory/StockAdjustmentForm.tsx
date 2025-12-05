@@ -31,19 +31,10 @@ export function StockAdjustmentForm({
     e.preventDefault();
     if (isAdjusting) return; // Prevent double submission
     
-    // Check if product is packing or composite
-    if (
-      productData?.product &&
-      (productData.product.product_type === "packing" ||
-        productData.product.product_type === "composite")
-    ) {
-      const baseProductId =
-        productData.product.product_type === "packing"
-          ? productData.product.base_product_id
-          : productData.product.composite_product_id;
-      
+    // Check if product is a related product (has base_product_id)
+    if (productData?.product && productData.product.base_product_id) {
       toast.error(
-        `Cannot adjust ${productData.product.product_type} product directly. Please adjust the base product (ID: ${baseProductId}) instead.`,
+        `Cannot adjust related product directly. Please adjust the base product (ID: ${productData.product.base_product_id}) instead.`,
         { duration: 5000 }
       );
       return;

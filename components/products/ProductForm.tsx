@@ -91,8 +91,6 @@ const productUnitEnum = z.enum([
   "milliliter",
 ]);
 
-const productTypeEnum = z.enum(["simple", "base", "packing", "composite"]);
-
 const productSchema = z.object({
   name: z.string().min(1, "Name is required"),
   barcode: z.string().optional(),
@@ -115,14 +113,8 @@ const productSchema = z.object({
   min_stock_level: z.union([z.number(), z.string()]),
   unit: productUnitEnum,
   image_url: z.string().optional(),
-  product_type: productTypeEnum.optional(),
   base_product_id: z.union([z.number(), z.string(), z.undefined()]).optional(),
-  base_unit_quantity: z.union([z.number(), z.string()]).optional(),
-  composite_product_id: z
-    .union([z.number(), z.string(), z.undefined()])
-    .optional(),
-  composite_quantity: z.union([z.number(), z.string()]).optional(),
-  is_variable_quantity: z.boolean().optional(),
+  quantity_multiplier: z.union([z.number(), z.string()]).optional(),
 });
 
 type ProductFormDataRaw = z.infer<typeof productSchema>;
@@ -140,12 +132,8 @@ interface ProductFormData {
   min_stock_level: number;
   unit: "piece" | "gram" | "kilogram" | "liter" | "milliliter";
   image_url?: string;
-  product_type?: "simple" | "base" | "packing" | "composite";
   base_product_id?: number;
-  base_unit_quantity?: number;
-  composite_product_id?: number;
-  composite_quantity?: number;
-  is_variable_quantity?: boolean;
+  quantity_multiplier?: number;
 }
 
 interface ProductFormProps {
@@ -196,29 +184,21 @@ export function ProductForm({
       min_stock_level: "",
       unit: "piece" as const,
       image_url: "",
-      product_type: "simple" as const,
       base_product_id: undefined,
-      base_unit_quantity: "",
-      composite_product_id: undefined,
-      composite_quantity: "",
-      is_variable_quantity: false,
+      quantity_multiplier: "",
     },
   });
 
-  const productType = watch("product_type") || "simple";
+  const [isCreatingRelatedProduct, setIsCreatingRelatedProduct] =
+    useState(false);
+  const baseProductId = watch("base_product_id");
+  const isRelatedProduct = !!baseProductId || isCreatingRelatedProduct;
 
-  // Search state for base products (packings)
+  // Search state for base products (when creating related product)
   const [baseProductSearchTerm, setBaseProductSearchTerm] = useState("");
   const debouncedBaseProductSearch = useDebounce(baseProductSearchTerm, 300);
 
-  // Search state for composite base products
-  const [compositeBaseSearchTerm, setCompositeBaseSearchTerm] = useState("");
-  const debouncedCompositeBaseSearch = useDebounce(
-    compositeBaseSearchTerm,
-    300
-  );
-
-  // Fetch base products for packing selection (only when product type is packing)
+  // Fetch base products (products without base_product_id) for related product selection
   // Use debounced search to trigger API calls
   const { data: baseProductsData } = useGetProductsQuery(
     {
@@ -226,40 +206,19 @@ export function ProductForm({
       categoryId: undefined,
       limit: 50, // Limit results for better performance
     },
-    { skip: productType !== "packing" }
+    { skip: !isRelatedProduct } // Only fetch when creating/editing related product
   );
 
-  // Fetch all products for composite selection (only when product type is composite)
-  // Use debounced search to trigger API calls
-  const { data: allProductsData } = useGetProductsQuery(
-    {
-      search: debouncedCompositeBaseSearch || undefined,
-      categoryId: undefined,
-      limit: 50, // Limit results for better performance
-    },
-    { skip: productType !== "composite" }
-  );
-
-  // Filter base products (product_type = 'base')
+  // Filter to get only base products (products without base_product_id)
   const baseProducts = useMemo(
-    () =>
-      baseProductsData?.products.filter((p) => p.product_type === "base") || [],
+    () => baseProductsData?.products.filter((p) => !p.base_product_id) || [],
     [baseProductsData?.products]
-  );
-
-  // Filter products for composite (simple or base)
-  const compositeBaseProducts = useMemo(
-    () =>
-      allProductsData?.products.filter(
-        (p) => p.product_type === "simple" || p.product_type === "base"
-      ) || [],
-    [allProductsData?.products]
   );
 
   // Barcode scanner for base product selection
   const { isBarcodePattern } = useBarcodeScanner();
 
-  // Handle barcode scan for base product (packings)
+  // Handle barcode scan for base product selection
   const handleBaseProductBarcodeScan = (
     e: React.KeyboardEvent<HTMLInputElement>
   ) => {
@@ -283,43 +242,10 @@ export function ProductForm({
     }
   };
 
-  // Handle barcode scan for composite base product
-  const handleCompositeBaseBarcodeScan = (
-    e: React.KeyboardEvent<HTMLInputElement>
-  ) => {
-    if (e.key === "Enter") {
-      const currentValue = (e.target as HTMLInputElement).value.trim();
-      if (currentValue && isBarcodePattern(currentValue)) {
-        e.preventDefault();
-        // Find product by barcode
-        const foundProduct = compositeBaseProducts.find(
-          (p) =>
-            p.barcode === currentValue ||
-            p.additional_barcodes?.includes(currentValue)
-        );
-        if (foundProduct) {
-          setValue("composite_product_id", foundProduct.id);
-          toast.success(`Selected: ${foundProduct.name}`);
-        } else {
-          toast.error("Product not found with this barcode");
-        }
-      }
-    }
-  };
-
   // Create searchable options with barcode in label for better search
   const baseProductOptions = [
     { value: "", label: "Select Base Product" },
     ...baseProducts.map((p) => ({
-      value: p.id,
-      label: `${p.name}${p.barcode ? ` (${p.barcode})` : ""}`,
-      searchText: `${p.name} ${p.barcode || ""} ${p.sku || ""}`.toLowerCase(),
-    })),
-  ];
-
-  const compositeBaseProductOptions = [
-    { value: "", label: "Select Base Product" },
-    ...compositeBaseProducts.map((p) => ({
       value: p.id,
       label: `${p.name}${p.barcode ? ` (${p.barcode})` : ""}`,
       searchText: `${p.name} ${p.barcode || ""} ${p.sku || ""}`.toLowerCase(),
@@ -342,66 +268,30 @@ export function ProductForm({
         unit: (productData.product.unit ||
           "piece") as ProductFormDataRaw["unit"],
         image_url: productData.product.image_url || "",
-        product_type: (productData.product.product_type ||
-          "simple") as ProductFormDataRaw["product_type"],
         base_product_id: productData.product.base_product_id || undefined,
-        base_unit_quantity:
-          productData.product.base_unit_quantity?.toString() || "",
-        composite_product_id:
-          productData.product.composite_product_id || undefined,
-        composite_quantity:
-          productData.product.composite_quantity?.toString() || "",
-        is_variable_quantity: productData.product.is_variable_quantity || false,
+        quantity_multiplier:
+          productData.product.quantity_multiplier?.toString() || "",
       });
     }
   }, [productData, reset]);
 
-  // Auto-populate SKU from base product when base product is selected (for packings)
-  const baseProductId = watch("base_product_id");
+  // Auto-populate SKU from base product when base product is selected
   useEffect(() => {
-    if (productType === "packing" && baseProductId) {
+    if (baseProductId) {
       const baseProduct = baseProducts.find((p) => p.id === baseProductId);
       if (baseProduct?.sku) {
         setValue("sku", baseProduct.sku);
       }
     }
-  }, [baseProductId, productType, baseProducts, setValue]);
+  }, [baseProductId, baseProducts, setValue]);
 
-  // Auto-populate SKU from composite base product when selected (for composites)
-  const compositeProductId = watch("composite_product_id");
+  // Clear relationship fields when base_product_id is cleared
   useEffect(() => {
-    if (productType === "composite" && compositeProductId) {
-      const baseProduct = compositeBaseProducts.find(
-        (p) => p.id === compositeProductId
-      );
-      if (baseProduct?.sku) {
-        setValue("sku", baseProduct.sku);
-      }
+    if (!baseProductId) {
+      setValue("quantity_multiplier", "");
+      setBaseProductSearchTerm("");
     }
-  }, [compositeProductId, productType, compositeBaseProducts, setValue]);
-
-  // Clear relationship fields and search terms when product type changes
-  useEffect(() => {
-    if (productType === "simple" || productType === "base") {
-      setValue("base_product_id", undefined);
-      setValue("base_unit_quantity", "");
-      setValue("composite_product_id", undefined);
-      setValue("composite_quantity", "");
-    }
-    if (productType !== "base") {
-      setValue("is_variable_quantity", false);
-    }
-    if (productType !== "packing") {
-      setValue("base_product_id", undefined);
-      setValue("base_unit_quantity", "");
-      setBaseProductSearchTerm(""); // Clear search when switching away from packing
-    }
-    if (productType !== "composite") {
-      setValue("composite_product_id", undefined);
-      setValue("composite_quantity", "");
-      setCompositeBaseSearchTerm(""); // Clear search when switching away from composite
-    }
-  }, [productType, setValue]);
+  }, [baseProductId, setValue]);
 
   const { handleSubmit: handleFormSubmit, isSubmitting } =
     useFormSubmission<ProductFormDataRaw>({
@@ -409,18 +299,15 @@ export function ProductForm({
         // Convert and validate number fields using formHelpers
         const costPrice = toFloat(data.cost_price);
         const sellingPrice = toFloat(data.selling_price);
-        const productType = data.product_type || "simple";
 
-        // Stock fields are only required for simple and base products
-        // Packings and composites use base product stock, so set to 0
-        const stockQuantity =
-          productType === "packing" || productType === "composite"
-            ? 0
-            : toFloat(data.stock_quantity);
-        const minStockLevel =
-          productType === "packing" || productType === "composite"
-            ? 0
-            : toFloat(data.min_stock_level);
+        // Stock fields are only required for base products
+        // Related products use base product stock, so set to 0
+        const stockQuantity = isRelatedProduct
+          ? 0
+          : toFloat(data.stock_quantity);
+        const minStockLevel = isRelatedProduct
+          ? 0
+          : toFloat(data.min_stock_level);
 
         // Validate required number fields
         const costPriceValidation = validateNonNegative(
@@ -439,8 +326,8 @@ export function ProductForm({
           throw new Error(sellingPriceValidation.error);
         }
 
-        // Only validate stock fields for simple and base products
-        if (productType === "simple" || productType === "base") {
+        // Only validate stock fields for base products (not related products)
+        if (!isRelatedProduct) {
           const stockQuantityValidation = validateNonNegative(
             stockQuantity,
             "Stock quantity"
@@ -475,20 +362,12 @@ export function ProductForm({
           min_stock_level: minStockLevel,
           unit: data.unit || "piece",
           image_url: data.image_url || undefined,
-          product_type: data.product_type || "simple",
           base_product_id: data.base_product_id
             ? toOptionalId(data.base_product_id)
             : undefined,
-          base_unit_quantity: data.base_unit_quantity
-            ? toFloat(data.base_unit_quantity)
+          quantity_multiplier: data.quantity_multiplier
+            ? toFloat(data.quantity_multiplier)
             : undefined,
-          composite_product_id: data.composite_product_id
-            ? toOptionalId(data.composite_product_id)
-            : undefined,
-          composite_quantity: data.composite_quantity
-            ? toFloat(data.composite_quantity)
-            : undefined,
-          is_variable_quantity: data.is_variable_quantity || false,
         };
 
         if (productId) {
@@ -524,143 +403,69 @@ export function ProductForm({
         )}
         className="space-y-4"
       >
-        {/* Product Type Selector - At the top */}
-        <div className="mb-4 rounded-lg border border-indigo-200 bg-indigo-50 p-4">
-          <Controller
-            name="product_type"
-            control={control}
-            render={({ field }) => (
-              <Select
-                label="Product Type *"
-                options={[
-                  { value: "simple", label: "Simple" },
-                  { value: "base", label: "Base" },
-                  { value: "packing", label: "Packing" },
-                  { value: "composite", label: "Composite" },
-                ]}
-                value={field.value || "simple"}
-                onChange={(e) => field.onChange(e.target.value)}
-                error={errors.product_type?.message}
-              />
-            )}
-          />
-        </div>
-
-        {/* Product Relationship Fields - Right after type selector */}
-        {(productType === "packing" ||
-          productType === "composite" ||
-          productType === "base") && (
+        {/* Product Relationship Fields - Show when creating related product */}
+        {isRelatedProduct && (
           <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 p-4">
             <h3 className="mb-4 text-lg font-semibold text-gray-800">
-              Product Relationships
+              Related Product Configuration
             </h3>
+            <div className="space-y-4">
+              <Controller
+                name="base_product_id"
+                control={control}
+                render={({ field }) => (
+                  <SearchableSelect
+                    label="Base Product *"
+                    options={baseProductOptions}
+                    value={field.value || ""}
+                    onChange={(value) => {
+                      field.onChange(
+                        value === "" || value === 0 ? undefined : Number(value)
+                      );
+                    }}
+                    placeholder="Search by name or scan barcode..."
+                    searchPlaceholder="Type name or scan barcode..."
+                    onKeyDown={handleBaseProductBarcodeScan}
+                    onSearch={(term) => setBaseProductSearchTerm(term)}
+                    error={errors.base_product_id?.message as string}
+                  />
+                )}
+              />
+              <Input
+                label="Quantity Multiplier *"
+                type="number"
+                step="0.01"
+                {...register("quantity_multiplier")}
+                error={errors.quantity_multiplier?.message}
+                placeholder="e.g., 0.7 for 700g of 1kg base, or 10 for 10 units per box"
+              />
+              <p className="text-xs text-gray-600">
+                💡 This product will share stock with the base product. Selling
+                this product will reduce the base product&apos;s stock by the
+                multiplier amount.
+              </p>
+            </div>
+          </div>
+        )}
 
-            {/* Base Product Fields (for packings) */}
-            {productType === "packing" && (
-              <div className="space-y-4">
-                <Controller
-                  name="base_product_id"
-                  control={control}
-                  render={({ field }) => (
-                    <SearchableSelect
-                      label="Base Product *"
-                      options={baseProductOptions}
-                      value={field.value || ""}
-                      onChange={(value) => {
-                        field.onChange(
-                          value === "" || value === 0
-                            ? undefined
-                            : Number(value)
-                        );
-                      }}
-                      placeholder="Search by name or scan barcode..."
-                      searchPlaceholder="Type name or scan barcode..."
-                      onKeyDown={handleBaseProductBarcodeScan}
-                      onSearch={(term) => setBaseProductSearchTerm(term)}
-                      error={errors.base_product_id?.message as string}
-                    />
-                  )}
-                />
-                <Input
-                  label="Base Unit Quantity *"
-                  type="number"
-                  step="0.01"
-                  {...register("base_unit_quantity")}
-                  error={errors.base_unit_quantity?.message}
-                  placeholder="e.g., 0.75 for 750g of 1kg base"
-                />
-                <p className="text-xs text-gray-600">
-                  💡 This packing will share stock with the base product
-                </p>
-              </div>
-            )}
-
-            {/* Composite Product Fields */}
-            {productType === "composite" && (
-              <div className="space-y-4">
-                <Controller
-                  name="composite_product_id"
-                  control={control}
-                  render={({ field }) => (
-                    <SearchableSelect
-                      label="Base Product *"
-                      options={compositeBaseProductOptions}
-                      value={field.value || ""}
-                      onChange={(value) => {
-                        field.onChange(
-                          value === "" || value === 0
-                            ? undefined
-                            : Number(value)
-                        );
-                      }}
-                      placeholder="Search by name or scan barcode..."
-                      searchPlaceholder="Type name or scan barcode..."
-                      onKeyDown={handleCompositeBaseBarcodeScan}
-                      onSearch={(term) => setCompositeBaseSearchTerm(term)}
-                      error={errors.composite_product_id?.message as string}
-                    />
-                  )}
-                />
-                <Input
-                  label="Composite Quantity *"
-                  type="number"
-                  step="0.01"
-                  {...register("composite_quantity")}
-                  error={errors.composite_quantity?.message}
-                  placeholder="e.g., 12 for 12 biscuits per box"
-                />
-                <p className="text-xs text-gray-600">
-                  💡 Selling this composite will reduce the base product stock
-                </p>
-              </div>
-            )}
-
-            {/* Variable Quantity Option (for base products) */}
-            {productType === "base" && (
-              <div>
-                <Controller
-                  name="is_variable_quantity"
-                  control={control}
-                  render={({ field }) => (
-                    <label className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        checked={field.value || false}
-                        onChange={(e) => field.onChange(e.target.checked)}
-                        className="rounded border-gray-300"
-                      />
-                      <span className="text-sm font-medium text-gray-700">
-                        Allow variable quantity sales (e.g., 700g of 1kg sugar)
-                      </span>
-                    </label>
-                  )}
-                />
-                <p className="mt-2 text-xs text-gray-600">
-                  💡 When enabled, customers can purchase any quantity of this
-                  product
-                </p>
-              </div>
-            )}
+        {/* Toggle to create related product (only when creating new product) */}
+        {!productId && !baseProductId && (
+          <div className="mb-4 rounded-lg border border-gray-200 bg-gray-50 p-4">
+            <label className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                checked={isCreatingRelatedProduct}
+                onChange={(e) => setIsCreatingRelatedProduct(e.target.checked)}
+                className="rounded border-gray-300"
+              />
+              <span className="text-sm font-medium text-gray-700">
+                Create as related product (links to a base product)
+              </span>
+            </label>
+            <p className="mt-2 text-xs text-gray-600">
+              💡 Check this if this product should share stock with another base
+              product
+            </p>
           </div>
         )}
 
@@ -675,8 +480,8 @@ export function ProductForm({
               {...register("name")}
               error={errors.name?.message}
             />
-            {/* Hide SKU for packing and composite products - they use base product's SKU */}
-            {productType !== "packing" && productType !== "composite" && (
+            {/* Hide SKU for related products - they use base product's SKU */}
+            {!isRelatedProduct && (
               <Input
                 label="SKU"
                 {...register("sku")}
@@ -816,8 +621,8 @@ export function ProductForm({
           />
         </div>
 
-        {/* Stock & Inventory Information - Only for simple and base products */}
-        {(productType === "simple" || productType === "base") && (
+        {/* Stock & Inventory Information - Only for base products */}
+        {!isRelatedProduct && (
           <div className="mb-4 border-t pt-4">
             <h3 className="mb-4 text-lg font-semibold text-gray-800">
               Stock & Inventory
@@ -862,8 +667,8 @@ export function ProductForm({
           </div>
         )}
 
-        {/* Unit field for packings and composites (they still need a unit for display) */}
-        {(productType === "packing" || productType === "composite") && (
+        {/* Unit field for related products (they still need a unit for display) */}
+        {isRelatedProduct && (
           <div className="mb-4 border-t pt-4">
             <h3 className="mb-4 text-lg font-semibold text-gray-800">
               Display Settings

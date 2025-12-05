@@ -12,15 +12,12 @@ async function getHandler(req: NextRequest) {
 
     const sql = `
       SELECT p.id, p.name, p.sku, p.barcode, p.stock_quantity, p.min_stock_level,
-             p.unit, p.product_type, p.base_product_id, p.base_unit_quantity,
-             p.composite_product_id, p.composite_quantity,
+             p.unit, p.base_product_id, p.quantity_multiplier,
              c.name as category_name,
-             bp.stock_quantity as base_product_stock,
-             cp.stock_quantity as composite_base_stock
+             bp.stock_quantity as base_product_stock
       FROM products p
       LEFT JOIN categories c ON p.category_id = c.id
-      LEFT JOIN products bp ON p.base_product_id = bp.id AND p.product_type = 'packing'
-      LEFT JOIN products cp ON p.composite_product_id = cp.id AND p.product_type = 'composite'
+      LEFT JOIN products bp ON p.base_product_id = bp.id
       WHERE p.deleted_at IS NULL
     `;
 

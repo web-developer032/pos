@@ -65,13 +65,9 @@ export function InventoryList() {
                       calculateEffectiveStock({
                         stock_quantity: item.stock_quantity,
                         min_stock_level: item.min_stock_level,
-                        product_type: item.product_type,
                         base_product_id: item.base_product_id,
-                        base_unit_quantity: item.base_unit_quantity,
-                        composite_product_id: item.composite_product_id,
-                        composite_quantity: item.composite_quantity,
+                        quantity_multiplier: item.quantity_multiplier,
                         base_product_stock: item.base_product_stock,
-                        composite_base_stock: item.composite_base_stock,
                         unit: item.unit,
                       });
                     const stockDisplay = formatStockDisplay(
@@ -88,8 +84,7 @@ export function InventoryList() {
                         }
                       >
                         {stockDisplay} {item.unit || "pcs"}
-                        {(item.product_type === "packing" ||
-                          item.product_type === "composite") && (
+                        {item.base_product_id && (
                           <span className="ml-1 text-xs text-gray-400">
                             (from base)
                           </span>
@@ -102,8 +97,7 @@ export function InventoryList() {
                   {item.min_stock_level} {item.unit || "pcs"}
                 </td>
                 <td className="whitespace-nowrap px-3 py-4 text-right text-sm font-medium sm:px-6">
-                  {item.product_type === "packing" ||
-                  item.product_type === "composite" ? (
+                  {item.base_product_id ? (
                     <span className="text-xs italic text-gray-400">
                       Adjust base product
                     </span>

@@ -10,13 +10,9 @@ export interface InventoryItem {
   min_stock_level: number;
   unit?: string;
   category_name?: string;
-  product_type?: "simple" | "base" | "packing" | "composite";
   base_product_id?: number;
-  base_unit_quantity?: number;
-  composite_product_id?: number;
-  composite_quantity?: number;
+  quantity_multiplier?: number;
   base_product_stock?: number;
-  composite_base_stock?: number;
 }
 
 export interface InventoryTransaction {
