@@ -3,6 +3,7 @@ import { requireAuth, RouteContext, AuthRequest } from "@/lib/middleware/auth";
 import client from "@/lib/db";
 import { z } from "zod";
 import { roundPrice } from "@/lib/utils/apiHelpers";
+import { updateProductQuantity } from "@/lib/utils/productQuantity";
 
 async function getHandler(req: NextRequest, context?: RouteContext) {
   try {
@@ -238,21 +239,14 @@ async function putHandler(req: AuthRequest, context?: RouteContext) {
             newCostPrice = newCost;
           }
 
-          // Update stock quantity and cost price
+          // Update stock quantity with relationship logic
+          await updateProductQuantity(item.product_id, item.quantity, 'add', parseInt(params.id), 'purchase');
+          
+          // Update cost price on the actual product being purchased
+          // Note: For packings/composites, cost price is stored on the product itself, not the base
           await client.execute({
-            sql: "UPDATE products SET stock_quantity = stock_quantity + ?, cost_price = ? WHERE id = ?",
-            args: [item.quantity, newCostPrice, item.product_id],
-          });
-
-          await client.execute({
-            sql: `INSERT INTO inventory_transactions (product_id, transaction_type, quantity, reference_id) 
-                  VALUES (?, ?, ?, ?)`,
-            args: [
-              item.product_id,
-              "purchase",
-              item.quantity,
-              parseInt(params.id),
-            ],
+            sql: "UPDATE products SET cost_price = ? WHERE id = ?",
+            args: [roundPrice(newCostPrice), item.product_id],
           });
         }
       }
@@ -309,13 +303,8 @@ async function deleteHandler(req: AuthRequest, context?: RouteContext) {
         const productId = item.product_id as number;
         const quantity = item.quantity as number;
 
-        // Subtract stock quantity (only if product exists and is not deleted)
-        await client.execute({
-          sql: `UPDATE products 
-                SET stock_quantity = stock_quantity - ? 
-                WHERE id = ? AND deleted_at IS NULL`,
-          args: [quantity, productId],
-        });
+        // Subtract stock quantity with relationship logic
+        await updateProductQuantity(productId, quantity, 'subtract', poId, 'purchase');
       }
     }
 

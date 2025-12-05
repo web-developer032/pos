@@ -4,6 +4,7 @@ import { useState, useCallback, useRef } from "react";
 import {
   useGetProductsQuery,
   useUpdateProductMutation,
+  Product,
 } from "@/lib/api/productsApi";
 import { useGetCategoriesQuery } from "@/lib/api/categoriesApi";
 import { useAppDispatch } from "@/lib/hooks";
@@ -13,6 +14,7 @@ import { useThrottledCallback } from "@/lib/hooks/useThrottledCallback";
 import { useBarcodeScanner } from "@/lib/hooks/useBarcodeScanner";
 import { addItem } from "@/lib/slices/cartSlice";
 import { formatPriceForInput, roundPrice } from "@/lib/utils/formHelpers";
+import { calculateVariablePrice } from "@/lib/utils/productRelations";
 import { Select } from "@/components/ui/Select";
 import { Input } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
@@ -28,6 +30,9 @@ export function ProductGrid() {
     selling_price: number;
   } | null>(null);
   const [newPrice, setNewPrice] = useState("");
+  const [variableQuantityProduct, setVariableQuantityProduct] =
+    useState<Product | null>(null);
+  const [variableQuantity, setVariableQuantity] = useState("");
   const searchInputRef = useRef<HTMLInputElement>(null);
   const debouncedSearch = useDebounce(search, 500);
   const { data, isLoading, refetch } = useGetProductsQuery(
@@ -53,22 +58,59 @@ export function ProductGrid() {
     },
   });
 
-  const handleAddToCart = (product: {
-    id: number;
-    name: string;
-    selling_price: number;
-    stock_quantity: number;
-  }) => {
+  const handleAddToCart = (product: Product, quantity?: number) => {
+    let finalPrice = product.selling_price;
+    let finalQuantity = quantity || 1;
+
+    // Handle variable quantity for base products
+    if (
+      product.product_type === "base" &&
+      product.is_variable_quantity &&
+      quantity
+    ) {
+      finalPrice = calculateVariablePrice(product, quantity);
+      finalQuantity = quantity;
+    } else if (product.product_type === "packing") {
+      // For packings, use packing price or calculate from base
+      // Note: We'd need to fetch base product for calculation, but for now use packing price
+      finalPrice = product.selling_price;
+    }
+
     dispatch(
       addItem({
         product_id: product.id,
         name: product.name,
-        price: product.selling_price,
-        quantity: 1,
+        price: roundPrice(finalPrice),
+        quantity: finalQuantity,
         stock_quantity: product.stock_quantity,
       })
     );
     toast.success("Added to cart");
+  };
+
+  const handleProductClick = (product: Product) => {
+    // If base product with variable quantity, show quantity input
+    if (product.product_type === "base" && product.is_variable_quantity) {
+      setVariableQuantityProduct(product);
+      setVariableQuantity("");
+    } else {
+      // Normal click - add 1 unit
+      handleAddToCart(product);
+    }
+  };
+
+  const handleVariableQuantitySubmit = () => {
+    if (!variableQuantityProduct || !variableQuantity) return;
+
+    const quantity = parseFloat(variableQuantity);
+    if (isNaN(quantity) || quantity <= 0) {
+      toast.error("Please enter a valid quantity");
+      return;
+    }
+
+    handleAddToCart(variableQuantityProduct, quantity);
+    setVariableQuantityProduct(null);
+    setVariableQuantity("");
   };
 
   const handleEditPrice = (
@@ -165,7 +207,7 @@ export function ProductGrid() {
           <div
             key={product.id}
             className="group relative cursor-pointer rounded-lg border bg-white p-3 transition-shadow hover:shadow-lg sm:p-4"
-            onClick={() => handleAddToCart(product)}
+            onClick={() => handleProductClick(product)}
           >
             <button
               onClick={(e) => handleEditPrice(product, e)}
@@ -188,6 +230,21 @@ export function ProductGrid() {
               </svg>
             </button>
             <h3 className="mb-2 truncate pr-8 font-semibold">{product.name}</h3>
+            {product.product_type === "packing" && product.base_product_id && (
+              <p className="mb-1 text-xs text-gray-500">Packing</p>
+            )}
+            {product.product_type === "composite" &&
+              product.composite_product_id && (
+                <p className="mb-1 text-xs text-gray-500">
+                  Contains {product.composite_quantity} units
+                </p>
+              )}
+            {product.product_type === "base" &&
+              product.is_variable_quantity && (
+                <p className="mb-1 text-xs font-semibold text-blue-600">
+                  Variable Quantity
+                </p>
+              )}
             <p className="mb-2 text-xl font-bold text-indigo-600 sm:text-2xl">
               {formatCurrency(product.selling_price)}
             </p>
@@ -253,6 +310,80 @@ export function ProductGrid() {
               <Button type="submit" disabled={isUpdatingPrice}>
                 {isUpdatingPrice ? "Updating..." : "Update Price"}
               </Button>
+            </div>
+          </form>
+        )}
+      </Modal>
+
+      {/* Variable Quantity Modal */}
+      <Modal
+        isOpen={!!variableQuantityProduct}
+        onClose={() => {
+          setVariableQuantityProduct(null);
+          setVariableQuantity("");
+        }}
+        title="Enter Quantity"
+        size="sm"
+      >
+        {variableQuantityProduct && (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleVariableQuantitySubmit();
+            }}
+            className="space-y-4"
+          >
+            <div>
+              <p className="text-sm text-gray-600">
+                Product:{" "}
+                <span className="text-lg font-semibold">
+                  {variableQuantityProduct.name}
+                </span>
+              </p>
+              <p className="mt-1 text-sm text-gray-600">
+                Price per unit:{" "}
+                <span className="font-semibold">
+                  {formatCurrency(variableQuantityProduct.selling_price)}
+                </span>
+              </p>
+            </div>
+            <Input
+              label={`Quantity (${variableQuantityProduct.unit || "unit"})`}
+              type="number"
+              min="0.01"
+              step="0.01"
+              value={variableQuantity}
+              onChange={(e) => setVariableQuantity(e.target.value)}
+              placeholder="Enter quantity"
+              autoFocus
+            />
+            {variableQuantity &&
+              !isNaN(parseFloat(variableQuantity)) &&
+              parseFloat(variableQuantity) > 0 && (
+                <div className="rounded bg-gray-50 p-3">
+                  <p className="text-sm text-gray-600">Total Price:</p>
+                  <p className="text-xl font-bold text-indigo-600">
+                    {formatCurrency(
+                      calculateVariablePrice(
+                        variableQuantityProduct,
+                        parseFloat(variableQuantity)
+                      )
+                    )}
+                  </p>
+                </div>
+              )}
+            <div className="flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setVariableQuantityProduct(null);
+                  setVariableQuantity("");
+                }}
+              >
+                Cancel
+              </Button>
+              <Button type="submit">Add to Cart</Button>
             </div>
           </form>
         )}

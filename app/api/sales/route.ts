@@ -9,6 +9,7 @@ import {
   handleValidationError,
   roundPrice,
 } from "@/lib/utils/apiHelpers";
+import { updateProductQuantity } from "@/lib/utils/productQuantity";
 
 const saleSchema = z.object({
   customer_id: z.number().optional(),
@@ -194,17 +195,8 @@ async function postHandler(req: AuthRequest) {
         ],
       });
 
-      // Update inventory
-      await client.execute({
-        sql: "UPDATE products SET stock_quantity = stock_quantity - ? WHERE id = ?",
-        args: [item.quantity, item.product_id],
-      });
-
-      // Record inventory transaction
-      await client.execute({
-        sql: "INSERT INTO inventory_transactions (product_id, transaction_type, quantity, reference_id) VALUES (?, ?, ?, ?)",
-        args: [item.product_id, "sale", item.quantity, saleId],
-      });
+      // Update inventory with relationship logic
+      await updateProductQuantity(item.product_id, item.quantity, 'subtract', saleId, 'sale');
     }
 
     // Create payment record

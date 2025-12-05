@@ -8,6 +8,7 @@ import {
   useCreateProductMutation,
   useUpdateProductMutation,
   useGetProductQuery,
+  useGetProductsQuery,
 } from "@/lib/api/productsApi";
 import {
   useGetCategoriesQuery,
@@ -87,6 +88,8 @@ const productUnitEnum = z.enum([
   "milliliter",
 ]);
 
+const productTypeEnum = z.enum(["simple", "base", "packing", "composite"]);
+
 const productSchema = z.object({
   name: z.string().min(1, "Name is required"),
   barcode: z.string().optional(),
@@ -109,6 +112,14 @@ const productSchema = z.object({
   min_stock_level: z.union([z.number(), z.string()]),
   unit: productUnitEnum,
   image_url: z.string().optional(),
+  product_type: productTypeEnum.optional(),
+  base_product_id: z.union([z.number(), z.string(), z.undefined()]).optional(),
+  base_unit_quantity: z.union([z.number(), z.string()]).optional(),
+  composite_product_id: z
+    .union([z.number(), z.string(), z.undefined()])
+    .optional(),
+  composite_quantity: z.union([z.number(), z.string()]).optional(),
+  is_variable_quantity: z.boolean().optional(),
 });
 
 type ProductFormDataRaw = z.infer<typeof productSchema>;
@@ -126,6 +137,12 @@ interface ProductFormData {
   min_stock_level: number;
   unit: "piece" | "gram" | "kilogram" | "liter" | "milliliter";
   image_url?: string;
+  product_type?: "simple" | "base" | "packing" | "composite";
+  base_product_id?: number;
+  base_unit_quantity?: number;
+  composite_product_id?: number;
+  composite_quantity?: number;
+  is_variable_quantity?: boolean;
 }
 
 interface ProductFormProps {
@@ -176,8 +193,38 @@ export function ProductForm({
       min_stock_level: "",
       unit: "piece" as const,
       image_url: "",
+      product_type: "simple" as const,
+      base_product_id: undefined,
+      base_unit_quantity: "",
+      composite_product_id: undefined,
+      composite_quantity: "",
+      is_variable_quantity: false,
     },
   });
+
+  const productType = watch("product_type") || "simple";
+
+  // Fetch base products for packing selection (only when product type is packing)
+  const { data: baseProductsData } = useGetProductsQuery(
+    { search: undefined, categoryId: undefined },
+    { skip: productType !== "packing" }
+  );
+
+  // Fetch all products for composite selection (only when product type is composite)
+  const { data: allProductsData } = useGetProductsQuery(
+    { search: undefined, categoryId: undefined },
+    { skip: productType !== "composite" }
+  );
+
+  // Filter base products (product_type = 'base')
+  const baseProducts =
+    baseProductsData?.products.filter((p) => p.product_type === "base") || [];
+
+  // Filter products for composite (simple or base)
+  const compositeBaseProducts =
+    allProductsData?.products.filter(
+      (p) => p.product_type === "simple" || p.product_type === "base"
+    ) || [];
 
   useEffect(() => {
     if (productData?.product) {
@@ -195,9 +242,40 @@ export function ProductForm({
         unit: (productData.product.unit ||
           "piece") as ProductFormDataRaw["unit"],
         image_url: productData.product.image_url || "",
+        product_type: (productData.product.product_type ||
+          "simple") as ProductFormDataRaw["product_type"],
+        base_product_id: productData.product.base_product_id || undefined,
+        base_unit_quantity:
+          productData.product.base_unit_quantity?.toString() || "",
+        composite_product_id:
+          productData.product.composite_product_id || undefined,
+        composite_quantity:
+          productData.product.composite_quantity?.toString() || "",
+        is_variable_quantity: productData.product.is_variable_quantity || false,
       });
     }
   }, [productData, reset]);
+
+  // Clear relationship fields when product type changes
+  useEffect(() => {
+    if (productType === "simple" || productType === "base") {
+      setValue("base_product_id", undefined);
+      setValue("base_unit_quantity", "");
+      setValue("composite_product_id", undefined);
+      setValue("composite_quantity", "");
+    }
+    if (productType !== "base") {
+      setValue("is_variable_quantity", false);
+    }
+    if (productType !== "packing") {
+      setValue("base_product_id", undefined);
+      setValue("base_unit_quantity", "");
+    }
+    if (productType !== "composite") {
+      setValue("composite_product_id", undefined);
+      setValue("composite_quantity", "");
+    }
+  }, [productType, setValue]);
 
   const { handleSubmit: handleFormSubmit, isSubmitting } =
     useFormSubmission<ProductFormDataRaw>({
@@ -258,6 +336,20 @@ export function ProductForm({
           min_stock_level: minStockLevel,
           unit: data.unit || "piece",
           image_url: data.image_url || undefined,
+          product_type: data.product_type || "simple",
+          base_product_id: data.base_product_id
+            ? toOptionalId(data.base_product_id)
+            : undefined,
+          base_unit_quantity: data.base_unit_quantity
+            ? toFloat(data.base_unit_quantity)
+            : undefined,
+          composite_product_id: data.composite_product_id
+            ? toOptionalId(data.composite_product_id)
+            : undefined,
+          composite_quantity: data.composite_quantity
+            ? toFloat(data.composite_quantity)
+            : undefined,
+          is_variable_quantity: data.is_variable_quantity || false,
         };
 
         if (productId) {
@@ -463,6 +555,134 @@ export function ProductForm({
             )}
           />
         </div>
+
+        {/* Product Type and Relationship Fields */}
+        <div className="mt-4 border-t pt-4">
+          <h3 className="mb-4 text-lg font-medium">Product Relationships</h3>
+
+          <div className="mb-4">
+            <Controller
+              name="product_type"
+              control={control}
+              render={({ field }) => (
+                <Select
+                  label="Product Type *"
+                  options={[
+                    { value: "simple", label: "Simple" },
+                    { value: "base", label: "Base" },
+                    { value: "packing", label: "Packing" },
+                    { value: "composite", label: "Composite" },
+                  ]}
+                  value={field.value || "simple"}
+                  onChange={(e) => field.onChange(e.target.value)}
+                  error={errors.product_type?.message}
+                />
+              )}
+            />
+          </div>
+
+          {/* Base Product Fields (for packings) */}
+          {productType === "packing" && (
+            <div className="mb-4 space-y-4 rounded bg-gray-50 p-4">
+              <Controller
+                name="base_product_id"
+                control={control}
+                render={({ field }) => (
+                  <Select
+                    label="Base Product *"
+                    options={[
+                      { value: "", label: "Select Base Product" },
+                      ...baseProducts.map((p) => ({
+                        value: p.id.toString(),
+                        label: `${p.name} (${p.barcode || "No barcode"})`,
+                      })),
+                    ]}
+                    value={field.value?.toString() || ""}
+                    onChange={(e) => {
+                      field.onChange(
+                        e.target.value === ""
+                          ? undefined
+                          : Number(e.target.value)
+                      );
+                    }}
+                    error={errors.base_product_id?.message}
+                  />
+                )}
+              />
+              <Input
+                label="Base Unit Quantity *"
+                type="number"
+                step="0.01"
+                {...register("base_unit_quantity")}
+                error={errors.base_unit_quantity?.message}
+                placeholder="e.g., 0.75 for 750g of 1kg base"
+              />
+            </div>
+          )}
+
+          {/* Composite Product Fields */}
+          {productType === "composite" && (
+            <div className="mb-4 space-y-4 rounded bg-gray-50 p-4">
+              <Controller
+                name="composite_product_id"
+                control={control}
+                render={({ field }) => (
+                  <Select
+                    label="Base Product *"
+                    options={[
+                      { value: "", label: "Select Base Product" },
+                      ...compositeBaseProducts.map((p) => ({
+                        value: p.id.toString(),
+                        label: `${p.name} (${p.barcode || "No barcode"})`,
+                      })),
+                    ]}
+                    value={field.value?.toString() || ""}
+                    onChange={(e) => {
+                      field.onChange(
+                        e.target.value === ""
+                          ? undefined
+                          : Number(e.target.value)
+                      );
+                    }}
+                    error={errors.composite_product_id?.message}
+                  />
+                )}
+              />
+              <Input
+                label="Composite Quantity *"
+                type="number"
+                step="0.01"
+                {...register("composite_quantity")}
+                error={errors.composite_quantity?.message}
+                placeholder="e.g., 12 for 12 biscuits per box"
+              />
+            </div>
+          )}
+
+          {/* Variable Quantity Option (for base products) */}
+          {productType === "base" && (
+            <div className="mb-4">
+              <Controller
+                name="is_variable_quantity"
+                control={control}
+                render={({ field }) => (
+                  <label className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      checked={field.value || false}
+                      onChange={(e) => field.onChange(e.target.checked)}
+                      className="rounded border-gray-300"
+                    />
+                    <span className="text-sm font-medium text-gray-700">
+                      Allow variable quantity sales (e.g., 700g of 1kg sugar)
+                    </span>
+                  </label>
+                )}
+              />
+            </div>
+          )}
+        </div>
+
         <div className="flex justify-end space-x-2">
           <Button type="submit" disabled={isSubmitting}>
             {isSubmitting ? "Saving..." : productId ? "Update" : "Create"}

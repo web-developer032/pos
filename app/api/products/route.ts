@@ -18,6 +18,8 @@ const productUnitEnum = z.enum([
   "milliliter",
 ]);
 
+const productTypeEnum = z.enum(['simple', 'base', 'packing', 'composite']);
+
 const productSchema = z.object({
   name: z.string().min(1),
   barcode: z.string().optional(),
@@ -31,6 +33,63 @@ const productSchema = z.object({
   min_stock_level: z.number().min(0),
   unit: productUnitEnum.default("piece"),
   image_url: z.string().optional(),
+  product_type: productTypeEnum.optional(),
+  base_product_id: z.number().optional(),
+  base_unit_quantity: z.number().optional(),
+  composite_product_id: z.number().optional(),
+  composite_quantity: z.number().optional(),
+  is_variable_quantity: z.boolean().optional(),
+}).refine((data) => {
+  // Validation based on product_type
+  if (data.product_type === 'packing') {
+    // Packings must have base_product_id and base_unit_quantity
+    if (!data.base_product_id || data.base_unit_quantity === undefined || data.base_unit_quantity <= 0) {
+      return false;
+    }
+    // Packings cannot have composite fields
+    if (data.composite_product_id !== undefined || data.composite_quantity !== undefined) {
+      return false;
+    }
+    // Packings cannot have is_variable_quantity
+    if (data.is_variable_quantity === true) {
+      return false;
+    }
+  } else if (data.product_type === 'composite') {
+    // Composites must have composite_product_id and composite_quantity
+    if (!data.composite_product_id || data.composite_quantity === undefined || data.composite_quantity <= 0) {
+      return false;
+    }
+    // Composites cannot have base fields
+    if (data.base_product_id !== undefined || data.base_unit_quantity !== undefined) {
+      return false;
+    }
+    // Composites cannot have is_variable_quantity
+    if (data.is_variable_quantity === true) {
+      return false;
+    }
+  } else if (data.product_type === 'base') {
+    // Base products cannot have relationship fields
+    if (data.base_product_id !== undefined || data.base_unit_quantity !== undefined) {
+      return false;
+    }
+    if (data.composite_product_id !== undefined || data.composite_quantity !== undefined) {
+      return false;
+    }
+  } else if (data.product_type === 'simple' || !data.product_type) {
+    // Simple products cannot have any relationship fields
+    if (data.base_product_id !== undefined || data.base_unit_quantity !== undefined) {
+      return false;
+    }
+    if (data.composite_product_id !== undefined || data.composite_quantity !== undefined) {
+      return false;
+    }
+    if (data.is_variable_quantity === true) {
+      return false;
+    }
+  }
+  return true;
+}, {
+  message: "Invalid product relationship configuration",
 });
 
 async function getHandler(req: NextRequest) {
@@ -91,10 +150,47 @@ async function postHandler(req: NextRequest) {
     const body = await req.json();
     const validated = productSchema.parse(body);
 
+    // Additional validation: Check if base_product_id exists and is of type 'base'
+    if (validated.product_type === 'packing' && validated.base_product_id) {
+      const baseProduct = await client.execute({
+        sql: "SELECT product_type FROM products WHERE id = ? AND deleted_at IS NULL",
+        args: [validated.base_product_id],
+      });
+      if (baseProduct.rows.length === 0) {
+        return NextResponse.json(
+          { error: "Base product not found" },
+          { status: 400 }
+        );
+      }
+      const baseProductType = (baseProduct.rows[0] as unknown as { product_type: string }).product_type;
+      if (baseProductType !== 'base') {
+        return NextResponse.json(
+          { error: "Base product must be of type 'base'" },
+          { status: 400 }
+        );
+      }
+    }
+
+    // Additional validation: Check if composite_product_id exists
+    if (validated.product_type === 'composite' && validated.composite_product_id) {
+      const compositeBase = await client.execute({
+        sql: "SELECT id FROM products WHERE id = ? AND deleted_at IS NULL",
+        args: [validated.composite_product_id],
+      });
+      if (compositeBase.rows.length === 0) {
+        return NextResponse.json(
+          { error: "Composite base product not found" },
+          { status: 400 }
+        );
+      }
+    }
+
     const result = await client.execute({
       sql: `INSERT INTO products (name, barcode, sku, description, category_id, 
-            cost_price, selling_price, stock_quantity, min_stock_level, unit, image_url) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`,
+            cost_price, selling_price, stock_quantity, min_stock_level, unit, image_url,
+            product_type, base_product_id, base_unit_quantity, composite_product_id, 
+            composite_quantity, is_variable_quantity) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`,
       args: [
         validated.name,
         validated.barcode || null,
@@ -107,6 +203,12 @@ async function postHandler(req: NextRequest) {
         validated.min_stock_level,
         validated.unit || "piece",
         validated.image_url || null,
+        validated.product_type || 'simple',
+        validated.base_product_id || null,
+        validated.base_unit_quantity || null,
+        validated.composite_product_id || null,
+        validated.composite_quantity || null,
+        validated.is_variable_quantity ? 1 : 0,
       ],
     });
 

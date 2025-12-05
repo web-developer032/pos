@@ -52,10 +52,18 @@ export async function initializeDatabase() {
       min_stock_level REAL NOT NULL DEFAULT 0,
       unit TEXT NOT NULL DEFAULT 'piece' CHECK(unit IN ('piece', 'gram', 'kilogram', 'liter', 'milliliter')),
       image_url TEXT,
+      product_type TEXT DEFAULT 'simple' CHECK(product_type IN ('simple', 'base', 'packing', 'composite')),
+      base_product_id INTEGER,
+      base_unit_quantity REAL,
+      composite_product_id INTEGER,
+      composite_quantity REAL,
+      is_variable_quantity INTEGER DEFAULT 0,
       deleted_at DATETIME,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (category_id) REFERENCES categories(id)
+      FOREIGN KEY (category_id) REFERENCES categories(id),
+      FOREIGN KEY (base_product_id) REFERENCES products(id),
+      FOREIGN KEY (composite_product_id) REFERENCES products(id)
     )
   `);
 

@@ -4,6 +4,7 @@ import client from "@/lib/db";
 import { z } from "zod";
 import { getCurrentTimestamp } from "@/lib/utils/dateTime";
 import { roundPrice } from "@/lib/utils/apiHelpers";
+import { updateProductQuantity } from "@/lib/utils/productQuantity";
 
 const returnSchema = z.object({
   sale_id: z.number(),
@@ -158,18 +159,8 @@ async function postHandler(req: AuthRequest) {
         ],
       });
 
-      // Restore inventory
-      await client.execute({
-        sql: "UPDATE products SET stock_quantity = stock_quantity + ? WHERE id = ?",
-        args: [item.quantity, item.product_id],
-      });
-
-      // Record inventory transaction
-      await client.execute({
-        sql: `INSERT INTO inventory_transactions (product_id, transaction_type, quantity, reference_id)
-              VALUES (?, ?, ?, ?)`,
-        args: [item.product_id, "return", item.quantity, returnId],
-      });
+      // Restore inventory with relationship logic
+      await updateProductQuantity(item.product_id, item.quantity, 'add', returnId, 'return');
     }
 
     // Get full return details
