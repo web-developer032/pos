@@ -31,6 +31,13 @@ import toast from "react-hot-toast";
 import { ProfitPercentage } from "@/components/common/ProfitPercentage";
 import { useBarcodeScanner } from "@/lib/hooks/useBarcodeScanner";
 import { useDebounce } from "@/lib/hooks/useDebounce";
+import { UNIT_OPTIONS, ProductUnit } from "@/lib/constants/productUnits";
+import {
+  SubProductsSection,
+  SubProductInput,
+  createSubProduct,
+} from "./SubProductsSection";
+import { validateSubProducts } from "@/lib/utils/subProductValidation";
 
 // Inline Category Form Component
 function InlineCategoryForm({
@@ -145,17 +152,6 @@ interface ProductFormProps {
     name: string;
     cost_price: number;
   }) => void;
-}
-
-// Interface for inline sub-product creation
-interface SubProductInput {
-  id: string; // temporary ID for React key
-  name: string;
-  barcode: string;
-  quantity_multiplier: string;
-  cost_price: string;
-  selling_price: string;
-  unit: "piece" | "gram" | "kilogram" | "liter" | "milliliter";
 }
 
 export function ProductForm({
@@ -331,30 +327,18 @@ export function ProductForm({
     }
   };
 
-  // Sub-product management functions
-  // Get current unit for default value in sub-products
-  const currentUnit = watch("unit") || "piece";
+  // Sub-product management
+  const currentUnit = (watch("unit") || "piece") as ProductUnit;
 
-  const addSubProduct = () => {
-    setSubProducts((prev) => [
-      ...prev,
-      {
-        id: `sub-${Date.now()}`,
-        name: "",
-        barcode: "",
-        quantity_multiplier: "",
-        cost_price: "",
-        selling_price: "",
-        unit: currentUnit,
-      },
-    ]);
+  const handleAddSubProduct = () => {
+    setSubProducts((prev) => [...prev, createSubProduct(currentUnit)]);
   };
 
-  const removeSubProduct = (id: string) => {
+  const handleRemoveSubProduct = (id: string) => {
     setSubProducts((prev) => prev.filter((sp) => sp.id !== id));
   };
 
-  const updateSubProduct = (
+  const handleUpdateSubProduct = (
     id: string,
     field: keyof SubProductInput,
     value: string
@@ -418,29 +402,7 @@ export function ProductForm({
 
         // Validate sub-products if any exist
         if (subProducts.length > 0) {
-          for (const sp of subProducts) {
-            if (!sp.name.trim()) {
-              throw new Error("All sub-products must have a name");
-            }
-            if (
-              !sp.quantity_multiplier ||
-              toFloat(sp.quantity_multiplier) <= 0
-            ) {
-              throw new Error(
-                `Sub-product "${sp.name || "unnamed"}" must have a valid quantity multiplier`
-              );
-            }
-            if (!sp.cost_price || toFloat(sp.cost_price) < 0) {
-              throw new Error(
-                `Sub-product "${sp.name}" must have a valid cost price`
-              );
-            }
-            if (!sp.selling_price || toFloat(sp.selling_price) < 0) {
-              throw new Error(
-                `Sub-product "${sp.name}" must have a valid selling price`
-              );
-            }
-          }
+          validateSubProducts(subProducts);
         }
 
         // Convert category_id using formHelpers
@@ -824,13 +786,7 @@ export function ProductForm({
                   render={({ field }) => (
                     <Select
                       label="Measuring Unit *"
-                      options={[
-                        { value: "piece", label: "Piece" },
-                        { value: "gram", label: "Gram (g)" },
-                        { value: "kilogram", label: "Kilogram (kg)" },
-                        { value: "liter", label: "Liter (L)" },
-                        { value: "milliliter", label: "Milliliter (mL)" },
-                      ]}
+                      options={[...UNIT_OPTIONS]}
                       value={field.value || "piece"}
                       onChange={(e) => field.onChange(e.target.value)}
                       error={errors.unit?.message}
@@ -855,13 +811,7 @@ export function ProductForm({
                 render={({ field }) => (
                   <Select
                     label="Measuring Unit *"
-                    options={[
-                      { value: "piece", label: "Piece" },
-                      { value: "gram", label: "Gram (g)" },
-                      { value: "kilogram", label: "Kilogram (kg)" },
-                      { value: "liter", label: "Liter (L)" },
-                      { value: "milliliter", label: "Milliliter (mL)" },
-                    ]}
+                    options={[...UNIT_OPTIONS]}
                     value={field.value || "piece"}
                     onChange={(e) => field.onChange(e.target.value)}
                     error={errors.unit?.message}
@@ -874,161 +824,13 @@ export function ProductForm({
 
         {/* Sub-Products Section - Only show when creating new base product */}
         {!productId && !isRelatedProduct && (
-          <div className="my-4 rounded-lg border border-green-200 bg-green-50 p-4">
-            <div className="mb-3 flex items-center justify-between">
-              <div>
-                <h4 className="text-sm font-semibold text-gray-800">
-                  Sub-Products (Optional)
-                </h4>
-                <p className="text-xs text-gray-600">
-                  Create related products that share stock with this base
-                  product
-                </p>
-              </div>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={addSubProduct}
-                className="text-green-700 hover:text-green-800"
-              >
-                + Add Sub-Product
-              </Button>
-            </div>
-
-            {subProducts.length > 0 && (
-              <div className="space-y-3">
-                {subProducts.map((subProduct, index) => (
-                  <div
-                    key={subProduct.id}
-                    className="rounded-md border border-green-300 bg-white p-3"
-                  >
-                    <div className="mb-2 flex items-center justify-between">
-                      <span className="text-xs font-medium text-gray-500">
-                        Sub-Product #{index + 1}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => removeSubProduct(subProduct.id)}
-                        className="text-red-500 hover:text-red-700"
-                      >
-                        <svg
-                          className="h-4 w-4"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M6 18L18 6M6 6l12 12"
-                          />
-                        </svg>
-                      </button>
-                    </div>
-                    <div className="space-y-3">
-                      {/* Row 1: Name */}
-                      <Input
-                        label="Name *"
-                        value={subProduct.name}
-                        onChange={(e) =>
-                          updateSubProduct(
-                            subProduct.id,
-                            "name",
-                            e.target.value
-                          )
-                        }
-                        placeholder="e.g., Sugar 700g"
-                      />
-                      {/* Row 2: Barcode, Qty Multiplier, Unit */}
-                      <div className="grid grid-cols-3 gap-3">
-                        <Input
-                          label="Barcode"
-                          value={subProduct.barcode}
-                          onChange={(e) =>
-                            updateSubProduct(
-                              subProduct.id,
-                              "barcode",
-                              e.target.value
-                            )
-                          }
-                          placeholder="Scan or enter"
-                        />
-                        <Input
-                          label="Qty Multiplier *"
-                          type="number"
-                          step="0.01"
-                          value={subProduct.quantity_multiplier}
-                          onChange={(e) =>
-                            updateSubProduct(
-                              subProduct.id,
-                              "quantity_multiplier",
-                              e.target.value
-                            )
-                          }
-                          placeholder="e.g., 0.7"
-                        />
-                        <Select
-                          label="Unit"
-                          direction="column"
-                          options={[
-                            { value: "piece", label: "Piece" },
-                            { value: "gram", label: "Gram (g)" },
-                            { value: "kilogram", label: "Kilogram (kg)" },
-                            { value: "liter", label: "Liter (L)" },
-                            { value: "milliliter", label: "Milliliter (mL)" },
-                          ]}
-                          value={subProduct.unit}
-                          onChange={(e) =>
-                            updateSubProduct(
-                              subProduct.id,
-                              "unit",
-                              e.target.value as SubProductInput["unit"]
-                            )
-                          }
-                        />
-                      </div>
-                      {/* Row 3: Cost Price, Selling Price */}
-                      <div className="grid grid-cols-2 gap-3">
-                        <Input
-                          label="Cost Price *"
-                          type="number"
-                          step="0.01"
-                          value={subProduct.cost_price}
-                          onChange={(e) =>
-                            updateSubProduct(
-                              subProduct.id,
-                              "cost_price",
-                              e.target.value
-                            )
-                          }
-                          placeholder="e.g., 50"
-                        />
-                        <Input
-                          label="Selling Price *"
-                          type="number"
-                          step="0.01"
-                          value={subProduct.selling_price}
-                          onChange={(e) =>
-                            updateSubProduct(
-                              subProduct.id,
-                              "selling_price",
-                              e.target.value
-                            )
-                          }
-                          placeholder="e.g., 70"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                ))}
-                <p className="text-xs text-gray-500">
-                  Sub-products will inherit SKU and category from the base
-                  product. Unit defaults to parent but can be changed.
-                </p>
-              </div>
-            )}
-          </div>
+          <SubProductsSection
+            subProducts={subProducts}
+            parentUnit={currentUnit}
+            onAdd={handleAddSubProduct}
+            onUpdate={handleUpdateSubProduct}
+            onRemove={handleRemoveSubProduct}
+          />
         )}
 
         <div className="flex justify-end space-x-2">
