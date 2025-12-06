@@ -23,6 +23,7 @@ import { Select } from "@/components/ui/Select";
 import { Input } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
+import { Form } from "@/components/ui/Form";
 import toast from "react-hot-toast";
 
 export function ProductGrid() {
@@ -237,12 +238,13 @@ export function ProductGrid() {
         size="sm"
       >
         {editingProduct && (
-          <form
+          <Form
             onSubmit={(e) => {
               e.preventDefault();
               handleSavePrice();
             }}
             className="space-y-4"
+            preventEnterSubmit={true}
           >
             <div>
               <p className="text-sm text-gray-600">
@@ -281,7 +283,7 @@ export function ProductGrid() {
                 {isUpdatingPrice ? "Updating..." : "Update Price"}
               </Button>
             </div>
-          </form>
+          </Form>
         )}
       </Modal>
     </div>

@@ -24,6 +24,7 @@ import { Select } from "@/components/ui/Select";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
+import { Form } from "@/components/ui/Form";
 import { useCurrency } from "@/lib/hooks/useCurrency";
 import { useDebounce } from "@/lib/hooks/useDebounce";
 import toast from "react-hot-toast";
@@ -103,7 +104,7 @@ function InlineSupplierForm({
   };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+    <Form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
       <Input
         label="Name *"
         {...register("name", { required: "Name is required" })}
@@ -135,7 +136,7 @@ function InlineSupplierForm({
           {isSubmitting ? "Creating..." : "Create"}
         </Button>
       </div>
-    </form>
+    </Form>
   );
 }
 
@@ -527,7 +528,11 @@ export function PurchaseOrderForm({
 
   return (
     <>
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+      <Form
+        onSubmit={handleSubmit(onSubmit)}
+        className="space-y-4"
+        preventEnterSubmit={true}
+      >
         <div>
           <Controller
             name="supplier_id"
@@ -792,7 +797,7 @@ export function PurchaseOrderForm({
                 : "Create Purchase Order"}
           </Button>
         </div>
-      </form>
+      </Form>
 
       <Modal
         isOpen={showSupplierModal}

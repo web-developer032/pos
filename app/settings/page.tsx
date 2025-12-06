@@ -8,6 +8,7 @@ import {
 } from "@/lib/api/settingsApi";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
+import { Form } from "@/components/ui/Form";
 import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
 
@@ -61,7 +62,7 @@ function SettingsForm() {
   }
 
   return (
-    <form
+    <Form
       onSubmit={handleSubmit}
       className="max-w-2xl space-y-4 rounded-lg bg-white p-6 shadow"
     >
@@ -85,6 +86,6 @@ function SettingsForm() {
         }
       />
       <Button type="submit">Save Settings</Button>
-    </form>
+    </Form>
   );
 }

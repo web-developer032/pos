@@ -11,6 +11,7 @@ import {
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
+import { Form } from "@/components/ui/Form";
 import toast from "react-hot-toast";
 
 interface CapitalFormProps {
@@ -68,7 +69,7 @@ export function CapitalForm({ capitalId, onSuccess }: CapitalFormProps) {
   };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+    <Form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
       <Select
         label="Transaction Type *"
         options={[
@@ -119,7 +120,7 @@ export function CapitalForm({ capitalId, onSuccess }: CapitalFormProps) {
               : "Create"}
         </Button>
       </div>
-    </form>
+    </Form>
   );
 }
 

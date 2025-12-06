@@ -6,6 +6,7 @@ import { useGetProductQuery } from "@/lib/api/productsApi";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Button } from "@/components/ui/Button";
+import { Form } from "@/components/ui/Form";
 import toast from "react-hot-toast";
 
 interface StockAdjustmentFormProps {
@@ -64,7 +65,7 @@ export function StockAdjustmentForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <Form onSubmit={handleSubmit} className="space-y-4">
       {productData?.product && (
         <div className="mb-4 rounded-lg bg-gray-50">
           <p className="text-sm text-gray-600">
@@ -115,6 +116,6 @@ export function StockAdjustmentForm({
           {isAdjusting ? "Adjusting..." : "Adjust Stock"}
         </Button>
       </div>
-    </form>
+    </Form>
   );
 }

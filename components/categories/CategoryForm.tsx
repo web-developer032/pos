@@ -11,6 +11,7 @@ import {
 } from "@/lib/api/categoriesApi";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
+import { Form } from "@/components/ui/Form";
 import toast from "react-hot-toast";
 
 const categorySchema = z.object({
@@ -84,7 +85,7 @@ export function CategoryForm({ categoryId, onSuccess }: CategoryFormProps) {
   };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+    <Form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
       <Input
         label="Name *"
         {...register("name")}
@@ -100,6 +101,6 @@ export function CategoryForm({ categoryId, onSuccess }: CategoryFormProps) {
           {isSubmitting ? "Saving..." : categoryId ? "Update" : "Create"}
         </Button>
       </div>
-    </form>
+    </Form>
   );
 }

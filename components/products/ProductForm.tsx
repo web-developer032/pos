@@ -20,6 +20,7 @@ import { Select } from "@/components/ui/Select";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
+import { Form } from "@/components/ui/Form";
 import { useFormSubmission } from "@/lib/hooks/useFormSubmission";
 import {
   toFloat,
@@ -71,7 +72,7 @@ function InlineCategoryForm({
   });
 
   return (
-    <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4">
+    <Form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4">
       <Input
         label="Name *"
         {...register("name", { required: "Name is required" })}
@@ -87,7 +88,7 @@ function InlineCategoryForm({
           {isSubmitting ? "Creating..." : "Create"}
         </Button>
       </div>
-    </form>
+    </Form>
   );
 }
 
@@ -508,17 +509,12 @@ export function ProductForm({
 
   return (
     <>
-      <form
+      <Form
         onSubmit={reactHookFormHandleSubmit((data: ProductFormDataRaw) =>
           handleFormSubmit(data)
         )}
-        onKeyDown={(e) => {
-          // Prevent Enter key from submitting form (barcode scanners send Enter)
-          if (e.key === "Enter" && e.target instanceof HTMLInputElement) {
-            e.preventDefault();
-          }
-        }}
         className="space-y-4"
+        preventEnterSubmit={true}
       >
         {/* Product Relationship Fields - Show when creating related product */}
         {isRelatedProduct && (
@@ -838,7 +834,7 @@ export function ProductForm({
             {isSubmitting ? "Saving..." : productId ? "Update" : "Create"}
           </Button>
         </div>
-      </form>
+      </Form>
 
       <Modal
         isOpen={showCategoryModal}

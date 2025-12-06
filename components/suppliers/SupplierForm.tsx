@@ -11,6 +11,7 @@ import {
 } from "@/lib/api/suppliersApi";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
+import { Form } from "@/components/ui/Form";
 import toast from "react-hot-toast";
 
 const supplierSchema = z.object({
@@ -96,7 +97,7 @@ export function SupplierForm({ supplierId, onSuccess }: SupplierFormProps) {
   };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+    <Form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
       <Input
         label="Name *"
         {...register("name")}
@@ -128,6 +129,6 @@ export function SupplierForm({ supplierId, onSuccess }: SupplierFormProps) {
           {isSubmitting ? "Saving..." : supplierId ? "Update" : "Create"}
         </Button>
       </div>
-    </form>
+    </Form>
   );
 }

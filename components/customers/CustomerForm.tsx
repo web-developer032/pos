@@ -11,6 +11,7 @@ import {
 } from "@/lib/api/customersApi";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
+import { Form } from "@/components/ui/Form";
 import { useFormSubmission } from "@/lib/hooks/useFormSubmission";
 
 const customerSchema = z.object({
@@ -92,7 +93,7 @@ export function CustomerForm({ customerId, onSuccess }: CustomerFormProps) {
   });
 
   return (
-    <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4">
+    <Form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4">
       <Input
         label="Name *"
         {...register("name")}
@@ -127,6 +128,6 @@ export function CustomerForm({ customerId, onSuccess }: CustomerFormProps) {
           {isSubmitting ? "Saving..." : customerId ? "Update" : "Create"}
         </Button>
       </div>
-    </form>
+    </Form>
   );
 }
