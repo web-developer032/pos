@@ -970,6 +970,7 @@ export function ProductForm({
                         />
                         <Select
                           label="Unit"
+                          direction="column"
                           options={[
                             { value: "piece", label: "Piece" },
                             { value: "gram", label: "Gram (g)" },
