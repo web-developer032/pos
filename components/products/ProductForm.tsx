@@ -147,6 +147,17 @@ interface ProductFormProps {
   }) => void;
 }
 
+// Interface for inline sub-product creation
+interface SubProductInput {
+  id: string; // temporary ID for React key
+  name: string;
+  barcode: string;
+  quantity_multiplier: string;
+  cost_price: string;
+  selling_price: string;
+  unit: "piece" | "gram" | "kilogram" | "liter" | "milliliter";
+}
+
 export function ProductForm({
   productId,
   onSuccess,
@@ -196,6 +207,9 @@ export function ProductForm({
     useState(false);
   const baseProductId = watch("base_product_id");
   const isRelatedProduct = !!baseProductId || isCreatingRelatedProduct;
+
+  // State for inline sub-product creation
+  const [subProducts, setSubProducts] = useState<SubProductInput[]>([]);
 
   // Search state for base products (when creating related product)
   const [baseProductSearchTerm, setBaseProductSearchTerm] = useState("");
@@ -296,6 +310,13 @@ export function ProductForm({
     }
   }, [baseProductId, setValue]);
 
+  // Clear sub-products when switching to related product mode
+  useEffect(() => {
+    if (isCreatingRelatedProduct) {
+      setSubProducts([]);
+    }
+  }, [isCreatingRelatedProduct]);
+
   // Handle SKU generation
   const handleGenerateSKU = async () => {
     try {
@@ -307,6 +328,39 @@ export function ProductForm({
     } catch {
       toast.error("Failed to generate SKU");
     }
+  };
+
+  // Sub-product management functions
+  // Get current unit for default value in sub-products
+  const currentUnit = watch("unit") || "piece";
+
+  const addSubProduct = () => {
+    setSubProducts((prev) => [
+      ...prev,
+      {
+        id: `sub-${Date.now()}`,
+        name: "",
+        barcode: "",
+        quantity_multiplier: "",
+        cost_price: "",
+        selling_price: "",
+        unit: currentUnit,
+      },
+    ]);
+  };
+
+  const removeSubProduct = (id: string) => {
+    setSubProducts((prev) => prev.filter((sp) => sp.id !== id));
+  };
+
+  const updateSubProduct = (
+    id: string,
+    field: keyof SubProductInput,
+    value: string
+  ) => {
+    setSubProducts((prev) =>
+      prev.map((sp) => (sp.id === id ? { ...sp, [field]: value } : sp))
+    );
   };
 
   const { handleSubmit: handleFormSubmit, isSubmitting } =
@@ -361,6 +415,33 @@ export function ProductForm({
           }
         }
 
+        // Validate sub-products if any exist
+        if (subProducts.length > 0) {
+          for (const sp of subProducts) {
+            if (!sp.name.trim()) {
+              throw new Error("All sub-products must have a name");
+            }
+            if (
+              !sp.quantity_multiplier ||
+              toFloat(sp.quantity_multiplier) <= 0
+            ) {
+              throw new Error(
+                `Sub-product "${sp.name || "unnamed"}" must have a valid quantity multiplier`
+              );
+            }
+            if (!sp.cost_price || toFloat(sp.cost_price) < 0) {
+              throw new Error(
+                `Sub-product "${sp.name}" must have a valid cost price`
+              );
+            }
+            if (!sp.selling_price || toFloat(sp.selling_price) < 0) {
+              throw new Error(
+                `Sub-product "${sp.name}" must have a valid selling price`
+              );
+            }
+          }
+        }
+
         // Convert category_id using formHelpers
         const categoryId = toOptionalId(data.category_id);
 
@@ -392,10 +473,59 @@ export function ProductForm({
             data: submitData,
           }).unwrap();
         } else {
-          return await createProduct(submitData).unwrap();
+          // Create base product first
+          const result = await createProduct(submitData).unwrap();
+          const baseProductId = result.product.id;
+
+          // Create sub-products if any exist
+          if (subProducts.length > 0) {
+            let successCount = 0;
+            let failCount = 0;
+
+            for (const sp of subProducts) {
+              try {
+                await createProduct({
+                  name: sp.name,
+                  barcode: sp.barcode || undefined,
+                  sku: data.sku || undefined, // Inherit SKU from base
+                  category_id: categoryId,
+                  cost_price: roundPrice(toFloat(sp.cost_price)),
+                  selling_price: roundPrice(toFloat(sp.selling_price)),
+                  stock_quantity: 0, // Sub-products don't hold stock
+                  min_stock_level: 0,
+                  unit: sp.unit || data.unit || "piece",
+                  base_product_id: baseProductId,
+                  quantity_multiplier: toFloat(sp.quantity_multiplier),
+                }).unwrap();
+                successCount++;
+              } catch (error) {
+                console.error(
+                  `Failed to create sub-product "${sp.name}":`,
+                  error
+                );
+                failCount++;
+              }
+            }
+
+            // Show summary toast for sub-products
+            if (failCount > 0) {
+              toast.error(
+                `Created base product, but ${failCount} sub-product(s) failed`
+              );
+            } else if (successCount > 0) {
+              toast.success(
+                `Created base product with ${successCount} sub-product(s)`
+              );
+            }
+          }
+
+          return result;
         }
       },
       onSuccess: (result: unknown) => {
+        // Clear sub-products state after successful creation
+        setSubProducts([]);
+
         // If creating a new product and onProductCreated is provided, pass the product
         if (!productId && onProductCreated && result) {
           const productResult = result as {
@@ -407,7 +537,9 @@ export function ProductForm({
       },
       successMessage: productId
         ? "Product updated successfully"
-        : "Product created successfully",
+        : subProducts.length > 0
+          ? undefined // We'll show custom toast for sub-products
+          : "Product created successfully",
       errorMessage: "Failed to save product",
     });
 
@@ -417,6 +549,12 @@ export function ProductForm({
         onSubmit={reactHookFormHandleSubmit((data: ProductFormDataRaw) =>
           handleFormSubmit(data)
         )}
+        onKeyDown={(e) => {
+          // Prevent Enter key from submitting form (barcode scanners send Enter)
+          if (e.key === "Enter" && e.target instanceof HTMLInputElement) {
+            e.preventDefault();
+          }
+        }}
         className="space-y-4"
       >
         {/* Product Relationship Fields - Show when creating related product */}
@@ -583,6 +721,7 @@ export function ProductForm({
               )}
             />
           </div>
+
           <div>
             <Controller
               name="category_id"
@@ -729,6 +868,157 @@ export function ProductForm({
                 )}
               />
             </div>
+          </div>
+        )}
+
+        {/* Sub-Products Section - Only show when creating new base product */}
+        {!productId && !isRelatedProduct && (
+          <div className="my-4 rounded-lg border border-green-200 bg-green-50 p-4">
+            <div className="mb-3 flex items-center justify-between">
+              <div>
+                <h4 className="text-sm font-semibold text-gray-800">
+                  Sub-Products (Optional)
+                </h4>
+                <p className="text-xs text-gray-600">
+                  Create related products that share stock with this base
+                  product
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={addSubProduct}
+                className="text-green-700 hover:text-green-800"
+              >
+                + Add Sub-Product
+              </Button>
+            </div>
+
+            {subProducts.length > 0 && (
+              <div className="space-y-3">
+                {subProducts.map((subProduct, index) => (
+                  <div
+                    key={subProduct.id}
+                    className="rounded-md border border-green-300 bg-white p-3"
+                  >
+                    <div className="mb-2 flex items-center justify-between">
+                      <span className="text-xs font-medium text-gray-500">
+                        Sub-Product #{index + 1}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => removeSubProduct(subProduct.id)}
+                        className="text-red-500 hover:text-red-700"
+                      >
+                        <svg
+                          className="h-4 w-4"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M6 18L18 6M6 6l12 12"
+                          />
+                        </svg>
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 md:grid-cols-6">
+                      <Input
+                        label="Name *"
+                        value={subProduct.name}
+                        onChange={(e) =>
+                          updateSubProduct(
+                            subProduct.id,
+                            "name",
+                            e.target.value
+                          )
+                        }
+                        placeholder="e.g., Sugar 700g"
+                      />
+                      <Input
+                        label="Barcode"
+                        value={subProduct.barcode}
+                        onChange={(e) =>
+                          updateSubProduct(
+                            subProduct.id,
+                            "barcode",
+                            e.target.value
+                          )
+                        }
+                        placeholder="Scan or enter"
+                      />
+                      <Input
+                        label="Qty Multiplier *"
+                        type="number"
+                        step="0.01"
+                        value={subProduct.quantity_multiplier}
+                        onChange={(e) =>
+                          updateSubProduct(
+                            subProduct.id,
+                            "quantity_multiplier",
+                            e.target.value
+                          )
+                        }
+                        placeholder="e.g., 0.7"
+                      />
+                      <Select
+                        label="Unit"
+                        options={[
+                          { value: "piece", label: "Piece" },
+                          { value: "gram", label: "Gram (g)" },
+                          { value: "kilogram", label: "Kilogram (kg)" },
+                          { value: "liter", label: "Liter (L)" },
+                          { value: "milliliter", label: "Milliliter (mL)" },
+                        ]}
+                        value={subProduct.unit}
+                        onChange={(e) =>
+                          updateSubProduct(
+                            subProduct.id,
+                            "unit",
+                            e.target.value as SubProductInput["unit"]
+                          )
+                        }
+                      />
+                      <Input
+                        label="Cost Price *"
+                        type="number"
+                        step="0.01"
+                        value={subProduct.cost_price}
+                        onChange={(e) =>
+                          updateSubProduct(
+                            subProduct.id,
+                            "cost_price",
+                            e.target.value
+                          )
+                        }
+                        placeholder="e.g., 50"
+                      />
+                      <Input
+                        label="Selling Price *"
+                        type="number"
+                        step="0.01"
+                        value={subProduct.selling_price}
+                        onChange={(e) =>
+                          updateSubProduct(
+                            subProduct.id,
+                            "selling_price",
+                            e.target.value
+                          )
+                        }
+                        placeholder="e.g., 70"
+                      />
+                    </div>
+                  </div>
+                ))}
+                <p className="text-xs text-gray-500">
+                  Sub-products will inherit SKU and category from the base
+                  product. Unit defaults to parent but can be changed.
+                </p>
+              </div>
+            )}
           </div>
         )}
 
