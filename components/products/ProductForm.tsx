@@ -265,7 +265,8 @@ export function ProductForm({
     ...baseProducts.map((p) => ({
       value: p.id,
       label: `${p.name}${p.barcode ? ` (${p.barcode})` : ""}`,
-      searchText: `${p.name} ${p.barcode || ""} ${p.sku || ""}`.toLowerCase(),
+      searchText:
+        `${p.name} ${p.barcode || ""} ${p.sku || ""} ${p.additional_barcodes?.join(" ") || ""}`.toLowerCase(),
     })),
   ];
 
@@ -925,7 +926,8 @@ export function ProductForm({
                         </svg>
                       </button>
                     </div>
-                    <div className="grid grid-cols-2 gap-2 md:grid-cols-6">
+                    <div className="space-y-3">
+                      {/* Row 1: Name */}
                       <Input
                         label="Name *"
                         value={subProduct.name}
@@ -938,78 +940,84 @@ export function ProductForm({
                         }
                         placeholder="e.g., Sugar 700g"
                       />
-                      <Input
-                        label="Barcode"
-                        value={subProduct.barcode}
-                        onChange={(e) =>
-                          updateSubProduct(
-                            subProduct.id,
-                            "barcode",
-                            e.target.value
-                          )
-                        }
-                        placeholder="Scan or enter"
-                      />
-                      <Input
-                        label="Qty Multiplier *"
-                        type="number"
-                        step="0.01"
-                        value={subProduct.quantity_multiplier}
-                        onChange={(e) =>
-                          updateSubProduct(
-                            subProduct.id,
-                            "quantity_multiplier",
-                            e.target.value
-                          )
-                        }
-                        placeholder="e.g., 0.7"
-                      />
-                      <Select
-                        label="Unit"
-                        options={[
-                          { value: "piece", label: "Piece" },
-                          { value: "gram", label: "Gram (g)" },
-                          { value: "kilogram", label: "Kilogram (kg)" },
-                          { value: "liter", label: "Liter (L)" },
-                          { value: "milliliter", label: "Milliliter (mL)" },
-                        ]}
-                        value={subProduct.unit}
-                        onChange={(e) =>
-                          updateSubProduct(
-                            subProduct.id,
-                            "unit",
-                            e.target.value as SubProductInput["unit"]
-                          )
-                        }
-                      />
-                      <Input
-                        label="Cost Price *"
-                        type="number"
-                        step="0.01"
-                        value={subProduct.cost_price}
-                        onChange={(e) =>
-                          updateSubProduct(
-                            subProduct.id,
-                            "cost_price",
-                            e.target.value
-                          )
-                        }
-                        placeholder="e.g., 50"
-                      />
-                      <Input
-                        label="Selling Price *"
-                        type="number"
-                        step="0.01"
-                        value={subProduct.selling_price}
-                        onChange={(e) =>
-                          updateSubProduct(
-                            subProduct.id,
-                            "selling_price",
-                            e.target.value
-                          )
-                        }
-                        placeholder="e.g., 70"
-                      />
+                      {/* Row 2: Barcode, Qty Multiplier, Unit */}
+                      <div className="grid grid-cols-3 gap-3">
+                        <Input
+                          label="Barcode"
+                          value={subProduct.barcode}
+                          onChange={(e) =>
+                            updateSubProduct(
+                              subProduct.id,
+                              "barcode",
+                              e.target.value
+                            )
+                          }
+                          placeholder="Scan or enter"
+                        />
+                        <Input
+                          label="Qty Multiplier *"
+                          type="number"
+                          step="0.01"
+                          value={subProduct.quantity_multiplier}
+                          onChange={(e) =>
+                            updateSubProduct(
+                              subProduct.id,
+                              "quantity_multiplier",
+                              e.target.value
+                            )
+                          }
+                          placeholder="e.g., 0.7"
+                        />
+                        <Select
+                          label="Unit"
+                          options={[
+                            { value: "piece", label: "Piece" },
+                            { value: "gram", label: "Gram (g)" },
+                            { value: "kilogram", label: "Kilogram (kg)" },
+                            { value: "liter", label: "Liter (L)" },
+                            { value: "milliliter", label: "Milliliter (mL)" },
+                          ]}
+                          value={subProduct.unit}
+                          onChange={(e) =>
+                            updateSubProduct(
+                              subProduct.id,
+                              "unit",
+                              e.target.value as SubProductInput["unit"]
+                            )
+                          }
+                        />
+                      </div>
+                      {/* Row 3: Cost Price, Selling Price */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <Input
+                          label="Cost Price *"
+                          type="number"
+                          step="0.01"
+                          value={subProduct.cost_price}
+                          onChange={(e) =>
+                            updateSubProduct(
+                              subProduct.id,
+                              "cost_price",
+                              e.target.value
+                            )
+                          }
+                          placeholder="e.g., 50"
+                        />
+                        <Input
+                          label="Selling Price *"
+                          type="number"
+                          step="0.01"
+                          value={subProduct.selling_price}
+                          onChange={(e) =>
+                            updateSubProduct(
+                              subProduct.id,
+                              "selling_price",
+                              e.target.value
+                            )
+                          }
+                          placeholder="e.g., 70"
+                        />
+                      </div>
                     </div>
                   </div>
                 ))}

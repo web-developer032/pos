@@ -18,38 +18,51 @@ const productUnitEnum = z.enum([
   "milliliter",
 ]);
 
-const productSchema = z.object({
-  name: z.string().min(1),
-  barcode: z.string().optional(),
-  additional_barcodes: z.array(z.string()).optional(),
-  sku: z.string().optional(),
-  description: z.string().optional(),
-  category_id: z.number().optional(),
-  cost_price: z.number().min(0),
-  selling_price: z.number().min(0),
-  stock_quantity: z.number().min(0),
-  min_stock_level: z.number().min(0),
-  unit: productUnitEnum.default("piece"),
-  image_url: z.string().optional(),
-  base_product_id: z.number().optional(),
-  quantity_multiplier: z.number().optional(),
-}).refine((data) => {
-  // If base_product_id is set, quantity_multiplier must be > 0
-  if (data.base_product_id !== undefined && data.base_product_id !== null) {
-    if (data.quantity_multiplier === undefined || data.quantity_multiplier === null || data.quantity_multiplier <= 0) {
-      return false;
+const productSchema = z
+  .object({
+    name: z.string().min(1),
+    barcode: z.string().optional(),
+    additional_barcodes: z.array(z.string()).optional(),
+    sku: z.string().optional(),
+    description: z.string().optional(),
+    category_id: z.number().optional(),
+    cost_price: z.number().min(0),
+    selling_price: z.number().min(0),
+    stock_quantity: z.number().min(0),
+    min_stock_level: z.number().min(0),
+    unit: productUnitEnum.default("piece"),
+    image_url: z.string().optional(),
+    base_product_id: z.number().optional(),
+    quantity_multiplier: z.number().optional(),
+  })
+  .refine(
+    (data) => {
+      // If base_product_id is set, quantity_multiplier must be > 0
+      if (data.base_product_id !== undefined && data.base_product_id !== null) {
+        if (
+          data.quantity_multiplier === undefined ||
+          data.quantity_multiplier === null ||
+          data.quantity_multiplier <= 0
+        ) {
+          return false;
+        }
+      }
+      // If base_product_id is not set, quantity_multiplier should not be set
+      if (data.base_product_id === undefined || data.base_product_id === null) {
+        if (
+          data.quantity_multiplier !== undefined &&
+          data.quantity_multiplier !== null
+        ) {
+          return false;
+        }
+      }
+      return true;
+    },
+    {
+      message:
+        "If base_product_id is set, quantity_multiplier must be > 0. If base_product_id is not set, quantity_multiplier should not be set.",
     }
-  }
-  // If base_product_id is not set, quantity_multiplier should not be set
-  if (data.base_product_id === undefined || data.base_product_id === null) {
-    if (data.quantity_multiplier !== undefined && data.quantity_multiplier !== null) {
-      return false;
-    }
-  }
-  return true;
-}, {
-  message: "If base_product_id is set, quantity_multiplier must be > 0. If base_product_id is not set, quantity_multiplier should not be set.",
-});
+  );
 
 async function getHandler(req: NextRequest) {
   try {
@@ -98,8 +111,39 @@ async function getHandler(req: NextRequest) {
       offset,
     });
 
+    // Fetch additional barcodes for all products
+    const products = result.data as Array<{
+      id: number;
+      [key: string]: unknown;
+    }>;
+    const productIds = products.map((p) => p.id);
+    const additionalBarcodesMap: Record<number, string[]> = {};
+
+    if (productIds.length > 0) {
+      const placeholders = productIds.map(() => "?").join(",");
+      const barcodesResult = await client.execute({
+        sql: `SELECT product_id, barcode FROM product_barcodes WHERE product_id IN (${placeholders})`,
+        args: productIds,
+      });
+
+      // Group barcodes by product_id
+      for (const row of barcodesResult.rows) {
+        const r = row as unknown as { product_id: number; barcode: string };
+        if (!additionalBarcodesMap[r.product_id]) {
+          additionalBarcodesMap[r.product_id] = [];
+        }
+        additionalBarcodesMap[r.product_id].push(r.barcode);
+      }
+    }
+
+    // Add additional_barcodes to each product
+    const productsWithBarcodes = products.map((p) => ({
+      ...p,
+      additional_barcodes: additionalBarcodesMap[p.id] || [],
+    }));
+
     return NextResponse.json({
-      products: result.data,
+      products: productsWithBarcodes,
       pagination: result.pagination,
     });
   } catch (error) {
@@ -124,9 +168,9 @@ async function postHandler(req: NextRequest) {
           { status: 400 }
         );
       }
-      const baseProductData = baseProduct.rows[0] as unknown as { 
-        id: number; 
-        sku: string | null; 
+      const baseProductData = baseProduct.rows[0] as unknown as {
+        id: number;
+        sku: string | null;
         base_product_id: number | null;
       };
       // Prevent nested relationships - base product cannot itself be a related product
