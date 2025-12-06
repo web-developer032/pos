@@ -46,6 +46,7 @@ export function SubProductsSection({
               key={subProduct.id}
               subProduct={subProduct}
               index={index}
+              totalCount={subProducts.length}
               onUpdate={onUpdate}
               onRemove={onRemove}
             />

@@ -17,6 +17,7 @@ export interface SubProductInput {
 interface SubProductCardProps {
   subProduct: SubProductInput;
   index: number;
+  totalCount: number;
   onUpdate: (id: string, field: keyof SubProductInput, value: string) => void;
   onRemove: (id: string) => void;
 }
@@ -24,14 +25,19 @@ interface SubProductCardProps {
 export function SubProductCard({
   subProduct,
   index,
+  totalCount,
   onUpdate,
   onRemove,
 }: SubProductCardProps) {
+  // Newest items are at the start of array, so reverse the numbering
+  // to show newest with highest number
+  const displayNumber = totalCount - index;
+
   return (
     <div className="rounded-md border border-green-300 bg-white p-3">
       <div className="mb-2 flex items-center justify-between">
         <span className="text-xs font-medium text-gray-500">
-          Sub-Product #{index + 1}
+          Sub-Product #{displayNumber}
         </span>
         <button
           type="button"

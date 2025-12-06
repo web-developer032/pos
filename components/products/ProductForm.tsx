@@ -331,7 +331,7 @@ export function ProductForm({
   const currentUnit = (watch("unit") || "piece") as ProductUnit;
 
   const handleAddSubProduct = () => {
-    setSubProducts((prev) => [...prev, createSubProduct(currentUnit)]);
+    setSubProducts((prev) => [createSubProduct(currentUnit), ...prev]);
   };
 
   const handleRemoveSubProduct = (id: string) => {
