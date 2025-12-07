@@ -23,7 +23,7 @@ import { Form } from "@/components/ui/Form";
 import { useCurrency } from "@/lib/hooks/useCurrency";
 import { useDebounce } from "@/lib/hooks/useDebounce";
 import {
-  useBarcodeScanner,
+  useFormBarcodeScanner,
   useBarcodeHandler,
 } from "@/lib/hooks/useBarcodeScanner";
 import { useOrderCalculations } from "@/lib/hooks/useOrderCalculations";
@@ -82,7 +82,7 @@ export function PurchaseOrderForm({
   const { format: formatCurrency } = useCurrency();
   const debouncedProductSearch = useDebounce(productSearch, 200);
   const { barcodeToScan, handleBarcodeKeyDown, clearBarcodeState } =
-    useBarcodeScanner();
+    useFormBarcodeScanner();
 
   // API Queries
   const { data: suppliersData, refetch: refetchSuppliers } =

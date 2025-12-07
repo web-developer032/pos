@@ -13,10 +13,11 @@ import {
   setDiscount,
   setTax,
   holdCart,
+  addItem,
 } from "@/lib/slices/cartSlice";
 import { Modal } from "@/components/ui/Modal";
 import { useGetCustomersQuery } from "@/lib/api/customersApi";
-import { useBarcodeScanner } from "@/lib/hooks/useBarcodeScanner";
+import { useGetProductByBarcodeQuery } from "@/lib/api/productsApi";
 import { useCurrency } from "@/lib/hooks/useCurrency";
 import { roundPrice } from "@/lib/utils/formHelpers";
 import { Select } from "@/components/ui/Select";
@@ -35,7 +36,9 @@ export default function POSPage() {
   const [isHoldCartModalOpen, setIsHoldCartModalOpen] = useState(false);
   const [holdCartName, setHoldCartName] = useState("");
   const [barcodeInput, setBarcodeInput] = useState("");
+  const [barcodeToScan, setBarcodeToScan] = useState("");
   const barcodeInputRef = useRef<HTMLInputElement>(null);
+  const processedBarcodesRef = useRef<Set<string>>(new Set());
 
   // Calculate totals
   const subtotal = roundPrice(
@@ -45,22 +48,88 @@ export default function POSPage() {
   );
   const finalTotal = roundPrice(subtotal - discount + tax);
 
-  // Use optimized barcode scanner hook
-  const { scanBarcode } = useBarcodeScanner({
-    onScanComplete: () => {
+  // Barcode lookup query
+  const {
+    data: barcodeProductData,
+    error: barcodeError,
+    isLoading: isBarcodeLoading,
+  } = useGetProductByBarcodeQuery(barcodeToScan, {
+    skip: !barcodeToScan,
+  });
+
+  // Handle barcode product lookup result
+  useEffect(() => {
+    if (!barcodeToScan) return;
+
+    // Skip if already processed
+    if (processedBarcodesRef.current.has(barcodeToScan)) {
+      return;
+    }
+
+    // Product found - add to cart
+    if (barcodeProductData?.product) {
+      const product = barcodeProductData.product;
+      processedBarcodesRef.current.add(barcodeToScan);
+
+      // Add to cart
+      dispatch(
+        addItem({
+          product_id: product.id,
+          name: product.name,
+          price: roundPrice(product.selling_price),
+          quantity: 1,
+          stock_quantity: product.stock_quantity,
+        })
+      );
+      toast.success(`${product.name} added to cart`);
+
+      // Clear state
+      setBarcodeToScan("");
       setBarcodeInput("");
-      // Refocus immediately for next scan
+
+      // Refocus for next scan
       requestAnimationFrame(() => {
         barcodeInputRef.current?.focus();
       });
-    },
-  });
+
+      // Clean up processed after delay
+      setTimeout(() => {
+        processedBarcodesRef.current.delete(barcodeToScan);
+      }, 300);
+      return;
+    }
+
+    // Error - product not found
+    if (barcodeError && !isBarcodeLoading) {
+      processedBarcodesRef.current.add(barcodeToScan);
+      toast.error("Product not found");
+      setBarcodeToScan("");
+      setBarcodeInput("");
+
+      requestAnimationFrame(() => {
+        barcodeInputRef.current?.focus();
+      });
+
+      setTimeout(() => {
+        processedBarcodesRef.current.delete(barcodeToScan);
+      }, 300);
+    }
+  }, [
+    barcodeToScan,
+    barcodeProductData,
+    barcodeError,
+    isBarcodeLoading,
+    dispatch,
+  ]);
 
   // Handle barcode input (scanners send Enter after barcode)
   const handleBarcodeKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" && barcodeInput.trim()) {
       e.preventDefault();
-      scanBarcode(barcodeInput);
+      const barcode = barcodeInput.trim();
+      if (!processedBarcodesRef.current.has(barcode)) {
+        setBarcodeToScan(barcode);
+      }
     }
   };
 

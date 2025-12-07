@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import {
   useGetProductsQuery,
   useUpdateProductMutation,
+  useGetProductByBarcodeQuery,
   Product,
 } from "@/lib/api/productsApi";
 import { useGetCategoriesQuery } from "@/lib/api/categoriesApi";
@@ -35,7 +36,9 @@ export function ProductGrid() {
     selling_price: number;
   } | null>(null);
   const [newPrice, setNewPrice] = useState("");
+  const [barcodeToScan, setBarcodeToScan] = useState<string>("");
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const processedBarcodesRef = useRef<Set<string>>(new Set());
   const debouncedSearch = useDebounce(search, 500);
   const { data, isLoading, refetch } = useGetProductsQuery(
     {
@@ -53,12 +56,73 @@ export function ProductGrid() {
   const dispatch = useAppDispatch();
   const { format: formatCurrency } = useCurrency();
 
-  // Use optimized barcode scanner hook
-  const { scanBarcode, isBarcodePattern } = useBarcodeScanner({
-    onScanComplete: () => {
-      setSearch("");
-    },
+  // Barcode lookup query
+  const {
+    data: barcodeProductData,
+    error: barcodeError,
+    isLoading: isBarcodeLoading,
+  } = useGetProductByBarcodeQuery(barcodeToScan, {
+    skip: !barcodeToScan,
   });
+
+  // Use barcode scanner hook for pattern detection
+  const { isBarcodePattern } = useBarcodeScanner();
+
+  // Handle barcode product lookup result
+  useEffect(() => {
+    if (!barcodeToScan) return;
+
+    // Skip if already processed
+    if (processedBarcodesRef.current.has(barcodeToScan)) {
+      return;
+    }
+
+    // Product found - add to cart
+    if (barcodeProductData?.product) {
+      const product = barcodeProductData.product;
+      processedBarcodesRef.current.add(barcodeToScan);
+
+      // Add to cart
+      dispatch(
+        addItem({
+          product_id: product.id,
+          name: product.name,
+          price: roundPrice(product.selling_price),
+          quantity: 1,
+          stock_quantity: product.stock_quantity,
+        })
+      );
+      toast.success(`${product.name} added to cart`);
+
+      // Clear barcode and search
+      setBarcodeToScan("");
+      setSearch("");
+
+      // Clean up processed after delay
+      setTimeout(() => {
+        processedBarcodesRef.current.delete(barcodeToScan);
+      }, 300);
+      return;
+    }
+
+    // Error - product not found
+    if (barcodeError && !isBarcodeLoading) {
+      processedBarcodesRef.current.add(barcodeToScan);
+      toast.error("Product not found");
+      setBarcodeToScan("");
+      setSearch("");
+
+      setTimeout(() => {
+        processedBarcodesRef.current.delete(barcodeToScan);
+      }, 300);
+    }
+  }, [
+    barcodeToScan,
+    barcodeProductData,
+    barcodeError,
+    isBarcodeLoading,
+    dispatch,
+  ]);
 
   const handleAddToCart = (product: Product, quantity?: number) => {
     const finalPrice = product.selling_price;
@@ -127,10 +191,13 @@ export function ProductGrid() {
   const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" && search.trim()) {
       const currentValue = search.trim();
-      // If it looks like a barcode, scan it instead of searching
-      if (isBarcodePattern(currentValue)) {
+      // If it looks like a barcode, scan it to add to cart
+      if (
+        isBarcodePattern(currentValue) &&
+        !processedBarcodesRef.current.has(currentValue)
+      ) {
         e.preventDefault();
-        scanBarcode(currentValue);
+        setBarcodeToScan(currentValue);
       }
       // Otherwise allow normal search behavior
     }
