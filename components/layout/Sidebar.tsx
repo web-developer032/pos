@@ -49,6 +49,12 @@ const menuItems: MenuItem[] = [
     icon: "🖨️",
     roles: ["admin", "manager"],
   },
+  {
+    name: "Barcode Generator",
+    href: "/barcode-generator",
+    icon: "📇",
+    roles: ["admin", "manager"],
+  },
 ];
 
 export function Sidebar() {

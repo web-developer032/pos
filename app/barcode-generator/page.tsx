@@ -25,45 +25,6 @@ export default function BarcodeGeneratorPage() {
   >([]);
   const [isGenerating, setIsGenerating] = useState(false);
 
-  // Add print styles
-  useEffect(() => {
-    const style = document.createElement("style");
-    style.textContent = `
-      @media print {
-        body {
-          margin: 0;
-          padding: 20px;
-        }
-        nav, header, button {
-          display: none !important;
-        }
-        .print\\:grid-cols-3 {
-          grid-template-columns: repeat(3, 1fr) !important;
-        }
-        .print\\:break-inside-avoid {
-          break-inside: avoid;
-          page-break-inside: avoid;
-        }
-        .print\\:border {
-          border: 1px solid #d1d5db !important;
-        }
-        @page {
-          size: A4;
-          margin: 1cm;
-        }
-        .shadow {
-          box-shadow: none !important;
-        }
-      }
-    `;
-    document.head.appendChild(style);
-    return () => {
-      if (document.head.contains(style)) {
-        document.head.removeChild(style);
-      }
-    };
-  }, []);
-
   const handleGenerate = () => {
     const count = parseInt(quantity, 10);
     if (isNaN(count) || count < 1 || count > 100) {
@@ -94,7 +55,100 @@ export default function BarcodeGeneratorPage() {
   };
 
   const handlePrint = () => {
-    window.print();
+    // Create a new window with only barcodes for clean printing
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) {
+      toast.error("Please allow popups to print");
+      return;
+    }
+
+    const barcodeCards = document.querySelectorAll(".barcode-card");
+    let barcodesHTML = "";
+
+    barcodeCards.forEach((card) => {
+      const canvas = card.querySelector("canvas");
+      const barcodeText = card.querySelector(".font-mono")?.textContent || "";
+      const formattedText =
+        card.querySelector(".text-gray-400")?.textContent || "";
+
+      let canvasDataUrl = "";
+      if (canvas) {
+        canvasDataUrl = (canvas as HTMLCanvasElement).toDataURL("image/png");
+      }
+
+      barcodesHTML += `
+        <div class="barcode-card">
+          <div class="barcode-text">${barcodeText}</div>
+          <div class="barcode-formatted">${formattedText}</div>
+          ${canvasDataUrl ? `<img src="${canvasDataUrl}" alt="${barcodeText}" />` : ""}
+        </div>
+      `;
+    });
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Barcodes</title>
+          <style>
+            @page {
+              size: A4;
+              margin: 5mm;
+            }
+            * {
+              margin: 0;
+              padding: 0;
+              box-sizing: border-box;
+            }
+            body {
+              font-family: Arial, sans-serif;
+              padding: 5mm;
+            }
+            .grid {
+              display: grid;
+              grid-template-columns: repeat(4, 1fr);
+              gap: 3mm;
+            }
+            .barcode-card {
+              border: 1px solid #999;
+              padding: 3mm;
+              text-align: center;
+              break-inside: avoid;
+              page-break-inside: avoid;
+            }
+            .barcode-text {
+              font-family: monospace;
+              font-size: 10px;
+              font-weight: bold;
+              margin-bottom: 1mm;
+            }
+            .barcode-formatted {
+              font-size: 8px;
+              color: #666;
+              margin-bottom: 2mm;
+            }
+            .barcode-card img {
+              max-width: 100%;
+              height: auto;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="grid">
+            ${barcodesHTML}
+          </div>
+          <script>
+            window.onload = function() {
+              window.print();
+              window.onafterprint = function() {
+                window.close();
+              };
+            };
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
   };
 
   const handleCopyAll = () => {
@@ -143,7 +197,7 @@ export default function BarcodeGeneratorPage() {
                     Copy All
                   </Button>
                   <Button onClick={handlePrint} variant="outline">
-                    Print
+                    🖨️ Print
                   </Button>
                 </>
               )}
@@ -153,13 +207,16 @@ export default function BarcodeGeneratorPage() {
 
         {/* Generated Barcodes */}
         {generatedBarcodes.length > 0 && (
-          <div className="rounded-lg bg-white p-6 shadow">
+          <div
+            id="barcode-print-area"
+            className="rounded-lg bg-white p-6 shadow"
+          >
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-lg font-semibold">
                 Generated Barcodes ({generatedBarcodes.length})
               </h2>
             </div>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 print:grid-cols-3">
+            <div className="barcode-grid grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
               {generatedBarcodes.map((item) => (
                 <BarcodeCard key={item.id} barcode={item.barcode} />
               ))}
@@ -225,10 +282,10 @@ function BarcodeCard({ barcode }: { barcode: string }) {
               if (JsBarcode && canvasRef.current) {
                 JsBarcode(canvasRef.current, barcode, {
                   format: "CODE128",
-                  width: 2,
-                  height: 50,
+                  width: 1.5,
+                  height: 40,
                   displayValue: false,
-                  margin: 10,
+                  margin: 5,
                 });
               }
             } catch (error) {
@@ -248,14 +305,12 @@ function BarcodeCard({ barcode }: { barcode: string }) {
   };
 
   return (
-    <div className="flex flex-col items-center justify-between rounded border border-gray-200 bg-white p-4 print:break-inside-avoid print:border print:border-gray-300">
-      <div className="mb-2 w-full text-center">
-        <div className="mb-2 text-xs font-medium text-gray-500">BARCODE</div>
-        <div className="mb-1 font-mono text-lg font-bold">{barcode}</div>
-        <div className="text-xs text-gray-400">{formattedBarcode}</div>
-      </div>
+    <div className="barcode-card flex flex-col items-center rounded border border-gray-200 bg-white p-3">
+      {/* Barcode number */}
+      <div className="mb-1 font-mono text-sm font-bold">{barcode}</div>
+      <div className="mb-1 text-xs text-gray-400">{formattedBarcode}</div>
       {/* Barcode image */}
-      <div className="mb-2 flex h-20 w-full items-center justify-center border border-gray-300 bg-white p-2">
+      <div className="flex w-full items-center justify-center bg-white">
         <canvas ref={canvasRef} className="max-w-full" />
       </div>
       <button
