@@ -24,6 +24,7 @@ import { Modal } from "@/components/ui/Modal";
 import { Pagination } from "@/components/ui/Pagination";
 import { ProductForm } from "./ProductForm";
 import { ImportExport } from "@/components/common/ImportExport";
+import Link from "next/link";
 import toast from "react-hot-toast";
 
 export function ProductList() {
@@ -326,6 +327,11 @@ export function ProductList() {
             onImportSuccess={refetch}
             templateData={templateData}
           />
+          <Link href="/products/bulk-link">
+            <Button variant="outline" className="w-full sm:w-auto">
+              🔗 Bulk Link
+            </Button>
+          </Link>
           <Button
             variant="outline"
             onClick={handleDeleteAll}
@@ -396,10 +402,13 @@ export function ProductList() {
                     <span>{product.name}</span>
                     {product.base_product_id ? (
                       <span className="text-xs text-gray-500">
-                        Related to base product (x{product.quantity_multiplier || 0})
+                        Related to base product (x
+                        {product.quantity_multiplier || 0})
                       </span>
                     ) : (
-                      <span className="text-xs text-gray-500">Base Product</span>
+                      <span className="text-xs text-gray-500">
+                        Base Product
+                      </span>
                     )}
                   </div>
                 </td>
