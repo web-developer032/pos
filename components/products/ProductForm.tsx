@@ -30,6 +30,7 @@ import {
 } from "@/lib/utils/formHelpers";
 import toast from "react-hot-toast";
 import { ProfitPercentage } from "@/components/common/ProfitPercentage";
+import { useCurrency } from "@/lib/hooks/useCurrency";
 import { useBarcodeScanner } from "@/lib/hooks/useBarcodeScanner";
 import { useDebounce } from "@/lib/hooks/useDebounce";
 import { UNIT_OPTIONS, ProductUnit } from "@/lib/constants/productUnits";
@@ -238,6 +239,19 @@ export function ProductForm({
     () => baseProductsData?.products.filter((p) => !p.base_product_id) || [],
     [baseProductsData?.products]
   );
+
+  // Get selected base product details
+  const selectedBaseProduct = useMemo(
+    () => baseProducts.find((p) => p.id === baseProductId),
+    [baseProducts, baseProductId]
+  );
+
+  // Currency formatting
+  const { format: formatCurrency } = useCurrency();
+
+  // Get current quantity multiplier for calculations
+  const currentMultiplier =
+    parseFloat(watch("quantity_multiplier") as string) || 0;
 
   // Barcode scanner for base product selection
   const { isBarcodePattern } = useBarcodeScanner();
@@ -554,6 +568,58 @@ export function ProductForm({
                   />
                 )}
               />
+
+              {/* Base Product Pricing Info */}
+              {selectedBaseProduct && (
+                <div className="rounded-lg border-2 border-green-300 bg-green-50 p-4">
+                  <h4 className="mb-2 text-sm font-semibold text-green-800">
+                    💰 Base Product Pricing
+                  </h4>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="rounded bg-white p-2 text-center shadow-sm">
+                      <p className="text-xs text-gray-500">Cost Price</p>
+                      <p className="text-lg font-bold text-gray-800">
+                        {formatCurrency(selectedBaseProduct.cost_price)}
+                      </p>
+                    </div>
+                    <div className="rounded bg-white p-2 text-center shadow-sm">
+                      <p className="text-xs text-gray-500">Retail Price</p>
+                      <p className="text-lg font-bold text-green-600">
+                        {formatCurrency(selectedBaseProduct.selling_price)}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Suggested prices based on multiplier */}
+                  {currentMultiplier > 0 && (
+                    <div className="mt-3 border-t border-green-200 pt-3">
+                      <p className="mb-2 text-xs font-medium text-green-700">
+                        📊 Suggested Sub-Product Prices (×{currentMultiplier}):
+                      </p>
+                      <div className="grid grid-cols-2 gap-3 text-sm">
+                        <div>
+                          <span className="text-gray-600">Cost:</span>{" "}
+                          <span className="font-semibold text-gray-800">
+                            {formatCurrency(
+                              selectedBaseProduct.cost_price * currentMultiplier
+                            )}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-gray-600">Retail:</span>{" "}
+                          <span className="font-semibold text-green-600">
+                            {formatCurrency(
+                              selectedBaseProduct.selling_price *
+                                currentMultiplier
+                            )}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               <Input
                 label="Quantity Multiplier *"
                 type="number"
@@ -657,6 +723,60 @@ export function ProductForm({
                     />
                   )}
                 />
+
+                {/* Base Product Pricing Info */}
+                {selectedBaseProduct && (
+                  <div className="rounded-lg border-2 border-green-300 bg-green-50 p-4">
+                    <h4 className="mb-2 text-sm font-semibold text-green-800">
+                      💰 Base Product Pricing
+                    </h4>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="rounded bg-white p-2 text-center shadow-sm">
+                        <p className="text-xs text-gray-500">Cost Price</p>
+                        <p className="text-lg font-bold text-gray-800">
+                          {formatCurrency(selectedBaseProduct.cost_price)}
+                        </p>
+                      </div>
+                      <div className="rounded bg-white p-2 text-center shadow-sm">
+                        <p className="text-xs text-gray-500">Retail Price</p>
+                        <p className="text-lg font-bold text-green-600">
+                          {formatCurrency(selectedBaseProduct.selling_price)}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Suggested prices based on multiplier */}
+                    {currentMultiplier > 0 && (
+                      <div className="mt-3 border-t border-green-200 pt-3">
+                        <p className="mb-2 text-xs font-medium text-green-700">
+                          📊 Suggested Sub-Product Prices (×{currentMultiplier}
+                          ):
+                        </p>
+                        <div className="grid grid-cols-2 gap-3 text-sm">
+                          <div>
+                            <span className="text-gray-600">Cost:</span>{" "}
+                            <span className="font-semibold text-gray-800">
+                              {formatCurrency(
+                                selectedBaseProduct.cost_price *
+                                  currentMultiplier
+                              )}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-gray-600">Retail:</span>{" "}
+                            <span className="font-semibold text-green-600">
+                              {formatCurrency(
+                                selectedBaseProduct.selling_price *
+                                  currentMultiplier
+                              )}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <Input
                   label="Quantity Multiplier *"
                   type="number"
