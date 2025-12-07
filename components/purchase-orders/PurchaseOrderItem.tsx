@@ -26,6 +26,7 @@ interface PurchaseOrderItemProps {
   quantity: number;
   unitCost: number;
   retailPrice: number;
+  discountFactor: number;
   productOptions: ProductOption[];
   errors?: FieldErrors<PurchaseOrderItemData>;
   register: UseFormRegister<{
@@ -52,6 +53,7 @@ export const PurchaseOrderItem = memo(
         quantity,
         unitCost,
         retailPrice,
+        discountFactor,
         productOptions,
         errors,
         register,
@@ -66,8 +68,14 @@ export const PurchaseOrderItem = memo(
       const { format: formatCurrency } = useCurrency();
       const subtotal = (quantity || 0) * (unitCost || 0);
       const hasValues = productId > 0 && quantity > 0 && unitCost > 0;
-      const profit = (retailPrice || 0) - (unitCost || 0);
-      const profitMargin = unitCost > 0 ? (profit / unitCost) * 100 : 0;
+
+      // Calculate adjusted cost after discount
+      const adjustedCost = (unitCost || 0) * discountFactor;
+      const hasDiscount = discountFactor < 1;
+
+      // Calculate profit based on adjusted cost
+      const profit = (retailPrice || 0) - adjustedCost;
+      const profitMargin = adjustedCost > 0 ? (profit / adjustedCost) * 100 : 0;
 
       return (
         <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm transition-shadow hover:shadow-md">
@@ -159,10 +167,10 @@ export const PurchaseOrderItem = memo(
             </div>
           </div>
 
-          {/* Fields - Row 2: Cost, Retail Price, Profit */}
+          {/* Fields - Row 2: Cost, Adjusted Cost, Retail Price */}
           <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-12">
             {/* Unit Cost */}
-            <div className="sm:col-span-3">
+            <div className="sm:col-span-2">
               <Input
                 label="Cost Price"
                 type="number"
@@ -175,8 +183,29 @@ export const PurchaseOrderItem = memo(
               />
             </div>
 
+            {/* Adjusted Cost (after discount) */}
+            <div className="flex items-end sm:col-span-2">
+              <div
+                className={`w-full rounded-md px-3 py-2 ${hasDiscount ? "border-2 border-green-300 bg-green-50" : "bg-gray-50"}`}
+              >
+                <span className="block text-xs text-gray-500">
+                  {hasDiscount ? "After Discount" : "Final Cost"}
+                </span>
+                <span
+                  className={`block text-sm font-semibold ${hasDiscount ? "text-green-700" : "text-gray-900"}`}
+                >
+                  {unitCost > 0 ? formatCurrency(adjustedCost) : "—"}
+                </span>
+                {hasDiscount && unitCost > 0 && (
+                  <span className="block text-xs text-green-600">
+                    -{((1 - discountFactor) * 100).toFixed(1)}%
+                  </span>
+                )}
+              </div>
+            </div>
+
             {/* Retail Price */}
-            <div className="sm:col-span-3">
+            <div className="sm:col-span-2">
               <Input
                 label="Retail Price"
                 type="number"

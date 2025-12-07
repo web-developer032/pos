@@ -145,7 +145,9 @@ async function putHandler(req: AuthRequest, context?: RouteContext) {
         // Insert new items
         for (const item of validated.items) {
           const roundedUnitCost = roundPrice(item.unit_cost);
-          const roundedRetailPrice = item.retail_price ? roundPrice(item.retail_price) : null;
+          const roundedRetailPrice = item.retail_price
+            ? roundPrice(item.retail_price)
+            : null;
           const itemSubtotal = roundPrice(item.quantity * roundedUnitCost);
           await client.execute({
             sql: `INSERT INTO purchase_order_items (po_id, product_id, quantity, unit_cost, retail_price, subtotal) 
@@ -204,17 +206,54 @@ async function putHandler(req: AuthRequest, context?: RouteContext) {
 
       // If completing, update inventory and cost/retail prices
       if (status === "completed") {
-        const itemsResult = await client.execute({
-          sql: "SELECT product_id, quantity, unit_cost, retail_price FROM purchase_order_items WHERE po_id = ?",
+        // Get purchase order discount info
+        const poResult = await client.execute({
+          sql: "SELECT discount_type, discount_value, total_amount FROM purchase_orders WHERE id = ?",
           args: [params.id],
         });
 
-        for (const item of itemsResult.rows as unknown as {
+        const po = poResult.rows[0] as unknown as {
+          discount_type: string | null;
+          discount_value: number | null;
+          total_amount: number;
+        };
+
+        const itemsResult = await client.execute({
+          sql: "SELECT product_id, quantity, unit_cost, retail_price, subtotal FROM purchase_order_items WHERE po_id = ?",
+          args: [params.id],
+        });
+
+        // Calculate subtotal (before discount)
+        const items = itemsResult.rows as unknown as {
           product_id: number;
           quantity: number;
           unit_cost: number;
           retail_price: number | null;
-        }[]) {
+          subtotal: number;
+        }[];
+
+        const subtotal = items.reduce((sum, item) => sum + item.subtotal, 0);
+
+        // Calculate discount factor
+        let discountFactor = 1;
+        if (
+          po.discount_type &&
+          po.discount_value &&
+          po.discount_value > 0 &&
+          subtotal > 0
+        ) {
+          if (po.discount_type === "percentage") {
+            discountFactor = 1 - po.discount_value / 100;
+          } else {
+            // Amount discount - calculate proportional reduction
+            discountFactor = Math.max(
+              0,
+              (subtotal - po.discount_value) / subtotal
+            );
+          }
+        }
+
+        for (const item of items) {
           // Get current product information
           const productResult = await client.execute({
             sql: "SELECT cost_price, stock_quantity FROM products WHERE id = ?",
@@ -233,7 +272,8 @@ async function putHandler(req: AuthRequest, context?: RouteContext) {
           const currentStock = product.stock_quantity || 0;
           const currentCost = product.cost_price || 0;
           const newQuantity = item.quantity;
-          const newCost = item.unit_cost;
+          // Apply discount to the unit cost
+          const newCost = item.unit_cost * discountFactor;
 
           // Calculate new cost price
           let newCostPrice: number;
@@ -249,8 +289,14 @@ async function putHandler(req: AuthRequest, context?: RouteContext) {
           }
 
           // Update stock quantity with relationship logic
-          await updateProductQuantity(item.product_id, item.quantity, 'add', parseInt(params.id), 'purchase');
-          
+          await updateProductQuantity(
+            item.product_id,
+            item.quantity,
+            "add",
+            parseInt(params.id),
+            "purchase"
+          );
+
           // Update cost price on the actual product being purchased
           // Note: For packings/composites, cost price is stored on the product itself, not the base
           await client.execute({
@@ -321,7 +367,13 @@ async function deleteHandler(req: AuthRequest, context?: RouteContext) {
         const quantity = item.quantity as number;
 
         // Subtract stock quantity with relationship logic
-        await updateProductQuantity(productId, quantity, 'subtract', poId, 'purchase');
+        await updateProductQuantity(
+          productId,
+          quantity,
+          "subtract",
+          poId,
+          "purchase"
+        );
       }
     }
 

@@ -131,11 +131,8 @@ export function PurchaseOrderForm({
   const discountValue = watch("discount_value");
 
   // Calculations
-  const { subtotal, discountAmount, total } = useOrderCalculations(
-    watchedItems,
-    discountType,
-    discountValue
-  );
+  const { subtotal, discountAmount, total, discountFactor } =
+    useOrderCalculations(watchedItems, discountType, discountValue);
 
   // Cache products from API
   useEffect(() => {
@@ -412,6 +409,7 @@ export function PurchaseOrderForm({
                 quantity={watchedItems[index]?.quantity || 0}
                 unitCost={watchedItems[index]?.unit_cost || 0}
                 retailPrice={watchedItems[index]?.retail_price || 0}
+                discountFactor={discountFactor}
                 productOptions={productOptions}
                 errors={errors.items?.[index]}
                 register={register}

@@ -12,6 +12,7 @@ interface OrderCalculations {
   subtotal: number;
   discountAmount: number;
   total: number;
+  discountFactor: number;
 }
 
 export function useOrderCalculations(
@@ -26,17 +27,21 @@ export function useOrderCalculations(
     );
 
     let discountAmount = 0;
-    if (discountType && discountValue && discountValue > 0) {
+    let discountFactor = 1;
+    
+    if (discountType && discountValue && discountValue > 0 && subtotal > 0) {
       if (discountType === "percentage") {
         discountAmount = (subtotal * discountValue) / 100;
+        discountFactor = 1 - (discountValue / 100);
       } else {
         discountAmount = discountValue;
+        discountFactor = Math.max(0, (subtotal - discountValue) / subtotal);
       }
     }
 
     const total = Math.max(0, subtotal - discountAmount);
 
-    return { subtotal, discountAmount, total };
+    return { subtotal, discountAmount, total, discountFactor };
   }, [items, discountType, discountValue]);
 }
 
