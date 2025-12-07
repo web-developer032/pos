@@ -823,6 +823,8 @@ export function ProductForm({
           <SubProductsSection
             subProducts={subProducts}
             parentUnit={currentUnit}
+            baseCostPrice={parseFloat(watch("cost_price") as string) || 0}
+            baseSellingPrice={parseFloat(watch("selling_price") as string) || 0}
             onAdd={handleAddSubProduct}
             onUpdate={handleUpdateSubProduct}
             onRemove={handleRemoveSubProduct}

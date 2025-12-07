@@ -7,6 +7,8 @@ import { ProductUnit, DEFAULT_UNIT } from "@/lib/constants/productUnits";
 interface SubProductsSectionProps {
   subProducts: SubProductInput[];
   parentUnit: ProductUnit;
+  baseCostPrice: number;
+  baseSellingPrice: number;
   onAdd: () => void;
   onUpdate: (id: string, field: keyof SubProductInput, value: string) => void;
   onRemove: (id: string) => void;
@@ -14,6 +16,8 @@ interface SubProductsSectionProps {
 
 export function SubProductsSection({
   subProducts,
+  baseCostPrice,
+  baseSellingPrice,
   onAdd,
   onUpdate,
   onRemove,
@@ -47,13 +51,16 @@ export function SubProductsSection({
               subProduct={subProduct}
               index={index}
               totalCount={subProducts.length}
+              baseCostPrice={baseCostPrice}
+              baseSellingPrice={baseSellingPrice}
               onUpdate={onUpdate}
               onRemove={onRemove}
             />
           ))}
           <p className="text-xs text-gray-500">
             Sub-products will inherit SKU and category from the base product.
-            Unit defaults to parent but can be changed.
+            Prices auto-calculate from base product when you set the quantity
+            multiplier.
           </p>
         </div>
       )}
@@ -62,7 +69,9 @@ export function SubProductsSection({
 }
 
 // Helper to create a new sub-product with default values
-export function createSubProduct(parentUnit: ProductUnit = DEFAULT_UNIT): SubProductInput {
+export function createSubProduct(
+  parentUnit: ProductUnit = DEFAULT_UNIT
+): SubProductInput {
   return {
     id: `sub-${Date.now()}`,
     name: "",
@@ -76,4 +85,3 @@ export function createSubProduct(parentUnit: ProductUnit = DEFAULT_UNIT): SubPro
 
 // Re-export types for convenience
 export type { SubProductInput };
-

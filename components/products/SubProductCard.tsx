@@ -61,14 +61,27 @@ interface SubProductCardProps {
   subProduct: SubProductInput;
   index: number;
   totalCount: number;
+  baseCostPrice: number;
+  baseSellingPrice: number;
   onUpdate: (id: string, field: keyof SubProductInput, value: string) => void;
   onRemove: (id: string) => void;
+}
+
+// Calculate price based on multiplier and base price
+function calculatePrice(multiplier: string, basePrice: number): string {
+  const mult = parseFloat(multiplier);
+  if (isNaN(mult) || mult <= 0 || !basePrice || basePrice <= 0) {
+    return "";
+  }
+  return (basePrice * mult).toFixed(2);
 }
 
 export function SubProductCard({
   subProduct,
   index,
   totalCount,
+  baseCostPrice,
+  baseSellingPrice,
   onUpdate,
   onRemove,
 }: SubProductCardProps) {
@@ -126,9 +139,24 @@ export function SubProductCard({
             type="number"
             step="0.01"
             value={subProduct.quantity_multiplier}
-            onChange={(e) =>
-              onUpdate(subProduct.id, "quantity_multiplier", e.target.value)
-            }
+            onChange={(e) => {
+              const newMultiplier = e.target.value;
+              onUpdate(subProduct.id, "quantity_multiplier", newMultiplier);
+
+              // Auto-calculate prices based on base prices
+              const newCostPrice = calculatePrice(newMultiplier, baseCostPrice);
+              const newSellingPrice = calculatePrice(
+                newMultiplier,
+                baseSellingPrice
+              );
+
+              if (newCostPrice) {
+                onUpdate(subProduct.id, "cost_price", newCostPrice);
+              }
+              if (newSellingPrice) {
+                onUpdate(subProduct.id, "selling_price", newSellingPrice);
+              }
+            }}
             placeholder="e.g., 0.7"
           />
           <Select
