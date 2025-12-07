@@ -1,125 +1,159 @@
+"use client";
+
 import { useState, useRef, useEffect, useCallback } from "react";
-import { useAppDispatch } from "@/lib/hooks";
-import { addItem } from "@/lib/slices/cartSlice";
-import { useGetProductByBarcodeQuery } from "@/lib/api/productsApi";
+import {
+  useGetProductByBarcodeQuery,
+  type Product,
+} from "@/lib/api/productsApi";
 import toast from "react-hot-toast";
 
-interface UseBarcodeScannerOptions {
-  onScanComplete?: () => void;
+interface BarcodeScanState {
+  index: number;
+  barcode: string;
 }
 
-/**
- * Custom hook for handling barcode scanning
- * Optimized for fast product lookup and cart addition
- */
-export function useBarcodeScanner(options: UseBarcodeScannerOptions = {}) {
-  const { onScanComplete } = options;
-  const dispatch = useAppDispatch();
-  const [barcodeToScan, setBarcodeToScan] = useState<string | null>(null);
+interface UseBarcodeScanner {
+  barcodeToScan: BarcodeScanState | null;
+  processedBarcodes: Set<string>;
+  handleBarcodeKeyDown: (
+    index: number,
+    e: React.KeyboardEvent<HTMLInputElement>
+  ) => void;
+  setBarcodeToScan: (state: BarcodeScanState | null) => void;
+  clearBarcodeState: () => void;
+}
+
+interface UseBarcodeHandlerOptions {
+  onProductFound: (index: number, product: Product) => void;
+  onProductNotFound: (index: number) => void;
+  inputRefs: React.MutableRefObject<{ [key: number]: HTMLInputElement | null }>;
+}
+
+// Detect if input is a barcode
+function isBarcode(value: string): boolean {
+  const trimmed = value.trim();
+  // Numeric barcodes (6+ digits) or alphanumeric (8+ chars)
+  return (
+    (trimmed.length >= 6 && /^[0-9]+$/.test(trimmed)) ||
+    (trimmed.length >= 8 && /^[0-9A-Za-z]+$/.test(trimmed))
+  );
+}
+
+export function useBarcodeScanner(): UseBarcodeScanner {
+  const [barcodeToScan, setBarcodeToScan] = useState<BarcodeScanState | null>(
+    null
+  );
   const processedBarcodesRef = useRef<Set<string>>(new Set());
 
-  // Query product by barcode - optimized with skip
+  const handleBarcodeKeyDown = useCallback(
+    (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === "Enter") {
+        const value = e.currentTarget.value.trim();
+        if (isBarcode(value) && !processedBarcodesRef.current.has(value)) {
+          e.preventDefault();
+          setBarcodeToScan({ index, barcode: value });
+        }
+      }
+    },
+    []
+  );
+
+  const clearBarcodeState = useCallback(() => {
+    setBarcodeToScan(null);
+  }, []);
+
+  return {
+    barcodeToScan,
+    processedBarcodes: processedBarcodesRef.current,
+    handleBarcodeKeyDown,
+    setBarcodeToScan,
+    clearBarcodeState,
+  };
+}
+
+export function useBarcodeHandler(
+  barcodeToScan: BarcodeScanState | null,
+  options: UseBarcodeHandlerOptions
+) {
+  const { onProductFound, onProductNotFound, inputRefs } = options;
+  const processedBarcodesRef = useRef<Set<string>>(new Set());
+
   const {
     data: barcodeProductData,
     error: barcodeError,
-    isLoading,
-  } = useGetProductByBarcodeQuery(barcodeToScan || "", {
-    skip: !barcodeToScan,
+    isLoading: isBarcodeLoading,
+  } = useGetProductByBarcodeQuery(barcodeToScan?.barcode || "", {
+    skip: !barcodeToScan?.barcode,
   });
 
-  // Handle barcode scan result - optimized to run only when needed
   useEffect(() => {
     if (!barcodeToScan) return;
 
-    const barcode = barcodeToScan;
+    const { index, barcode } = barcodeToScan;
 
     // Skip if already processed
     if (processedBarcodesRef.current.has(barcode)) {
       return;
     }
 
-    // Check if we have a product result
+    // Handle successful product found
     if (barcodeProductData?.product) {
       const product = barcodeProductData.product;
-
-      // CRITICAL: Verify the product's barcode matches the current scan
-      // Check both primary barcode and additional barcodes
-      // This prevents adding a cached product from a previous scan
       const matchesPrimaryBarcode = product.barcode === barcode;
       const matchesAdditionalBarcode =
         product.additional_barcodes?.includes(barcode) || false;
 
-      if (!matchesPrimaryBarcode && !matchesAdditionalBarcode) {
-        // Product doesn't match current barcode, wait for correct result or error
-        return;
+      if (matchesPrimaryBarcode || matchesAdditionalBarcode) {
+        processedBarcodesRef.current.add(barcode);
+        onProductFound(index, product);
+
+        // Clear input
+        requestAnimationFrame(() => {
+          const input = inputRefs.current[index];
+          if (input) {
+            input.value = "";
+            input.dispatchEvent(new Event("input", { bubbles: true }));
+            input.blur();
+          }
+        });
+
+        toast.success(`${product.name} selected`);
+
+        // Clean up after delay
+        setTimeout(() => {
+          processedBarcodesRef.current.delete(barcode);
+        }, 200);
       }
+      return;
+    }
 
-      // Mark as processed immediately to prevent duplicates
+    // Handle error case
+    if (barcodeError && !isBarcodeLoading) {
       processedBarcodesRef.current.add(barcode);
+      onProductNotFound(index);
 
-      // Add to cart immediately (optimistic)
-      dispatch(
-        addItem({
-          product_id: product.id,
-          name: product.name,
-          price: product.selling_price,
-          quantity: 1,
-          stock_quantity: product.stock_quantity,
-        })
-      );
+      requestAnimationFrame(() => {
+        const input = inputRefs.current[index];
+        if (input) {
+          input.value = "";
+          input.dispatchEvent(new Event("input", { bubbles: true }));
+          input.blur();
+        }
+      });
 
-      toast.success(`${product.name} added to cart`, { duration: 1500 });
+      toast.error("Product not found");
 
-      // Clear and reset
-      setBarcodeToScan(null);
-      onScanComplete?.();
-
-      // Clean up processed barcode after a short delay
       setTimeout(() => {
         processedBarcodesRef.current.delete(barcode);
-      }, 500);
-    } else if (barcodeError && !isLoading) {
-      // Mark as processed even on error
-      processedBarcodesRef.current.add(barcode);
-
-      toast.error("Product not found", { duration: 1500 });
-      setBarcodeToScan(null);
-      onScanComplete?.();
-
-      // Clean up after delay
-      setTimeout(() => {
-        processedBarcodesRef.current.delete(barcode);
-      }, 500);
+      }, 100);
     }
   }, [
+    barcodeToScan,
     barcodeProductData,
     barcodeError,
-    barcodeToScan,
-    isLoading,
-    dispatch,
-    onScanComplete,
+    isBarcodeLoading,
+    onProductFound,
+    onProductNotFound,
+    inputRefs,
   ]);
-
-  // Scan barcode function
-  const scanBarcode = useCallback((barcode: string) => {
-    const trimmed = barcode.trim();
-    if (trimmed && !processedBarcodesRef.current.has(trimmed)) {
-      setBarcodeToScan(trimmed);
-    }
-  }, []);
-
-  // Check if input looks like a barcode
-  const isBarcodePattern = useCallback((value: string): boolean => {
-    const trimmed = value.trim();
-    return (
-      (trimmed.length >= 8 && /^[0-9A-Za-z]+$/.test(trimmed)) || // Long alphanumeric
-      (trimmed.length >= 6 && /^[0-9]+$/.test(trimmed)) // Numeric barcode
-    );
-  }, []);
-
-  return {
-    scanBarcode,
-    isBarcodePattern,
-    isScanning: isLoading && !!barcodeToScan,
-  };
 }

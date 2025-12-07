@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useLoginMutation } from "@/lib/api/authApi";
 import { useAppDispatch } from "@/lib/hooks";
 import { setCredentials } from "@/lib/slices/authSlice";
+import { Form } from "@/components/ui/Form";
 import toast from "react-hot-toast";
 
 export default function LoginPage() {
@@ -40,7 +41,7 @@ export default function LoginPage() {
             Sign in to your account
           </p>
         </div>
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+        <Form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           <div className="-space-y-px rounded-md shadow-sm">
             <div>
               <label htmlFor="username" className="sr-only">
@@ -87,7 +88,7 @@ export default function LoginPage() {
               {isLoading ? "Signing in..." : "Sign in"}
             </button>
           </div>
-        </form>
+        </Form>
       </div>
     </div>
   );

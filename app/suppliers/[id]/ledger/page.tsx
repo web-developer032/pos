@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Modal } from "@/components/ui/Modal";
+import { Form } from "@/components/ui/Form";
 import { format } from "date-fns";
 import Link from "next/link";
 import { useState } from "react";
@@ -415,7 +416,7 @@ export default function SupplierLedgerPage() {
           title={editingPaymentId ? "Edit Payment" : "Record Payment"}
           size="md"
         >
-          <form
+          <Form
             onSubmit={handleSubmit(handlePaymentSubmit)}
             className="space-y-4"
           >
@@ -490,7 +491,7 @@ export default function SupplierLedgerPage() {
                     : "Record Payment"}
               </Button>
             </div>
-          </form>
+          </Form>
         </Modal>
       </DashboardLayout>
     </ProtectedRoute>

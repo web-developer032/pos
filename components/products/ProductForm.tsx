@@ -20,6 +20,7 @@ import { Select } from "@/components/ui/Select";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
+import { Form } from "@/components/ui/Form";
 import { useFormSubmission } from "@/lib/hooks/useFormSubmission";
 import {
   toFloat,
@@ -31,6 +32,13 @@ import toast from "react-hot-toast";
 import { ProfitPercentage } from "@/components/common/ProfitPercentage";
 import { useBarcodeScanner } from "@/lib/hooks/useBarcodeScanner";
 import { useDebounce } from "@/lib/hooks/useDebounce";
+import { UNIT_OPTIONS, ProductUnit } from "@/lib/constants/productUnits";
+import {
+  SubProductsSection,
+  SubProductInput,
+  createSubProduct,
+} from "./SubProductsSection";
+import { validateSubProducts } from "@/lib/utils/subProductValidation";
 
 // Inline Category Form Component
 function InlineCategoryForm({
@@ -64,7 +72,7 @@ function InlineCategoryForm({
   });
 
   return (
-    <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4">
+    <Form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4">
       <Input
         label="Name *"
         {...register("name", { required: "Name is required" })}
@@ -80,7 +88,7 @@ function InlineCategoryForm({
           {isSubmitting ? "Creating..." : "Create"}
         </Button>
       </div>
-    </form>
+    </Form>
   );
 }
 
@@ -197,6 +205,9 @@ export function ProductForm({
   const baseProductId = watch("base_product_id");
   const isRelatedProduct = !!baseProductId || isCreatingRelatedProduct;
 
+  // State for inline sub-product creation
+  const [subProducts, setSubProducts] = useState<SubProductInput[]>([]);
+
   // Search state for base products (when creating related product)
   const [baseProductSearchTerm, setBaseProductSearchTerm] = useState("");
   const debouncedBaseProductSearch = useDebounce(baseProductSearchTerm, 300);
@@ -251,7 +262,8 @@ export function ProductForm({
     ...baseProducts.map((p) => ({
       value: p.id,
       label: `${p.name}${p.barcode ? ` (${p.barcode})` : ""}`,
-      searchText: `${p.name} ${p.barcode || ""} ${p.sku || ""}`.toLowerCase(),
+      searchText:
+        `${p.name} ${p.barcode || ""} ${p.sku || ""} ${p.additional_barcodes?.join(" ") || ""}`.toLowerCase(),
     })),
   ];
 
@@ -296,6 +308,13 @@ export function ProductForm({
     }
   }, [baseProductId, setValue]);
 
+  // Clear sub-products when switching to related product mode
+  useEffect(() => {
+    if (isCreatingRelatedProduct) {
+      setSubProducts([]);
+    }
+  }, [isCreatingRelatedProduct]);
+
   // Handle SKU generation
   const handleGenerateSKU = async () => {
     try {
@@ -307,6 +326,27 @@ export function ProductForm({
     } catch {
       toast.error("Failed to generate SKU");
     }
+  };
+
+  // Sub-product management
+  const currentUnit = (watch("unit") || "piece") as ProductUnit;
+
+  const handleAddSubProduct = () => {
+    setSubProducts((prev) => [createSubProduct(currentUnit), ...prev]);
+  };
+
+  const handleRemoveSubProduct = (id: string) => {
+    setSubProducts((prev) => prev.filter((sp) => sp.id !== id));
+  };
+
+  const handleUpdateSubProduct = (
+    id: string,
+    field: keyof SubProductInput,
+    value: string
+  ) => {
+    setSubProducts((prev) =>
+      prev.map((sp) => (sp.id === id ? { ...sp, [field]: value } : sp))
+    );
   };
 
   const { handleSubmit: handleFormSubmit, isSubmitting } =
@@ -361,6 +401,11 @@ export function ProductForm({
           }
         }
 
+        // Validate sub-products if any exist
+        if (subProducts.length > 0) {
+          validateSubProducts(subProducts);
+        }
+
         // Convert category_id using formHelpers
         const categoryId = toOptionalId(data.category_id);
 
@@ -392,10 +437,59 @@ export function ProductForm({
             data: submitData,
           }).unwrap();
         } else {
-          return await createProduct(submitData).unwrap();
+          // Create base product first
+          const result = await createProduct(submitData).unwrap();
+          const baseProductId = result.product.id;
+
+          // Create sub-products if any exist
+          if (subProducts.length > 0) {
+            let successCount = 0;
+            let failCount = 0;
+
+            for (const sp of subProducts) {
+              try {
+                await createProduct({
+                  name: sp.name,
+                  barcode: sp.barcode || undefined,
+                  sku: data.sku || undefined, // Inherit SKU from base
+                  category_id: categoryId,
+                  cost_price: roundPrice(toFloat(sp.cost_price)),
+                  selling_price: roundPrice(toFloat(sp.selling_price)),
+                  stock_quantity: 0, // Sub-products don't hold stock
+                  min_stock_level: 0,
+                  unit: sp.unit || data.unit || "piece",
+                  base_product_id: baseProductId,
+                  quantity_multiplier: toFloat(sp.quantity_multiplier),
+                }).unwrap();
+                successCount++;
+              } catch (error) {
+                console.error(
+                  `Failed to create sub-product "${sp.name}":`,
+                  error
+                );
+                failCount++;
+              }
+            }
+
+            // Show summary toast for sub-products
+            if (failCount > 0) {
+              toast.error(
+                `Created base product, but ${failCount} sub-product(s) failed`
+              );
+            } else if (successCount > 0) {
+              toast.success(
+                `Created base product with ${successCount} sub-product(s)`
+              );
+            }
+          }
+
+          return result;
         }
       },
       onSuccess: (result: unknown) => {
+        // Clear sub-products state after successful creation
+        setSubProducts([]);
+
         // If creating a new product and onProductCreated is provided, pass the product
         if (!productId && onProductCreated && result) {
           const productResult = result as {
@@ -407,17 +501,20 @@ export function ProductForm({
       },
       successMessage: productId
         ? "Product updated successfully"
-        : "Product created successfully",
+        : subProducts.length > 0
+          ? undefined // We'll show custom toast for sub-products
+          : "Product created successfully",
       errorMessage: "Failed to save product",
     });
 
   return (
     <>
-      <form
+      <Form
         onSubmit={reactHookFormHandleSubmit((data: ProductFormDataRaw) =>
           handleFormSubmit(data)
         )}
         className="space-y-4"
+        preventEnterSubmit={true}
       >
         {/* Product Relationship Fields - Show when creating related product */}
         {isRelatedProduct && (
@@ -583,6 +680,7 @@ export function ProductForm({
               )}
             />
           </div>
+
           <div>
             <Controller
               name="category_id"
@@ -684,13 +782,7 @@ export function ProductForm({
                   render={({ field }) => (
                     <Select
                       label="Measuring Unit *"
-                      options={[
-                        { value: "piece", label: "Piece" },
-                        { value: "gram", label: "Gram (g)" },
-                        { value: "kilogram", label: "Kilogram (kg)" },
-                        { value: "liter", label: "Liter (L)" },
-                        { value: "milliliter", label: "Milliliter (mL)" },
-                      ]}
+                      options={[...UNIT_OPTIONS]}
                       value={field.value || "piece"}
                       onChange={(e) => field.onChange(e.target.value)}
                       error={errors.unit?.message}
@@ -715,13 +807,7 @@ export function ProductForm({
                 render={({ field }) => (
                   <Select
                     label="Measuring Unit *"
-                    options={[
-                      { value: "piece", label: "Piece" },
-                      { value: "gram", label: "Gram (g)" },
-                      { value: "kilogram", label: "Kilogram (kg)" },
-                      { value: "liter", label: "Liter (L)" },
-                      { value: "milliliter", label: "Milliliter (mL)" },
-                    ]}
+                    options={[...UNIT_OPTIONS]}
                     value={field.value || "piece"}
                     onChange={(e) => field.onChange(e.target.value)}
                     error={errors.unit?.message}
@@ -732,12 +818,23 @@ export function ProductForm({
           </div>
         )}
 
+        {/* Sub-Products Section - Only show when creating new base product */}
+        {!productId && !isRelatedProduct && (
+          <SubProductsSection
+            subProducts={subProducts}
+            parentUnit={currentUnit}
+            onAdd={handleAddSubProduct}
+            onUpdate={handleUpdateSubProduct}
+            onRemove={handleRemoveSubProduct}
+          />
+        )}
+
         <div className="flex justify-end space-x-2">
           <Button type="submit" disabled={isSubmitting}>
             {isSubmitting ? "Saving..." : productId ? "Update" : "Create"}
           </Button>
         </div>
-      </form>
+      </Form>
 
       <Modal
         isOpen={showCategoryModal}

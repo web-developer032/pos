@@ -8,6 +8,7 @@ import {
 } from "@/lib/api/settingsApi";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
+import { Form } from "@/components/ui/Form";
 import { useState, useEffect, useRef } from "react";
 import toast from "react-hot-toast";
 
@@ -100,7 +101,7 @@ function ReceiptSettingsForm() {
   }
 
   return (
-    <form
+    <Form
       onSubmit={handleSubmit}
       className="max-w-4xl space-y-6 rounded-lg bg-white p-6 shadow"
     >
@@ -246,6 +247,6 @@ function ReceiptSettingsForm() {
       <div className="border-t pt-4">
         <Button type="submit">Save Print Settings</Button>
       </div>
-    </form>
+    </Form>
   );
 }

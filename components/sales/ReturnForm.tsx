@@ -11,6 +11,7 @@ import { SaleItem } from "@/lib/api/salesApi";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
+import { Form } from "@/components/ui/Form";
 import { useCurrency } from "@/lib/hooks/useCurrency";
 import toast from "react-hot-toast";
 
@@ -161,7 +162,11 @@ export function ReturnForm({ saleId, saleItems, onSuccess }: ReturnFormProps) {
   };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+    <Form
+      onSubmit={handleSubmit(onSubmit)}
+      className="space-y-4"
+      preventEnterSubmit={true}
+    >
       <div className="max-h-[400px] space-y-2 overflow-y-auto">
         {saleItems.map((item) => {
           const available = getAvailableQuantity(item.id);
@@ -293,6 +298,6 @@ export function ReturnForm({ saleId, saleItems, onSuccess }: ReturnFormProps) {
           {isLoading ? "Processing..." : "Process Return"}
         </Button>
       </div>
-    </form>
+    </Form>
   );
 }
