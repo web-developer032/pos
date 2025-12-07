@@ -202,11 +202,21 @@ export function ProductForm({
 
   const [isCreatingRelatedProduct, setIsCreatingRelatedProduct] =
     useState(false);
+  const [isLinkingToBase, setIsLinkingToBase] = useState(false);
   const baseProductId = watch("base_product_id");
-  const isRelatedProduct = !!baseProductId || isCreatingRelatedProduct;
+  const isRelatedProduct =
+    !!baseProductId || isCreatingRelatedProduct || isLinkingToBase;
 
   // State for inline sub-product creation
   const [subProducts, setSubProducts] = useState<SubProductInput[]>([]);
+
+  // Check if this is an existing sub-product (has base_product_id in loaded data)
+  const isExistingSubProduct = !!(
+    productId && productData?.product?.base_product_id
+  );
+
+  // Get current stock for validation when linking
+  const currentStock = productData?.product?.stock_quantity || 0;
 
   // Search state for base products (when creating related product)
   const [baseProductSearchTerm, setBaseProductSearchTerm] = useState("");
@@ -220,7 +230,7 @@ export function ProductForm({
       categoryId: undefined,
       limit: 50, // Limit results for better performance
     },
-    { skip: !isRelatedProduct } // Only fetch when creating/editing related product
+    { skip: !isRelatedProduct && !isLinkingToBase } // Fetch when creating related product or linking existing
   );
 
   // Filter to get only base products (products without base_product_id)
@@ -578,6 +588,119 @@ export function ProductForm({
             <p className="mt-2 text-xs text-gray-600">
               💡 Check this if this product should share stock with another base
               product
+            </p>
+          </div>
+        )}
+
+        {/* Link existing product to base product (only when editing a non-sub-product) */}
+        {productId && !isExistingSubProduct && !baseProductId && (
+          <div className="mb-4 rounded-lg border border-orange-200 bg-orange-50 p-4">
+            <label className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                checked={isLinkingToBase}
+                onChange={(e) => {
+                  if (e.target.checked && currentStock > 0) {
+                    toast.error(
+                      "Cannot link to base product: This product has stock. Please adjust stock to 0 first."
+                    );
+                    return;
+                  }
+                  setIsLinkingToBase(e.target.checked);
+                  if (!e.target.checked) {
+                    setValue("base_product_id", undefined);
+                    setValue("quantity_multiplier", "");
+                  }
+                }}
+                className="rounded border-gray-300"
+              />
+              <span className="text-sm font-medium text-gray-700">
+                Link to a base product (convert to sub-product)
+              </span>
+            </label>
+            {currentStock > 0 && (
+              <p className="mt-2 text-xs text-red-600">
+                ⚠️ This product has {currentStock} units in stock. Stock must be
+                0 to link to a base product.
+              </p>
+            )}
+            {currentStock === 0 && (
+              <p className="mt-2 text-xs text-gray-600">
+                💡 Link this product to share stock with a base product
+              </p>
+            )}
+
+            {isLinkingToBase && (
+              <div className="mt-4 space-y-4">
+                <Controller
+                  name="base_product_id"
+                  control={control}
+                  render={({ field }) => (
+                    <SearchableSelect
+                      label="Select Base Product *"
+                      options={baseProductOptions.filter(
+                        (opt) => opt.value !== productId // Exclude self
+                      )}
+                      value={field.value || ""}
+                      onChange={(value) => {
+                        field.onChange(
+                          value === "" || value === 0
+                            ? undefined
+                            : Number(value)
+                        );
+                      }}
+                      placeholder="Search by name or scan barcode..."
+                      searchPlaceholder="Type name or scan barcode..."
+                      onKeyDown={handleBaseProductBarcodeScan}
+                      onSearch={(term) => setBaseProductSearchTerm(term)}
+                      error={errors.base_product_id?.message as string}
+                    />
+                  )}
+                />
+                <Input
+                  label="Quantity Multiplier *"
+                  type="number"
+                  step="0.01"
+                  {...register("quantity_multiplier")}
+                  error={errors.quantity_multiplier?.message}
+                  placeholder="e.g., 0.7 for 700g of 1kg base"
+                />
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Unlink from base product (when editing an existing sub-product) */}
+        {productId && isExistingSubProduct && (
+          <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 p-4">
+            <h4 className="mb-2 text-sm font-semibold text-gray-800">
+              Currently Linked to Base Product
+            </h4>
+            <div className="mb-3 rounded bg-white p-3">
+              <p className="text-sm text-gray-700">
+                <span className="font-medium">Base Product ID:</span>{" "}
+                {productData?.product?.base_product_id}
+              </p>
+              <p className="text-sm text-gray-700">
+                <span className="font-medium">Quantity Multiplier:</span>{" "}
+                {productData?.product?.quantity_multiplier || "Not set"}
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setValue("base_product_id", undefined);
+                setValue("quantity_multiplier", "");
+                toast.success("Link removed. Save to apply changes.");
+              }}
+              className="text-red-600 hover:text-red-700"
+            >
+              Unlink from Base Product
+            </Button>
+            <p className="mt-2 text-xs text-gray-600">
+              ⚠️ Unlinking will make this an independent product. You may need
+              to set stock quantity after saving.
             </p>
           </div>
         )}

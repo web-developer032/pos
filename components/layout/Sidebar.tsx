@@ -23,6 +23,12 @@ const menuItems: MenuItem[] = [
     roles: ["admin", "cashier", "manager"],
   },
   { name: "Products", href: "/products", icon: "📦" },
+  {
+    name: "Bulk Link Products",
+    href: "/products/bulk-link",
+    icon: "🔗",
+    roles: ["admin", "manager"],
+  },
   { name: "Categories", href: "/categories", icon: "📁" },
   { name: "Suppliers", href: "/suppliers", icon: "🚚" },
   { name: "Customers", href: "/customers", icon: "👥" },
