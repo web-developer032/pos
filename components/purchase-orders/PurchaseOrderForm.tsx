@@ -17,6 +17,7 @@ import {
   useGetProductsQuery,
   useGetProductByBarcodeQuery,
   type Product,
+  ProductUnit,
 } from "@/lib/api/productsApi";
 import { ProductForm } from "@/components/products/ProductForm";
 import { Input } from "@/components/ui/Input";
@@ -232,6 +233,40 @@ export function PurchaseOrderForm({
   useEffect(() => {
     if (purchaseOrderData && isEditMode) {
       const { purchase_order, items } = purchaseOrderData;
+
+      // Populate cache with product data from items
+      items.forEach((item) => {
+        if (
+          item.product_id &&
+          item.product_name &&
+          item.product_name !== "Deleted Product"
+        ) {
+          // Create a minimal Product object for the cache
+          const productData: Product = {
+            id: item.product_id,
+            name: item.product_name,
+            sku: (item as { product_sku?: string }).product_sku || "",
+            barcode:
+              (item as { product_barcode?: string }).product_barcode ||
+              undefined,
+            cost_price:
+              (item as { product_cost_price?: number }).product_cost_price ??
+              item.unit_cost,
+            selling_price:
+              (item as { product_selling_price?: number })
+                .product_selling_price ?? 0,
+            stock_quantity: 0,
+            min_stock_level: 0,
+            category_id: undefined,
+            image_url: undefined,
+            unit: "piece" as ProductUnit,
+            base_product_id: undefined,
+            quantity_multiplier: undefined,
+          };
+          productsCache.current.set(item.product_id, productData);
+        }
+      });
+
       reset({
         supplier_id: purchase_order.supplier_id,
         items:
