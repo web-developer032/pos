@@ -45,6 +45,7 @@ const purchaseOrderSchema = z.object({
           .refine((val) => val > 0, { message: "Product is required" }),
         quantity: z.number().int().min(1, "Min 1"),
         unit_cost: z.number().min(0, "Min 0"),
+        retail_price: z.number().min(0).optional(),
       })
     )
     .min(1, "At least one item required"),
@@ -117,7 +118,7 @@ export function PurchaseOrderForm({
     resolver: zodResolver(purchaseOrderSchema),
     defaultValues: {
       supplier_id: 0,
-      items: [{ product_id: 0, quantity: 1, unit_cost: 0 }],
+      items: [{ product_id: 0, quantity: 1, unit_cost: 0, retail_price: 0 }],
       discount_type: undefined,
       discount_value: undefined,
     },
@@ -190,8 +191,10 @@ export function PurchaseOrderForm({
                 product_id: item.product_id,
                 quantity: item.quantity,
                 unit_cost: item.unit_cost,
+                retail_price:
+                  item.retail_price || item.product_selling_price || 0,
               }))
-            : [{ product_id: 0, quantity: 1, unit_cost: 0 }],
+            : [{ product_id: 0, quantity: 1, unit_cost: 0, retail_price: 0 }],
         discount_type: purchase_order.discount_type || undefined,
         discount_value: purchase_order.discount_value || undefined,
       });
@@ -207,6 +210,7 @@ export function PurchaseOrderForm({
           shouldValidate: true,
         });
         setValue(`items.${index}.unit_cost`, product.cost_price);
+        setValue(`items.${index}.retail_price`, product.selling_price);
         setProductSearch("");
         clearBarcodeState();
       },
@@ -251,7 +255,7 @@ export function PurchaseOrderForm({
 
   // Handlers
   const handleAddItem = useCallback(() => {
-    prepend({ product_id: 0, quantity: 1, unit_cost: 0 });
+    prepend({ product_id: 0, quantity: 1, unit_cost: 0, retail_price: 0 });
     setTimeout(() => {
       productInputRefs.current[0]?.focus();
       productInputRefs.current[0]?.click();
@@ -269,6 +273,7 @@ export function PurchaseOrderForm({
           shouldValidate: true,
         });
         setValue(`items.${index}.unit_cost`, product.cost_price);
+        setValue(`items.${index}.retail_price`, product.selling_price);
         setProductSearch("");
       }
     },
@@ -295,6 +300,7 @@ export function PurchaseOrderForm({
           product_id: item.product_id,
           quantity: item.quantity,
           unit_cost: item.unit_cost,
+          retail_price: item.retail_price || undefined,
         })),
         ...(data.discount_type && data.discount_value
           ? {
@@ -405,6 +411,7 @@ export function PurchaseOrderForm({
                 productId={watchedItems[index]?.product_id || 0}
                 quantity={watchedItems[index]?.quantity || 0}
                 unitCost={watchedItems[index]?.unit_cost || 0}
+                retailPrice={watchedItems[index]?.retail_price || 0}
                 productOptions={productOptions}
                 errors={errors.items?.[index]}
                 register={register}

@@ -10,6 +10,7 @@ interface PurchaseOrderItemData {
   product_id: number;
   quantity: number;
   unit_cost: number;
+  retail_price?: number;
 }
 
 interface ProductOption {
@@ -24,6 +25,7 @@ interface PurchaseOrderItemProps {
   productId: number;
   quantity: number;
   unitCost: number;
+  retailPrice: number;
   productOptions: ProductOption[];
   errors?: FieldErrors<PurchaseOrderItemData>;
   register: UseFormRegister<{
@@ -49,6 +51,7 @@ export const PurchaseOrderItem = memo(
         productId,
         quantity,
         unitCost,
+        retailPrice,
         productOptions,
         errors,
         register,
@@ -63,6 +66,8 @@ export const PurchaseOrderItem = memo(
       const { format: formatCurrency } = useCurrency();
       const subtotal = (quantity || 0) * (unitCost || 0);
       const hasValues = productId > 0 && quantity > 0 && unitCost > 0;
+      const profit = (retailPrice || 0) - (unitCost || 0);
+      const profitMargin = unitCost > 0 ? (profit / unitCost) * 100 : 0;
 
       return (
         <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm transition-shadow hover:shadow-md">
@@ -97,10 +102,10 @@ export const PurchaseOrderItem = memo(
             )}
           </div>
 
-          {/* Fields */}
+          {/* Fields - Row 1: Product and Quantity */}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-12">
             {/* Product - takes more space */}
-            <div className="sm:col-span-6">
+            <div className="sm:col-span-8">
               <SearchableSelect
                 ref={ref}
                 label="Product"
@@ -141,20 +146,6 @@ export const PurchaseOrderItem = memo(
               />
             </div>
 
-            {/* Unit Cost */}
-            <div className="sm:col-span-2">
-              <Input
-                label="Cost"
-                type="number"
-                step="0.01"
-                min="0"
-                {...register(`items.${index}.unit_cost`, {
-                  valueAsNumber: true,
-                })}
-                error={errors?.unit_cost?.message}
-              />
-            </div>
-
             {/* Subtotal */}
             <div className="flex items-end sm:col-span-2">
               <div className="w-full rounded-md bg-gray-50 px-3 py-2">
@@ -165,6 +156,63 @@ export const PurchaseOrderItem = memo(
                   {hasValues ? formatCurrency(subtotal) : "—"}
                 </span>
               </div>
+            </div>
+          </div>
+
+          {/* Fields - Row 2: Cost, Retail Price, Profit */}
+          <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-12">
+            {/* Unit Cost */}
+            <div className="sm:col-span-3">
+              <Input
+                label="Cost Price"
+                type="number"
+                step="0.01"
+                min="0"
+                {...register(`items.${index}.unit_cost`, {
+                  valueAsNumber: true,
+                })}
+                error={errors?.unit_cost?.message}
+              />
+            </div>
+
+            {/* Retail Price */}
+            <div className="sm:col-span-3">
+              <Input
+                label="Retail Price"
+                type="number"
+                step="0.01"
+                min="0"
+                {...register(`items.${index}.retail_price`, {
+                  valueAsNumber: true,
+                })}
+                error={errors?.retail_price?.message}
+              />
+            </div>
+
+            {/* Profit Display */}
+            <div className="flex items-end sm:col-span-6">
+              {hasValues && retailPrice > 0 && (
+                <div className="flex w-full gap-2">
+                  <div className="flex-1 rounded-md bg-gray-50 px-3 py-2">
+                    <span className="block text-xs text-gray-500">
+                      Profit/Unit
+                    </span>
+                    <span
+                      className={`block text-sm font-semibold ${profit >= 0 ? "text-green-600" : "text-red-600"}`}
+                    >
+                      {formatCurrency(profit)}
+                    </span>
+                  </div>
+                  <div className="flex-1 rounded-md bg-gray-50 px-3 py-2">
+                    <span className="block text-xs text-gray-500">Margin</span>
+                    <span
+                      className={`block text-sm font-semibold ${profitMargin >= 0 ? "text-green-600" : "text-red-600"}`}
+                    >
+                      {profitMargin.toFixed(1)}%
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

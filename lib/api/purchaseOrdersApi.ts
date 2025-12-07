@@ -22,8 +22,13 @@ export interface PurchaseOrderItem {
   product_id: number;
   quantity: number;
   unit_cost: number;
+  retail_price?: number;
   subtotal: number;
   product_name?: string;
+  product_sku?: string;
+  product_barcode?: string;
+  product_cost_price?: number;
+  product_selling_price?: number;
 }
 
 export interface CreatePurchaseOrderRequest {
@@ -32,6 +37,7 @@ export interface CreatePurchaseOrderRequest {
     product_id: number;
     quantity: number;
     unit_cost: number;
+    retail_price?: number;
   }[];
   discount_type?: "percentage" | "amount";
   discount_value?: number;
@@ -43,6 +49,7 @@ export interface UpdatePurchaseOrderItemsRequest {
     product_id: number;
     quantity: number;
     unit_cost: number;
+    retail_price?: number;
   }[];
   discount_type?: "percentage" | "amount";
   discount_value?: number;

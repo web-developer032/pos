@@ -61,6 +61,7 @@ const updateItemsSchema = z.object({
         product_id: z.number(),
         quantity: z.number().int().min(1),
         unit_cost: z.number().min(0),
+        retail_price: z.number().min(0).optional(),
       })
     )
     .optional(),
@@ -144,15 +145,17 @@ async function putHandler(req: AuthRequest, context?: RouteContext) {
         // Insert new items
         for (const item of validated.items) {
           const roundedUnitCost = roundPrice(item.unit_cost);
+          const roundedRetailPrice = item.retail_price ? roundPrice(item.retail_price) : null;
           const itemSubtotal = roundPrice(item.quantity * roundedUnitCost);
           await client.execute({
-            sql: `INSERT INTO purchase_order_items (po_id, product_id, quantity, unit_cost, subtotal) 
-                  VALUES (?, ?, ?, ?, ?)`,
+            sql: `INSERT INTO purchase_order_items (po_id, product_id, quantity, unit_cost, retail_price, subtotal) 
+                  VALUES (?, ?, ?, ?, ?, ?)`,
             args: [
               poId,
               item.product_id,
               item.quantity,
               roundedUnitCost,
+              roundedRetailPrice,
               itemSubtotal,
             ],
           });
@@ -199,10 +202,10 @@ async function putHandler(req: AuthRequest, context?: RouteContext) {
         args: [status, params.id],
       });
 
-      // If completing, update inventory and cost prices
+      // If completing, update inventory and cost/retail prices
       if (status === "completed") {
         const itemsResult = await client.execute({
-          sql: "SELECT product_id, quantity, unit_cost FROM purchase_order_items WHERE po_id = ?",
+          sql: "SELECT product_id, quantity, unit_cost, retail_price FROM purchase_order_items WHERE po_id = ?",
           args: [params.id],
         });
 
@@ -210,6 +213,7 @@ async function putHandler(req: AuthRequest, context?: RouteContext) {
           product_id: number;
           quantity: number;
           unit_cost: number;
+          retail_price: number | null;
         }[]) {
           // Get current product information
           const productResult = await client.execute({
@@ -253,6 +257,14 @@ async function putHandler(req: AuthRequest, context?: RouteContext) {
             sql: "UPDATE products SET cost_price = ? WHERE id = ?",
             args: [roundPrice(newCostPrice), item.product_id],
           });
+
+          // Update selling price if retail_price was specified
+          if (item.retail_price !== null && item.retail_price > 0) {
+            await client.execute({
+              sql: "UPDATE products SET selling_price = ? WHERE id = ?",
+              args: [roundPrice(item.retail_price), item.product_id],
+            });
+          }
         }
       }
 

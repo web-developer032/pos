@@ -150,6 +150,7 @@ export async function initializeDatabase() {
       product_id INTEGER NOT NULL,
       quantity INTEGER NOT NULL,
       unit_cost REAL NOT NULL,
+      retail_price REAL,
       subtotal REAL NOT NULL,
       FOREIGN KEY (po_id) REFERENCES purchase_orders(id) ON DELETE CASCADE,
       FOREIGN KEY (product_id) REFERENCES products(id)

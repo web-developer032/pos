@@ -17,6 +17,7 @@ const poSchema = z.object({
       product_id: z.number(),
       quantity: z.number().int().min(1),
       unit_cost: z.number().min(0),
+      retail_price: z.number().min(0).optional(),
     })
   ),
   discount_type: z.enum(["percentage", "amount"]).optional(),
@@ -114,15 +115,17 @@ async function postHandler(req: AuthRequest) {
 
     for (const item of validated.items) {
       const roundedUnitCost = roundPrice(item.unit_cost);
+      const roundedRetailPrice = item.retail_price ? roundPrice(item.retail_price) : null;
       const itemSubtotal = roundPrice(item.quantity * roundedUnitCost);
       await client.execute({
-        sql: `INSERT INTO purchase_order_items (po_id, product_id, quantity, unit_cost, subtotal) 
-              VALUES (?, ?, ?, ?, ?)`,
+        sql: `INSERT INTO purchase_order_items (po_id, product_id, quantity, unit_cost, retail_price, subtotal) 
+              VALUES (?, ?, ?, ?, ?, ?)`,
         args: [
           poId,
           item.product_id,
           item.quantity,
           roundedUnitCost,
+          roundedRetailPrice,
           itemSubtotal,
         ],
       });
