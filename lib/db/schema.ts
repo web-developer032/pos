@@ -352,4 +352,19 @@ export async function initializeDatabase() {
   await client.execute(
     `CREATE INDEX IF NOT EXISTS idx_expenses_category ON expenses(category)`
   );
+
+  // ============ MIGRATIONS ============
+  // Add retail_price column to purchase_order_items if it doesn't exist
+  const poItemsInfo = await client.execute(
+    `PRAGMA table_info(purchase_order_items)`
+  );
+  const hasRetailPrice = poItemsInfo.rows.some(
+    (row) => (row as Record<string, unknown>).name === "retail_price"
+  );
+  if (!hasRetailPrice) {
+    console.log("[DB] Adding retail_price column to purchase_order_items...");
+    await client.execute(
+      `ALTER TABLE purchase_order_items ADD COLUMN retail_price REAL`
+    );
+  }
 }

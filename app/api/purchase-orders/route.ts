@@ -91,50 +91,64 @@ async function postHandler(req: AuthRequest) {
     let discountAmount = 0;
     if (validated.discount_type && validated.discount_value) {
       if (validated.discount_type === "percentage") {
-        discountAmount = roundPrice((subtotal * validated.discount_value) / 100);
+        discountAmount = roundPrice(
+          (subtotal * validated.discount_value) / 100
+        );
       } else {
         discountAmount = roundPrice(validated.discount_value);
       }
     }
     const totalAmount = roundPrice(Math.max(0, subtotal - discountAmount));
 
-    const poResult = await client.execute({
-      sql: `INSERT INTO purchase_orders (po_number, supplier_id, user_id, total_amount, discount_type, discount_value) 
-            VALUES (?, ?, ?, ?, ?, ?) RETURNING *`,
-      args: [
-        poNumber,
-        validated.supplier_id,
-        user.userId,
-        totalAmount,
-        validated.discount_type || null,
-        validated.discount_value || null,
-      ],
-    });
+    // Use transaction to ensure atomicity - if items fail, PO header is rolled back
+    await client.execute("BEGIN TRANSACTION");
 
-    const poId = (poResult.rows[0] as unknown as { id: number }).id;
-
-    for (const item of validated.items) {
-      const roundedUnitCost = roundPrice(item.unit_cost);
-      const roundedRetailPrice = item.retail_price ? roundPrice(item.retail_price) : null;
-      const itemSubtotal = roundPrice(item.quantity * roundedUnitCost);
-      await client.execute({
-        sql: `INSERT INTO purchase_order_items (po_id, product_id, quantity, unit_cost, retail_price, subtotal) 
-              VALUES (?, ?, ?, ?, ?, ?)`,
+    try {
+      const poResult = await client.execute({
+        sql: `INSERT INTO purchase_orders (po_number, supplier_id, user_id, total_amount, discount_type, discount_value) 
+              VALUES (?, ?, ?, ?, ?, ?) RETURNING *`,
         args: [
-          poId,
-          item.product_id,
-          item.quantity,
-          roundedUnitCost,
-          roundedRetailPrice,
-          itemSubtotal,
+          poNumber,
+          validated.supplier_id,
+          user.userId,
+          totalAmount,
+          validated.discount_type || null,
+          validated.discount_value || null,
         ],
       });
-    }
 
-    return NextResponse.json(
-      { purchase_order: poResult.rows[0] },
-      { status: 201 }
-    );
+      const poId = (poResult.rows[0] as unknown as { id: number }).id;
+
+      for (const item of validated.items) {
+        const roundedUnitCost = roundPrice(item.unit_cost);
+        const roundedRetailPrice = item.retail_price
+          ? roundPrice(item.retail_price)
+          : null;
+        const itemSubtotal = roundPrice(item.quantity * roundedUnitCost);
+        await client.execute({
+          sql: `INSERT INTO purchase_order_items (po_id, product_id, quantity, unit_cost, retail_price, subtotal) 
+                VALUES (?, ?, ?, ?, ?, ?)`,
+          args: [
+            poId,
+            item.product_id,
+            item.quantity,
+            roundedUnitCost,
+            roundedRetailPrice,
+            itemSubtotal,
+          ],
+        });
+      }
+
+      await client.execute("COMMIT");
+
+      return NextResponse.json(
+        { purchase_order: poResult.rows[0] },
+        { status: 201 }
+      );
+    } catch (txError) {
+      await client.execute("ROLLBACK");
+      throw txError;
+    }
   } catch (error) {
     const validationError = handleValidationError(error);
     if (validationError) return validationError;
