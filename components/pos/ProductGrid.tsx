@@ -68,6 +68,20 @@ export function ProductGrid() {
   // Use barcode scanner hook for pattern detection
   const { isBarcodePattern } = useBarcodeScanner();
 
+  // F8 keyboard shortcut to focus search input
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "F8") {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+        searchInputRef.current?.select();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
   // Handle barcode product lookup result
   useEffect(() => {
     if (!barcodeToScan) return;
