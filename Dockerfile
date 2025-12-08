@@ -9,8 +9,9 @@ RUN corepack enable && corepack prepare pnpm@latest --activate
 # Copy package files
 COPY package.json pnpm-lock.yaml* ./
 
-# Install dependencies
-RUN pnpm install --frozen-lockfile
+# Install dependencies with cache mount for pnpm store
+RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
+    pnpm install --frozen-lockfile
 
 # Stage 2: Builder
 FROM node:20-alpine AS builder
@@ -21,17 +22,27 @@ RUN corepack enable && corepack prepare pnpm@latest --activate
 
 # Copy dependencies from deps stage
 COPY --from=deps /app/node_modules ./node_modules
-COPY . .
 
-# Ensure public directory exists (Next.js may not have one)
+# Copy config files first (changes less often)
+COPY package.json pnpm-lock.yaml* tsconfig.json next.config.js postcss.config.js tailwind.config.ts ./
+
+# Copy source files (separate layers for better caching)
+COPY lib ./lib
+COPY app ./app
+COPY components ./components
+COPY scripts ./scripts
+COPY instrumentation.ts ./
+
+# Create public directory (may not exist)
 RUN mkdir -p ./public
 
 # Set environment variables for build
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 
-# Build the application
-RUN pnpm run build
+# Build with cache mount for Next.js cache
+RUN --mount=type=cache,target=/app/.next/cache \
+    pnpm run build
 
 # Stage 3: Runner
 FROM node:20-alpine AS runner
@@ -61,9 +72,10 @@ COPY --from=builder /app/scripts ./scripts
 COPY --from=builder /app/lib ./lib
 COPY --from=builder /app/tsconfig.json ./tsconfig.json
 
-# Install production dependencies (including native modules for libsql)
+# Install production dependencies with cache mount
 RUN corepack enable && corepack prepare pnpm@latest --activate
-RUN pnpm install --prod --frozen-lockfile
+RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
+    pnpm install --prod --frozen-lockfile
 
 # Install tsx and typescript globally for database initialization (using npm for global installs)
 RUN npm install -g tsx typescript

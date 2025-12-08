@@ -456,14 +456,58 @@ export function ProductForm({
         };
 
         if (productId) {
-          return await updateProduct({
+          const result = await updateProduct({
             id: productId,
             data: submitData,
           }).unwrap();
+
+          // Create sub-products if any were added while editing
+          if (subProducts.length > 0) {
+            let successCount = 0;
+            let failCount = 0;
+
+            for (const sp of subProducts) {
+              try {
+                await createProduct({
+                  name: sp.name,
+                  barcode: sp.barcode || undefined,
+                  sku: data.sku || undefined, // Inherit SKU from base
+                  category_id: categoryId,
+                  cost_price: roundPrice(toFloat(sp.cost_price)),
+                  selling_price: roundPrice(toFloat(sp.selling_price)),
+                  stock_quantity: 0, // Sub-products don't hold stock
+                  min_stock_level: 0,
+                  unit: sp.unit || data.unit || "piece",
+                  base_product_id: productId,
+                  quantity_multiplier: toFloat(sp.quantity_multiplier),
+                }).unwrap();
+                successCount++;
+              } catch (error) {
+                console.error(
+                  `Failed to create sub-product "${sp.name}":`,
+                  error
+                );
+                failCount++;
+              }
+            }
+
+            // Show summary toast for sub-products
+            if (failCount > 0) {
+              toast.error(
+                `Updated product, but ${failCount} sub-product(s) failed to create`
+              );
+            } else if (successCount > 0) {
+              toast.success(
+                `Updated product and created ${successCount} sub-product(s)`
+              );
+            }
+          }
+
+          return result;
         } else {
           // Create base product first
           const result = await createProduct(submitData).unwrap();
-          const baseProductId = result.product.id;
+          const newProductId = result.product.id;
 
           // Create sub-products if any exist
           if (subProducts.length > 0) {
@@ -482,7 +526,7 @@ export function ProductForm({
                   stock_quantity: 0, // Sub-products don't hold stock
                   min_stock_level: 0,
                   unit: sp.unit || data.unit || "piece",
-                  base_product_id: baseProductId,
+                  base_product_id: newProductId,
                   quantity_multiplier: toFloat(sp.quantity_multiplier),
                 }).unwrap();
                 successCount++;
@@ -523,10 +567,10 @@ export function ProductForm({
         }
         onSuccess?.();
       },
-      successMessage: productId
-        ? "Product updated successfully"
-        : subProducts.length > 0
-          ? undefined // We'll show custom toast for sub-products
+      successMessage: subProducts.length > 0
+        ? undefined // We'll show custom toast for sub-products
+        : productId
+          ? "Product updated successfully"
           : "Product created successfully",
       errorMessage: "Failed to save product",
     });
@@ -1061,8 +1105,8 @@ export function ProductForm({
           </div>
         )}
 
-        {/* Sub-Products Section - Only show when creating new base product */}
-        {!productId && !isRelatedProduct && (
+        {/* Sub-Products Section - Show for base products (new or editing) */}
+        {!isRelatedProduct && !isExistingSubProduct && (
           <SubProductsSection
             subProducts={subProducts}
             parentUnit={currentUnit}

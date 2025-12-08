@@ -8,6 +8,7 @@ import { useCurrency } from "@/lib/hooks/useCurrency";
 
 interface PurchaseOrderItemData {
   product_id: number;
+  product_name?: string;
   quantity: number;
   unit_cost: number;
   retail_price?: number;
@@ -23,6 +24,7 @@ interface PurchaseOrderItemProps {
   itemNumber: number;
   canRemove: boolean;
   productId: number;
+  productName: string;
   quantity: number;
   unitCost: number;
   retailPrice: number;
@@ -112,8 +114,8 @@ export const PurchaseOrderItem = memo(
 
           {/* Fields Grid */}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-6">
-            {/* Product - full width on mobile, 3 cols on desktop */}
-            <div className="col-span-2 sm:col-span-3">
+            {/* Product Select - full width on mobile, 2 cols on desktop */}
+            <div className="col-span-2">
               <SearchableSelect
                 ref={ref}
                 label="Product"
@@ -139,6 +141,16 @@ export const PurchaseOrderItem = memo(
               >
                 + New Product
               </button>
+            </div>
+
+            {/* Product Name - editable */}
+            <div className="col-span-2">
+              <Input
+                label="Name"
+                placeholder="Product name"
+                {...register(`items.${index}.product_name`)}
+                error={errors?.product_name?.message}
+              />
             </div>
 
             {/* Quantity */}

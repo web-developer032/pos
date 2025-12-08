@@ -59,6 +59,7 @@ const updateItemsSchema = z.object({
     .array(
       z.object({
         product_id: z.number(),
+        product_name: z.string().optional(),
         quantity: z.number().int().min(1),
         unit_cost: z.number().min(0),
         retail_price: z.number().min(0).optional(),
@@ -150,11 +151,12 @@ async function putHandler(req: AuthRequest, context?: RouteContext) {
             : null;
           const itemSubtotal = roundPrice(item.quantity * roundedUnitCost);
           await client.execute({
-            sql: `INSERT INTO purchase_order_items (po_id, product_id, quantity, unit_cost, retail_price, subtotal) 
-                  VALUES (?, ?, ?, ?, ?, ?)`,
+            sql: `INSERT INTO purchase_order_items (po_id, product_id, product_name, quantity, unit_cost, retail_price, subtotal) 
+                  VALUES (?, ?, ?, ?, ?, ?, ?)`,
             args: [
               poId,
               item.product_id,
+              item.product_name || null,
               item.quantity,
               roundedUnitCost,
               roundedRetailPrice,
@@ -219,13 +221,14 @@ async function putHandler(req: AuthRequest, context?: RouteContext) {
         };
 
         const itemsResult = await client.execute({
-          sql: "SELECT product_id, quantity, unit_cost, retail_price, subtotal FROM purchase_order_items WHERE po_id = ?",
+          sql: "SELECT product_id, product_name, quantity, unit_cost, retail_price, subtotal FROM purchase_order_items WHERE po_id = ?",
           args: [params.id],
         });
 
         // Calculate subtotal (before discount)
         const items = itemsResult.rows as unknown as {
           product_id: number;
+          product_name: string | null;
           quantity: number;
           unit_cost: number;
           retail_price: number | null;
@@ -309,6 +312,14 @@ async function putHandler(req: AuthRequest, context?: RouteContext) {
             await client.execute({
               sql: "UPDATE products SET selling_price = ? WHERE id = ?",
               args: [roundPrice(item.retail_price), item.product_id],
+            });
+          }
+
+          // Update product name if specified
+          if (item.product_name) {
+            await client.execute({
+              sql: "UPDATE products SET name = ? WHERE id = ?",
+              args: [item.product_name, item.product_id],
             });
           }
         }

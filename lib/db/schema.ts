@@ -367,4 +367,15 @@ export async function initializeDatabase() {
       `ALTER TABLE purchase_order_items ADD COLUMN retail_price REAL`
     );
   }
+
+  // Add product_name column to purchase_order_items if it doesn't exist
+  const hasProductName = poItemsInfo.rows.some(
+    (row) => (row as Record<string, unknown>).name === "product_name"
+  );
+  if (!hasProductName) {
+    console.log("[DB] Adding product_name column to purchase_order_items...");
+    await client.execute(
+      `ALTER TABLE purchase_order_items ADD COLUMN product_name TEXT`
+    );
+  }
 }

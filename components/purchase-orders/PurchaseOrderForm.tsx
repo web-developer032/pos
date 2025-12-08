@@ -43,6 +43,7 @@ const purchaseOrderSchema = z.object({
         product_id: z
           .number()
           .refine((val) => val > 0, { message: "Product is required" }),
+        product_name: z.string().optional(),
         quantity: z.number().int().min(1, "Min 1"),
         unit_cost: z.number().min(0, "Min 0"),
         retail_price: z.number().min(0).optional(),
@@ -118,7 +119,15 @@ export function PurchaseOrderForm({
     resolver: zodResolver(purchaseOrderSchema),
     defaultValues: {
       supplier_id: 0,
-      items: [{ product_id: 0, quantity: 1, unit_cost: 0, retail_price: 0 }],
+      items: [
+        {
+          product_id: 0,
+          product_name: "",
+          quantity: 1,
+          unit_cost: 0,
+          retail_price: 0,
+        },
+      ],
       discount_type: undefined,
       discount_value: undefined,
     },
@@ -186,12 +195,21 @@ export function PurchaseOrderForm({
           items.length > 0
             ? items.map((item) => ({
                 product_id: item.product_id,
+                product_name: item.product_name || "",
                 quantity: item.quantity,
                 unit_cost: item.unit_cost,
                 retail_price:
                   item.retail_price || item.product_selling_price || 0,
               }))
-            : [{ product_id: 0, quantity: 1, unit_cost: 0, retail_price: 0 }],
+            : [
+                {
+                  product_id: 0,
+                  product_name: "",
+                  quantity: 1,
+                  unit_cost: 0,
+                  retail_price: 0,
+                },
+              ],
         discount_type: purchase_order.discount_type || undefined,
         discount_value: purchase_order.discount_value || undefined,
       });
@@ -206,6 +224,7 @@ export function PurchaseOrderForm({
         setValue(`items.${index}.product_id`, product.id, {
           shouldValidate: true,
         });
+        setValue(`items.${index}.product_name`, product.name);
         setValue(`items.${index}.unit_cost`, product.cost_price);
         setValue(`items.${index}.retail_price`, product.selling_price);
         setProductSearch("");
@@ -252,7 +271,13 @@ export function PurchaseOrderForm({
 
   // Handlers
   const handleAddItem = useCallback(() => {
-    prepend({ product_id: 0, quantity: 1, unit_cost: 0, retail_price: 0 });
+    prepend({
+      product_id: 0,
+      product_name: "",
+      quantity: 1,
+      unit_cost: 0,
+      retail_price: 0,
+    });
     setTimeout(() => {
       productInputRefs.current[0]?.focus();
       productInputRefs.current[0]?.click();
@@ -269,6 +294,7 @@ export function PurchaseOrderForm({
         setValue(`items.${index}.product_id`, productId, {
           shouldValidate: true,
         });
+        setValue(`items.${index}.product_name`, product.name);
         setValue(`items.${index}.unit_cost`, product.cost_price);
         setValue(`items.${index}.retail_price`, product.selling_price);
         setProductSearch("");
@@ -295,6 +321,7 @@ export function PurchaseOrderForm({
         supplier_id: data.supplier_id,
         items: data.items.map((item) => ({
           product_id: item.product_id,
+          product_name: item.product_name || undefined,
           quantity: item.quantity,
           unit_cost: item.unit_cost,
           retail_price: item.retail_price || undefined,
@@ -406,6 +433,7 @@ export function PurchaseOrderForm({
                 itemNumber={index + 1}
                 canRemove={fields.length > 1}
                 productId={watchedItems[index]?.product_id || 0}
+                productName={watchedItems[index]?.product_name || ""}
                 quantity={watchedItems[index]?.quantity || 0}
                 unitCost={watchedItems[index]?.unit_cost || 0}
                 retailPrice={watchedItems[index]?.retail_price || 0}
@@ -496,6 +524,7 @@ export function PurchaseOrderForm({
               setValue(`items.${productModalIndex}.product_id`, product.id, {
                 shouldValidate: true,
               });
+              setValue(`items.${productModalIndex}.product_name`, product.name);
               setValue(
                 `items.${productModalIndex}.unit_cost`,
                 product.cost_price

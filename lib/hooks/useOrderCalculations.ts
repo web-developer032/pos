@@ -20,6 +20,12 @@ export function useOrderCalculations(
   discountType?: "percentage" | "amount",
   discountValue?: number
 ): OrderCalculations {
+  // Create a stable key from item values to properly trigger recalculations
+  // when item contents change (react-hook-form may reuse array references)
+  const itemsKey = items
+    .map((item) => `${item.product_id}-${item.quantity}-${item.unit_cost}`)
+    .join("|");
+
   return useMemo(() => {
     const subtotal = items.reduce(
       (sum, item) => sum + (item.quantity || 0) * (item.unit_cost || 0),
@@ -28,11 +34,11 @@ export function useOrderCalculations(
 
     let discountAmount = 0;
     let discountFactor = 1;
-    
+
     if (discountType && discountValue && discountValue > 0 && subtotal > 0) {
       if (discountType === "percentage") {
         discountAmount = (subtotal * discountValue) / 100;
-        discountFactor = 1 - (discountValue / 100);
+        discountFactor = 1 - discountValue / 100;
       } else {
         discountAmount = discountValue;
         discountFactor = Math.max(0, (subtotal - discountValue) / subtotal);
@@ -42,6 +48,6 @@ export function useOrderCalculations(
     const total = Math.max(0, subtotal - discountAmount);
 
     return { subtotal, discountAmount, total, discountFactor };
-  }, [items, discountType, discountValue]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [itemsKey, discountType, discountValue]);
 }
-
