@@ -17,12 +17,14 @@ else
     cp /app/data/db-default/local.db /app/data/db/local.db
     echo "Default database copied successfully."
   else
-    echo "No source database found. Initializing new database..."
-    tsx scripts/init-db.ts || echo "Database initialization completed or already exists"
+    echo "No source database found. Database will be initialized on first request."
+    # Note: Don't run tsx here - instrumentation.ts will handle initialization
+    # This avoids double initialization and speeds up container startup
   fi
 fi
 
-# Start the application
+# Start the application immediately
+# Database initialization happens via Next.js instrumentation hook
 echo "Starting Next.js server..."
 exec node server.js
 

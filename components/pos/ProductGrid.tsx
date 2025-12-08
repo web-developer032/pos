@@ -60,7 +60,7 @@ export function ProductGrid() {
   const {
     data: barcodeProductData,
     error: barcodeError,
-    isLoading: isBarcodeLoading,
+    isFetching: isBarcodeFetching,
   } = useGetProductByBarcodeQuery(barcodeToScan, {
     skip: !barcodeToScan,
   });
@@ -91,9 +91,38 @@ export function ProductGrid() {
       return;
     }
 
-    // Product found - add to cart
+    // Wait for query to complete - don't act on stale data
+    if (isBarcodeFetching) {
+      return;
+    }
+
+    // Check if we have an error (product not found)
+    if (barcodeError) {
+      processedBarcodesRef.current.add(barcodeToScan);
+      toast.error("Product not found");
+      setBarcodeToScan("");
+      setSearch("");
+
+      setTimeout(() => {
+        processedBarcodesRef.current.delete(barcodeToScan);
+      }, 300);
+      return;
+    }
+
+    // Product found - verify the barcode matches to avoid stale data issues
     if (barcodeProductData?.product) {
       const product = barcodeProductData.product;
+
+      // Verify this product matches the scanned barcode
+      const barcodeMatches =
+        product.barcode === barcodeToScan ||
+        product.additional_barcodes?.includes(barcodeToScan);
+
+      if (!barcodeMatches) {
+        // Stale data - wait for correct response
+        return;
+      }
+
       processedBarcodesRef.current.add(barcodeToScan);
 
       // Add to cart
@@ -116,25 +145,12 @@ export function ProductGrid() {
       setTimeout(() => {
         processedBarcodesRef.current.delete(barcodeToScan);
       }, 300);
-      return;
-    }
-
-    // Error - product not found
-    if (barcodeError && !isBarcodeLoading) {
-      processedBarcodesRef.current.add(barcodeToScan);
-      toast.error("Product not found");
-      setBarcodeToScan("");
-      setSearch("");
-
-      setTimeout(() => {
-        processedBarcodesRef.current.delete(barcodeToScan);
-      }, 300);
     }
   }, [
     barcodeToScan,
     barcodeProductData,
     barcodeError,
-    isBarcodeLoading,
+    isBarcodeFetching,
     dispatch,
   ]);
 
