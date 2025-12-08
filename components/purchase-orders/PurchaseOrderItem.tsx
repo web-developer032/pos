@@ -110,10 +110,10 @@ export const PurchaseOrderItem = memo(
             )}
           </div>
 
-          {/* Fields - Row 1: Product and Quantity */}
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-12">
-            {/* Product - takes more space */}
-            <div className="sm:col-span-8">
+          {/* Fields Grid */}
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-6">
+            {/* Product - full width on mobile, 3 cols on desktop */}
+            <div className="col-span-2 sm:col-span-3">
               <SearchableSelect
                 ref={ref}
                 label="Product"
@@ -142,7 +142,7 @@ export const PurchaseOrderItem = memo(
             </div>
 
             {/* Quantity */}
-            <div className="sm:col-span-2">
+            <div className="col-span-1">
               <Input
                 label="Qty"
                 type="number"
@@ -154,25 +154,10 @@ export const PurchaseOrderItem = memo(
               />
             </div>
 
-            {/* Subtotal */}
-            <div className="flex items-end sm:col-span-2">
-              <div className="w-full rounded-md bg-gray-50 px-3 py-2">
-                <span className="block text-xs text-gray-500">Subtotal</span>
-                <span
-                  className={`block text-sm font-semibold ${hasValues ? "text-gray-900" : "text-gray-400"}`}
-                >
-                  {hasValues ? formatCurrency(subtotal) : "—"}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Fields - Row 2: Cost, Adjusted Cost, Retail Price */}
-          <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-12">
-            {/* Unit Cost */}
-            <div className="sm:col-span-2">
+            {/* Cost Price */}
+            <div className="col-span-1">
               <Input
-                label="Cost Price"
+                label="Cost"
                 type="number"
                 step="0.01"
                 min="0"
@@ -183,31 +168,10 @@ export const PurchaseOrderItem = memo(
               />
             </div>
 
-            {/* Adjusted Cost (after discount) */}
-            <div className="flex items-end sm:col-span-2">
-              <div
-                className={`w-full rounded-md px-3 py-2 ${hasDiscount ? "border-2 border-green-300 bg-green-50" : "bg-gray-50"}`}
-              >
-                <span className="block text-xs text-gray-500">
-                  {hasDiscount ? "After Discount" : "Final Cost"}
-                </span>
-                <span
-                  className={`block text-sm font-semibold ${hasDiscount ? "text-green-700" : "text-gray-900"}`}
-                >
-                  {unitCost > 0 ? formatCurrency(adjustedCost) : "—"}
-                </span>
-                {hasDiscount && unitCost > 0 && (
-                  <span className="block text-xs text-green-600">
-                    -{((1 - discountFactor) * 100).toFixed(1)}%
-                  </span>
-                )}
-              </div>
-            </div>
-
             {/* Retail Price */}
-            <div className="sm:col-span-2">
+            <div className="col-span-1">
               <Input
-                label="Retail Price"
+                label="Retail"
                 type="number"
                 step="0.01"
                 min="0"
@@ -218,31 +182,63 @@ export const PurchaseOrderItem = memo(
               />
             </div>
 
-            {/* Profit Display */}
-            <div className="flex items-end sm:col-span-6">
-              {hasValues && retailPrice > 0 && (
-                <div className="flex w-full gap-2">
-                  <div className="flex-1 rounded-md bg-gray-50 px-3 py-2">
-                    <span className="block text-xs text-gray-500">
-                      Profit/Unit
-                    </span>
-                    <span
-                      className={`block text-sm font-semibold ${profit >= 0 ? "text-green-600" : "text-red-600"}`}
-                    >
-                      {formatCurrency(profit)}
-                    </span>
-                  </div>
-                  <div className="flex-1 rounded-md bg-gray-50 px-3 py-2">
-                    <span className="block text-xs text-gray-500">Margin</span>
-                    <span
-                      className={`block text-sm font-semibold ${profitMargin >= 0 ? "text-green-600" : "text-red-600"}`}
-                    >
-                      {profitMargin.toFixed(1)}%
-                    </span>
-                  </div>
-                </div>
-              )}
+            {/* Subtotal */}
+            <div className="col-span-1 flex items-end">
+              <div className="w-full rounded-md bg-gray-50 px-3 py-2">
+                <span className="block text-xs text-gray-500">Subtotal</span>
+                <span
+                  className={`block text-sm font-semibold ${hasValues ? "text-gray-900" : "text-gray-400"}`}
+                >
+                  {hasValues ? formatCurrency(subtotal) : "—"}
+                </span>
+              </div>
             </div>
+
+            {/* Summary Row - Adjusted Cost & Profit (only show when discount or values exist) */}
+            {(hasDiscount || (hasValues && retailPrice > 0)) && (
+              <div className="mt-3 flex gap-3">
+                {/* Adjusted Cost (after discount) */}
+                {hasDiscount && unitCost > 0 && (
+                  <div className="rounded-md border-2 border-green-300 bg-green-50 px-3 py-2">
+                    <span className="block text-xs text-gray-500">
+                      Final Cost
+                    </span>
+                    <span className="block text-sm font-bold text-green-700">
+                      {formatCurrency(adjustedCost)}
+                      <span className="ml-1 text-xs font-normal">
+                        (-{((1 - discountFactor) * 100).toFixed(1)}%)
+                      </span>
+                    </span>
+                  </div>
+                )}
+
+                {/* Profit Display */}
+                {hasValues && retailPrice > 0 && (
+                  <>
+                    <div className="rounded-md bg-gray-50 px-3 py-2">
+                      <span className="block text-xs text-gray-500">
+                        Profit/Unit
+                      </span>
+                      <span
+                        className={`block text-sm font-semibold ${profit >= 0 ? "text-green-600" : "text-red-600"}`}
+                      >
+                        {formatCurrency(profit)}
+                      </span>
+                    </div>
+                    <div className="rounded-md bg-gray-50 px-3 py-2">
+                      <span className="block text-xs text-gray-500">
+                        Margin
+                      </span>
+                      <span
+                        className={`block text-sm font-semibold ${profitMargin >= 0 ? "text-green-600" : "text-red-600"}`}
+                      >
+                        {profitMargin.toFixed(1)}%
+                      </span>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         </div>
       );
