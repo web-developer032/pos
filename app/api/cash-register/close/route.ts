@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const session = openSession.rows[0] as {
+    const session = openSession.rows[0] as unknown as {
       id: number;
       opening_balance: number;
       opened_at: string;
@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
       `,
       args: [openedAt],
     });
-    const cashSales = (cashSalesResult.rows[0] as { total: number }).total || 0;
+    const cashSales = (cashSalesResult.rows[0] as unknown as { total: number }).total || 0;
 
     // Get cash refunds (refund_method = 'cash')
     const cashRefundsResult = await client.execute({
@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
       args: [openedAt],
     });
     const cashRefunds =
-      (cashRefundsResult.rows[0] as { total: number }).total || 0;
+      (cashRefundsResult.rows[0] as unknown as { total: number }).total || 0;
 
     // Get cash expenses (payment_method = 'cash')
     const cashExpensesResult = await client.execute({
@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
       args: [openedAt],
     });
     const cashExpenses =
-      (cashExpensesResult.rows[0] as { total: number }).total || 0;
+      (cashExpensesResult.rows[0] as unknown as { total: number }).total || 0;
 
     // Calculate expected balance
     const expectedBalance =
@@ -131,7 +131,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { error: error.errors[0].message },
+        { error: error.issues[0].message },
         { status: 400 }
       );
     }

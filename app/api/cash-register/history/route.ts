@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
       sql: `SELECT COUNT(*) as count FROM cash_register_sessions`,
       args: [],
     });
-    const total = (countResult.rows[0] as { count: number }).count;
+    const total = (countResult.rows[0] as unknown as { count: number }).count;
 
     // Get sessions with user info
     const result = await client.execute({
@@ -47,4 +47,3 @@ export async function GET(request: NextRequest) {
     );
   }
 }
-

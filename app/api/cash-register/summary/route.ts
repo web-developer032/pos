@@ -36,7 +36,7 @@ export async function GET() {
       });
     }
 
-    const session = openSession.rows[0] as {
+    const session = openSession.rows[0] as unknown as {
       id: number;
       opening_balance: number;
       opened_at: string;
