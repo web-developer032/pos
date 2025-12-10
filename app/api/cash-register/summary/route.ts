@@ -136,24 +136,31 @@ export async function GET() {
     const cashSales =
       (
         salesByMethodResult.rows.find(
-          (r) => (r as { payment_method: string }).payment_method === "cash"
-        ) as { total_amount?: number } | undefined
+          (r) =>
+            (r as unknown as { payment_method: string }).payment_method ===
+            "cash"
+        ) as unknown as { total_amount?: number } | undefined
       )?.total_amount || 0;
 
     const cashRefunds =
       (
         returnsByMethodResult.rows.find(
-          (r) => (r as { refund_method: string }).refund_method === "cash"
-        ) as { total_refund?: number } | undefined
+          (r) =>
+            (r as unknown as { refund_method: string }).refund_method === "cash"
+        ) as unknown as { total_refund?: number } | undefined
       )?.total_refund || 0;
 
     const cashExpenses =
       expensesByMethodResult.rows
         .filter(
-          (r) => (r as { payment_method: string }).payment_method === "cash"
+          (r) =>
+            (r as unknown as { payment_method: string }).payment_method ===
+            "cash"
         )
         .reduce(
-          (sum, r) => sum + ((r as { total_amount: number }).total_amount || 0),
+          (sum, r) =>
+            sum +
+            ((r as unknown as { total_amount: number }).total_amount || 0),
           0
         ) || 0;
 
@@ -194,4 +201,3 @@ export async function GET() {
     );
   }
 }
-
