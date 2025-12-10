@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Form } from "@/components/ui/Form";
+import { useScrollToError } from "@/lib/hooks/useScrollToError";
 import toast from "react-hot-toast";
 
 interface ExpenseFormProps {
@@ -51,6 +52,9 @@ export function ExpenseForm({ expenseId, onSuccess }: ExpenseFormProps) {
       payment_method: "cash",
     },
   });
+
+  // Auto-scroll to first error on validation failure
+  useScrollToError(errors);
 
   useEffect(() => {
     if (expenseData?.expense) {

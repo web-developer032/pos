@@ -12,6 +12,7 @@ import {
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { Form } from "@/components/ui/Form";
+import { useScrollToError } from "@/lib/hooks/useScrollToError";
 import toast from "react-hot-toast";
 
 const categorySchema = z.object({
@@ -46,6 +47,9 @@ export function CategoryForm({ categoryId, onSuccess }: CategoryFormProps) {
       description: "",
     },
   });
+
+  // Auto-scroll to first error on validation failure
+  useScrollToError(errors);
 
   useEffect(() => {
     if (categoryData?.category) {

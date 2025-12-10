@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { Form } from "@/components/ui/Form";
 import { useFormSubmission } from "@/lib/hooks/useFormSubmission";
+import { useScrollToError } from "@/lib/hooks/useScrollToError";
 
 const customerSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -51,6 +52,9 @@ export function CustomerForm({ customerId, onSuccess }: CustomerFormProps) {
       loyalty_points: 0,
     },
   });
+
+  // Auto-scroll to first error on validation failure
+  useScrollToError(errors);
 
   useEffect(() => {
     if (customerData?.customer) {

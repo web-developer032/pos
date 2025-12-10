@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Form } from "@/components/ui/Form";
 import { useCurrency } from "@/lib/hooks/useCurrency";
+import { useScrollToError } from "@/lib/hooks/useScrollToError";
 import toast from "react-hot-toast";
 
 interface ReturnFormProps {
@@ -67,6 +68,9 @@ export function ReturnForm({ saleId, saleItems, onSuccess }: ReturnFormProps) {
       notes: "",
     },
   });
+
+  // Auto-scroll to first error on validation failure
+  useScrollToError(errors);
 
   const handleItemToggle = (item: SaleItem) => {
     const available = getAvailableQuantity(item.id);

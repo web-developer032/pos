@@ -12,6 +12,7 @@ import {
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { Form } from "@/components/ui/Form";
+import { useScrollToError } from "@/lib/hooks/useScrollToError";
 import toast from "react-hot-toast";
 
 const supplierSchema = z.object({
@@ -52,6 +53,9 @@ export function SupplierForm({ supplierId, onSuccess }: SupplierFormProps) {
       address: "",
     },
   });
+
+  // Auto-scroll to first error on validation failure
+  useScrollToError(errors);
 
   useEffect(() => {
     if (supplierData?.supplier) {

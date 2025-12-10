@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Form } from "@/components/ui/Form";
+import { useScrollToError } from "@/lib/hooks/useScrollToError";
 import toast from "react-hot-toast";
 
 interface CapitalFormProps {
@@ -38,6 +39,9 @@ export function CapitalForm({ capitalId, onSuccess }: CapitalFormProps) {
       transaction_type: "investment",
     },
   });
+
+  // Auto-scroll to first error on validation failure
+  useScrollToError(errors);
 
   useEffect(() => {
     if (capitalData?.capital) {

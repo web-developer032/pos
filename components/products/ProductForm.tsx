@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { Form } from "@/components/ui/Form";
 import { useFormSubmission } from "@/lib/hooks/useFormSubmission";
+import { useScrollToError } from "@/lib/hooks/useScrollToError";
 import {
   toFloat,
   toOptionalId,
@@ -200,6 +201,9 @@ export function ProductForm({
       quantity_multiplier: "",
     },
   });
+
+  // Auto-scroll to first error on validation failure
+  useScrollToError(errors);
 
   const [isCreatingRelatedProduct, setIsCreatingRelatedProduct] =
     useState(false);
@@ -567,11 +571,12 @@ export function ProductForm({
         }
         onSuccess?.();
       },
-      successMessage: subProducts.length > 0
-        ? undefined // We'll show custom toast for sub-products
-        : productId
-          ? "Product updated successfully"
-          : "Product created successfully",
+      successMessage:
+        subProducts.length > 0
+          ? undefined // We'll show custom toast for sub-products
+          : productId
+            ? "Product updated successfully"
+            : "Product created successfully",
       errorMessage: "Failed to save product",
     });
 

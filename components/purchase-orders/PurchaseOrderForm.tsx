@@ -27,6 +27,7 @@ import {
   useBarcodeHandler,
 } from "@/lib/hooks/useBarcodeScanner";
 import { useOrderCalculations } from "@/lib/hooks/useOrderCalculations";
+import { useScrollToError } from "@/lib/hooks/useScrollToError";
 import { InlineSupplierForm } from "./InlineSupplierForm";
 import { PurchaseOrderItem } from "./PurchaseOrderItem";
 import { OrderSummary } from "./OrderSummary";
@@ -134,6 +135,16 @@ export function PurchaseOrderForm({
   });
 
   const { fields, prepend, remove } = useFieldArray({ control, name: "items" });
+
+  // Ref for the scrollable items container
+  const itemsContainerRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to first error on validation failure
+  useScrollToError(errors, {
+    showToast: true,
+    scrollOffset: 120,
+    containerRef: itemsContainerRef,
+  });
 
   const watchedItems = watch("items");
   const discountType = watch("discount_type");
@@ -422,7 +433,10 @@ export function PurchaseOrderForm({
             </Button>
           </div>
 
-          <div className="form-scrollbar max-h-[450px] space-y-3 overflow-y-auto pr-1">
+          <div
+            ref={itemsContainerRef}
+            className="form-scrollbar max-h-[450px] space-y-3 overflow-y-auto pr-1"
+          >
             {fields.map((field, index) => (
               <PurchaseOrderItem
                 key={field.id}

@@ -6,6 +6,7 @@ import { useCreateSupplierMutation } from "@/lib/api/suppliersApi";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { Form } from "@/components/ui/Form";
+import { useScrollToError } from "@/lib/hooks/useScrollToError";
 import toast from "react-hot-toast";
 
 interface SupplierFormData {
@@ -35,6 +36,10 @@ export function InlineSupplierForm({ onSuccess }: InlineSupplierFormProps) {
       address: "",
     },
   });
+
+  // Auto-scroll to first error on validation failure
+  useScrollToError(errors);
+
   const [createSupplier] = useCreateSupplierMutation();
 
   const onSubmit = async (data: SupplierFormData) => {

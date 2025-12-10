@@ -11,6 +11,7 @@ import {
   useDeleteSupplierPaymentMutation,
 } from "@/lib/api/suppliersApi";
 import { useCurrency } from "@/lib/hooks/useCurrency";
+import { useScrollToError } from "@/lib/hooks/useScrollToError";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
@@ -64,6 +65,9 @@ export default function SupplierLedgerPage() {
       notes: "",
     },
   });
+
+  // Auto-scroll to first error on validation failure
+  useScrollToError(errors);
 
   const handlePaymentSubmit = async (data: PaymentFormData) => {
     if (isSubmitting) return;
