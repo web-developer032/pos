@@ -378,4 +378,26 @@ export async function initializeDatabase() {
       `ALTER TABLE purchase_order_items ADD COLUMN product_name TEXT`
     );
   }
+
+  // Backfill product_name for existing purchase order items that don't have it
+  const nullProductNames = await client.execute(
+    `SELECT COUNT(*) as count FROM purchase_order_items WHERE product_name IS NULL`
+  );
+  const nullCount = (nullProductNames.rows[0] as Record<string, unknown>)
+    .count as number;
+  if (nullCount > 0) {
+    console.log(
+      `[DB] Backfilling product_name for ${nullCount} purchase order items...`
+    );
+    await client.execute(`
+      UPDATE purchase_order_items 
+      SET product_name = (
+        SELECT COALESCE(p.name, 'Unknown Product')
+        FROM products p 
+        WHERE p.id = purchase_order_items.product_id
+      )
+      WHERE product_name IS NULL
+    `);
+    console.log("[DB] Product names backfilled successfully");
+  }
 }
