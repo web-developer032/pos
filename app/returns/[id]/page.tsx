@@ -149,13 +149,23 @@ export default function ReturnDetailPage() {
 
             {/* Returned Items */}
             <div className="mt-6 rounded-lg bg-white shadow">
-              <div className="border-b border-gray-200 px-6 py-4">
+              <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
                 <h2 className="text-lg font-semibold">Returned Items</h2>
+                <span className="text-sm text-gray-500">
+                  Total:{" "}
+                  <span className="font-semibold text-gray-700">
+                    {items.length}
+                  </span>{" "}
+                  items
+                </span>
               </div>
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
+                      <th className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-gray-500">
+                        #
+                      </th>
                       <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                         Product
                       </th>
@@ -174,8 +184,11 @@ export default function ReturnDetailPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200 bg-white">
-                    {items.map((item) => (
+                    {items.map((item, index) => (
                       <tr key={item.id}>
+                        <td className="whitespace-nowrap px-4 py-4 text-center text-sm text-gray-500">
+                          {index + 1}
+                        </td>
                         <td className="whitespace-nowrap px-6 py-4 text-sm font-medium">
                           {item.product_name}
                         </td>

@@ -162,13 +162,23 @@ export default function SaleDetailPage() {
 
             {/* Sale Items */}
             <div className="mt-6 rounded-lg bg-white shadow">
-              <div className="border-b border-gray-200 px-6 py-4">
+              <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
                 <h2 className="text-lg font-semibold">Items</h2>
+                <span className="text-sm text-gray-500">
+                  Total:{" "}
+                  <span className="font-semibold text-gray-700">
+                    {items.length}
+                  </span>{" "}
+                  items
+                </span>
               </div>
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
+                      <th className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-gray-500">
+                        #
+                      </th>
                       <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                         Product
                       </th>
@@ -193,7 +203,7 @@ export default function SaleDetailPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200 bg-white">
-                    {items.map((item) => {
+                    {items.map((item, index) => {
                       const costPrice = item.cost_price || 0;
                       const profitPerUnit = item.unit_price - costPrice;
 
@@ -213,6 +223,9 @@ export default function SaleDetailPage() {
                             isFullyReturned ? "bg-gray-50 opacity-75" : ""
                           }
                         >
+                          <td className="whitespace-nowrap px-4 py-4 text-center text-sm text-gray-500">
+                            {index + 1}
+                          </td>
                           <td className="whitespace-nowrap px-6 py-4 text-sm font-medium">
                             <div className="flex items-center gap-2">
                               {item.product_name}
@@ -381,13 +394,23 @@ export default function SaleDetailPage() {
         {/* Returns History */}
         {returnsData && returnsData.returns.length > 0 && (
           <div className="mt-6 rounded-lg bg-white shadow">
-            <div className="border-b border-gray-200 px-6 py-4">
+            <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
               <h2 className="text-lg font-semibold">Return History</h2>
+              <span className="text-sm text-gray-500">
+                Total:{" "}
+                <span className="font-semibold text-gray-700">
+                  {returnsData.returns.length}
+                </span>{" "}
+                returns
+              </span>
             </div>
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
+                    <th className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-gray-500">
+                      #
+                    </th>
                     <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                       Return Number
                     </th>
@@ -409,8 +432,11 @@ export default function SaleDetailPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200 bg-white">
-                  {returnsData.returns.map((returnRecord) => (
+                  {returnsData.returns.map((returnRecord, index) => (
                     <tr key={returnRecord.id}>
+                      <td className="whitespace-nowrap px-4 py-4 text-center text-sm text-gray-500">
+                        {index + 1}
+                      </td>
                       <td className="whitespace-nowrap px-6 py-4 text-sm font-medium">
                         <Link
                           href={`/returns/${returnRecord.id}`}

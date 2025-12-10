@@ -251,13 +251,22 @@ export default function SupplierLedgerPage() {
         <div className="grid gap-6 lg:grid-cols-2">
           {/* Purchase Orders */}
           <div className="rounded-lg bg-white shadow">
-            <div className="border-b border-gray-200 px-6 py-4">
+            <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
               <h2 className="text-lg font-semibold">Purchase Orders</h2>
+              <span className="text-sm text-gray-500">
+                Total:{" "}
+                <span className="font-semibold text-gray-700">
+                  {purchase_orders.length}
+                </span>
+              </span>
             </div>
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
+                    <th className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-gray-500">
+                      #
+                    </th>
                     <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                       PO Number
                     </th>
@@ -279,15 +288,18 @@ export default function SupplierLedgerPage() {
                   {purchase_orders.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={5}
+                        colSpan={6}
                         className="px-6 py-4 text-center text-sm text-gray-500"
                       >
                         No purchase orders found
                       </td>
                     </tr>
                   ) : (
-                    purchase_orders.map((po) => (
+                    purchase_orders.map((po, index) => (
                       <tr key={po.id}>
+                        <td className="whitespace-nowrap px-4 py-4 text-center text-sm text-gray-500">
+                          {index + 1}
+                        </td>
                         <td className="whitespace-nowrap px-6 py-4 text-sm font-medium">
                           {po.po_number}
                         </td>
@@ -328,13 +340,22 @@ export default function SupplierLedgerPage() {
 
           {/* Payments */}
           <div className="rounded-lg bg-white shadow">
-            <div className="border-b border-gray-200 px-6 py-4">
+            <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
               <h2 className="text-lg font-semibold">Payments</h2>
+              <span className="text-sm text-gray-500">
+                Total:{" "}
+                <span className="font-semibold text-gray-700">
+                  {payments.length}
+                </span>
+              </span>
             </div>
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
+                    <th className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-gray-500">
+                      #
+                    </th>
                     <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                       Date
                     </th>
@@ -356,15 +377,18 @@ export default function SupplierLedgerPage() {
                   {payments.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={5}
+                        colSpan={6}
                         className="px-6 py-4 text-center text-sm text-gray-500"
                       >
                         No payments recorded
                       </td>
                     </tr>
                   ) : (
-                    payments.map((payment) => (
+                    payments.map((payment, index) => (
                       <tr key={payment.id}>
+                        <td className="whitespace-nowrap px-4 py-4 text-center text-sm text-gray-500">
+                          {index + 1}
+                        </td>
                         <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-500">
                           {format(new Date(payment.created_at), "MMM dd, yyyy")}
                         </td>
