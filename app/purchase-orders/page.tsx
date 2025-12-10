@@ -168,9 +168,25 @@ export default function PurchaseOrdersPage() {
         </div>
 
         <div className="overflow-hidden rounded-lg bg-white shadow">
+          <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3 sm:px-6">
+            <span className="text-sm text-gray-500">
+              Showing{" "}
+              <span className="font-semibold text-gray-700">
+                {data?.purchase_orders.length || 0}
+              </span>{" "}
+              of{" "}
+              <span className="font-semibold text-gray-700">
+                {data?.pagination?.total || 0}
+              </span>{" "}
+              purchase orders
+            </span>
+          </div>
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
+                <th className="px-4 py-3 text-center text-xs font-medium uppercase text-gray-500">
+                  #
+                </th>
                 <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">
                   PO Number
                 </th>
@@ -192,8 +208,11 @@ export default function PurchaseOrdersPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200 bg-white">
-              {data?.purchase_orders.map((po) => (
+              {data?.purchase_orders.map((po, index) => (
                 <tr key={po.id}>
+                  <td className="px-4 py-4 text-center text-sm text-gray-500">
+                    {(page - 1) * limit + index + 1}
+                  </td>
                   <td className="px-6 py-4 text-sm font-medium">
                     {po.po_number}
                   </td>
