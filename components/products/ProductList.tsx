@@ -368,9 +368,25 @@ export function ProductList() {
       </div>
 
       <div className="overflow-x-auto rounded-lg bg-white shadow">
+        <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3 sm:px-6">
+          <span className="text-sm text-gray-500">
+            Showing{" "}
+            <span className="font-semibold text-gray-700">
+              {data?.products.length || 0}
+            </span>{" "}
+            of{" "}
+            <span className="font-semibold text-gray-700">
+              {data?.pagination?.total || 0}
+            </span>{" "}
+            products
+          </span>
+        </div>
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
+              <th className="px-3 py-3 text-center text-xs font-medium uppercase tracking-wider text-gray-500 sm:px-4">
+                #
+              </th>
               <th className="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 sm:px-6">
                 Name
               </th>
@@ -395,8 +411,11 @@ export function ProductList() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200 bg-white">
-            {data?.products.map((product) => (
+            {data?.products.map((product, index) => (
               <tr key={product.id}>
+                <td className="whitespace-nowrap px-3 py-4 text-center text-sm text-gray-500 sm:px-4">
+                  {(page - 1) * limit + index + 1}
+                </td>
                 <td className="whitespace-nowrap px-3 py-4 text-sm font-medium sm:px-6">
                   <div className="flex flex-col gap-1">
                     <span>{product.name}</span>
