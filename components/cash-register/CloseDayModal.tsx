@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import {
   useCloseDayMutation,
@@ -36,7 +36,6 @@ export function CloseDayModal({
     { skip: !isOpen }
   );
   const { format: formatCurrency } = useCurrency();
-  const [showVariance, setShowVariance] = useState(false);
 
   const {
     register,
@@ -76,7 +75,6 @@ export function CloseDayModal({
 
       toast.success("Day closed successfully");
       reset();
-      setShowVariance(false);
       onSuccess?.();
       onClose();
     } catch (error) {
@@ -89,7 +87,6 @@ export function CloseDayModal({
 
   const handleClose = () => {
     reset();
-    setShowVariance(false);
     onClose();
   };
 
@@ -264,10 +261,10 @@ export function CloseDayModal({
             <div
               className={`rounded-lg p-3 ${
                 Math.abs(variance) < 0.01
-                  ? "bg-green-50 border border-green-200"
+                  ? "border border-green-200 bg-green-50"
                   : variance > 0
-                    ? "bg-blue-50 border border-blue-200"
-                    : "bg-red-50 border border-red-200"
+                    ? "border border-blue-200 bg-blue-50"
+                    : "border border-red-200 bg-red-50"
               }`}
             >
               <div className="flex items-center justify-between">
@@ -299,4 +296,3 @@ export function CloseDayModal({
     </Modal>
   );
 }
-
