@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import Link from "next/link";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { ProductGrid } from "@/components/pos/ProductGrid";
@@ -18,6 +19,8 @@ import {
 import { Modal } from "@/components/ui/Modal";
 import { useGetCustomersQuery } from "@/lib/api/customersApi";
 import { useGetProductByBarcodeQuery } from "@/lib/api/productsApi";
+import { useGetCurrentSessionQuery } from "@/lib/api/cashRegisterApi";
+import { OpenDayModal } from "@/components/cash-register/OpenDayModal";
 import { useCurrency } from "@/lib/hooks/useCurrency";
 import { roundPrice } from "@/lib/utils/formHelpers";
 import { Select } from "@/components/ui/Select";
@@ -31,14 +34,18 @@ export default function POSPage() {
     (state) => state.cart
   );
   const { data: customersData } = useGetCustomersQuery();
+  const { data: sessionData, refetch: refetchSession } = useGetCurrentSessionQuery();
   const { format: formatCurrency } = useCurrency();
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [isHoldCartModalOpen, setIsHoldCartModalOpen] = useState(false);
+  const [isOpenDayModalOpen, setIsOpenDayModalOpen] = useState(false);
   const [holdCartName, setHoldCartName] = useState("");
   const [barcodeInput, setBarcodeInput] = useState("");
   const [barcodeToScan, setBarcodeToScan] = useState("");
   const barcodeInputRef = useRef<HTMLInputElement>(null);
   const processedBarcodesRef = useRef<Set<string>>(new Set());
+
+  const isDayOpen = sessionData?.isOpen || false;
 
   // Calculate totals
   const subtotal = roundPrice(
@@ -174,6 +181,50 @@ export default function POSPage() {
   return (
     <ProtectedRoute allowedRoles={["admin", "cashier", "manager"]}>
       <DashboardLayout>
+        {/* Day Not Open Warning */}
+        {!isDayOpen && (
+          <div className="mb-4 rounded-xl border-2 border-amber-300 bg-amber-50 p-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex-shrink-0">
+                  <svg
+                    className="h-6 w-6 text-amber-600"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                    />
+                  </svg>
+                </div>
+                <div>
+                  <p className="font-semibold text-amber-800">
+                    Day is not open
+                  </p>
+                  <p className="text-sm text-amber-700">
+                    Open the day to start recording sales and track your cash drawer.
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  onClick={() => setIsOpenDayModalOpen(true)}
+                  className="bg-amber-600 hover:bg-amber-700"
+                >
+                  Open Day
+                </Button>
+                <Link href="/cash-register">
+                  <Button variant="outline">Go to Cash Register</Button>
+                </Link>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Price Summary Bar - Top Section (Sticky) */}
         <div className="mb-4 rounded-xl border border-gray-200 bg-white p-4">
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 lg:gap-6">
@@ -338,6 +389,13 @@ export default function POSPage() {
             </div>
           </div>
         </Modal>
+
+        {/* Open Day Modal */}
+        <OpenDayModal
+          isOpen={isOpenDayModalOpen}
+          onClose={() => setIsOpenDayModalOpen(false)}
+          onSuccess={() => refetchSession()}
+        />
       </DashboardLayout>
     </ProtectedRoute>
   );

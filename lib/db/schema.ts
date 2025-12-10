@@ -353,6 +353,34 @@ export async function initializeDatabase() {
     `CREATE INDEX IF NOT EXISTS idx_expenses_category ON expenses(category)`
   );
 
+  // Cash Register Sessions table
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS cash_register_sessions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      opening_balance REAL NOT NULL DEFAULT 0,
+      closing_balance REAL,
+      expected_balance REAL,
+      variance REAL,
+      status TEXT NOT NULL CHECK(status IN ('open', 'closed')) DEFAULT 'open',
+      opened_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      closed_at DATETIME,
+      notes TEXT,
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    )
+  `);
+
+  // Create indexes for cash register sessions
+  await client.execute(
+    `CREATE INDEX IF NOT EXISTS idx_cash_register_sessions_user ON cash_register_sessions(user_id)`
+  );
+  await client.execute(
+    `CREATE INDEX IF NOT EXISTS idx_cash_register_sessions_status ON cash_register_sessions(status)`
+  );
+  await client.execute(
+    `CREATE INDEX IF NOT EXISTS idx_cash_register_sessions_opened_at ON cash_register_sessions(opened_at)`
+  );
+
   // ============ MIGRATIONS ============
   // Add retail_price column to purchase_order_items if it doesn't exist
   const poItemsInfo = await client.execute(

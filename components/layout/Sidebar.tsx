@@ -29,6 +29,12 @@ const menuItems: MenuItem[] = [
   { name: "Inventory", href: "/inventory", icon: "📊" },
   { name: "Purchase Orders", href: "/purchase-orders", icon: "📋" },
   { name: "Sales", href: "/sales", icon: "💰" },
+  {
+    name: "Cash Register",
+    href: "/cash-register",
+    icon: "🗓️",
+    roles: ["admin", "cashier", "manager"],
+  },
   { name: "Reports", href: "/reports", icon: "📈" },
   {
     name: "Finance",
