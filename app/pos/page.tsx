@@ -34,7 +34,7 @@ export default function POSPage() {
     (state) => state.cart
   );
   const { data: customersData } = useGetCustomersQuery();
-  const { data: sessionData, refetch: refetchSession } = useGetCurrentSessionQuery();
+  const { data: sessionData } = useGetCurrentSessionQuery();
   const { format: formatCurrency } = useCurrency();
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [isHoldCartModalOpen, setIsHoldCartModalOpen] = useState(false);
@@ -206,7 +206,8 @@ export default function POSPage() {
                     Day is not open
                   </p>
                   <p className="text-sm text-amber-700">
-                    Open the day to start recording sales and track your cash drawer.
+                    Open the day to start recording sales and track your cash
+                    drawer.
                   </p>
                 </div>
               </div>
@@ -394,7 +395,6 @@ export default function POSPage() {
         <OpenDayModal
           isOpen={isOpenDayModalOpen}
           onClose={() => setIsOpenDayModalOpen(false)}
-          onSuccess={() => refetchSession()}
         />
       </DashboardLayout>
     </ProtectedRoute>
