@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/Button";
 import { Pagination } from "@/components/ui/Pagination";
 import { OpenDayModal } from "@/components/cash-register/OpenDayModal";
 import { CloseDayModal } from "@/components/cash-register/CloseDayModal";
-import { format } from "date-fns";
+import { formatDateTime, formatDateOnly } from "@/lib/utils/dateTime";
 
 // Reusable loading spinner
 function LoadingSpinner({ size = "md" }: { size?: "sm" | "md" }) {
@@ -115,7 +115,7 @@ export default function CashRegisterPage() {
                   <p>
                     Opened by{" "}
                     <span className="font-medium">{session.user_name}</span> at{" "}
-                    {format(new Date(session.opened_at), "MMM dd, yyyy h:mm a")}
+                    {formatDateTime(session.opened_at)}
                   </p>
                   <p>
                     Opening Balance:{" "}
@@ -247,7 +247,7 @@ export default function CashRegisterPage() {
                           {(page - 1) * limit + index + 1}
                         </td>
                         <td className="whitespace-nowrap px-6 py-4 text-sm">
-                          {format(new Date(s.opened_at), "MMM dd, yyyy")}
+                          {formatDateOnly(s.opened_at)}
                         </td>
                         <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-600">
                           {s.user_name}
@@ -329,7 +329,7 @@ export default function CashRegisterPage() {
           )}
         </div>
 
-        {/* Modals - No onSuccess needed, RTK Query invalidates tags automatically */}
+        {/* Modals */}
         <OpenDayModal
           isOpen={isOpenModalOpen}
           onClose={() => setIsOpenModalOpen(false)}

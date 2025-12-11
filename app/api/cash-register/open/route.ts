@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import client from "@/lib/db";
+import { getCurrentTimestamp } from "@/lib/utils/dateTime";
+import {
+  serializeSession,
+  SessionRow,
+  SESSION_SELECT_SQL,
+} from "@/lib/utils/cashRegisterHelpers";
 
 const openSessionSchema = z.object({
   opening_balance: z.number().min(0, "Opening balance must be non-negative"),
@@ -27,74 +33,31 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create new session
+    // Create new session with explicit local timestamp (consistent with sales)
+    const timestamp = getCurrentTimestamp();
     const result = await client.execute({
       sql: `
-        INSERT INTO cash_register_sessions (user_id, opening_balance, status, notes)
-        VALUES (?, ?, 'open', ?)
+        INSERT INTO cash_register_sessions (user_id, opening_balance, status, notes, opened_at)
+        VALUES (?, ?, 'open', ?, ?)
       `,
       args: [
         validatedData.user_id,
         validatedData.opening_balance,
         validatedData.notes || null,
+        timestamp,
       ],
     });
 
     // Fetch the created session
     const sessionId = Number(result.lastInsertRowid);
     const sessionResult = await client.execute({
-      sql: `
-        SELECT 
-          crs.id,
-          crs.user_id,
-          crs.opening_balance,
-          crs.closing_balance,
-          crs.expected_balance,
-          crs.variance,
-          crs.status,
-          crs.opened_at,
-          crs.closed_at,
-          crs.notes,
-          u.username as user_name
-        FROM cash_register_sessions crs
-        LEFT JOIN users u ON crs.user_id = u.id
-        WHERE crs.id = ?
-      `,
+      sql: `${SESSION_SELECT_SQL} WHERE crs.id = ?`,
       args: [sessionId],
     });
 
-    // Convert Row to plain object to avoid BigInt serialization issues
-    const sessionRow = sessionResult.rows[0] as unknown as {
-      id: number | bigint;
-      user_id: number;
-      opening_balance: number;
-      closing_balance: number | null;
-      expected_balance: number | null;
-      variance: number | null;
-      status: string;
-      opened_at: string;
-      closed_at: string | null;
-      notes: string | null;
-      user_name: string | null;
-    };
-
-    const session = {
-      id: Number(sessionRow.id),
-      user_id: sessionRow.user_id,
-      opening_balance: sessionRow.opening_balance,
-      closing_balance: sessionRow.closing_balance,
-      expected_balance: sessionRow.expected_balance,
-      variance: sessionRow.variance,
-      status: sessionRow.status,
-      opened_at: sessionRow.opened_at,
-      closed_at: sessionRow.closed_at,
-      notes: sessionRow.notes,
-      user_name: sessionRow.user_name,
-    };
-
     return NextResponse.json({
       message: "Day opened successfully",
-      session,
+      session: serializeSession(sessionResult.rows[0] as unknown as SessionRow),
     });
   } catch (error) {
     if (error instanceof z.ZodError) {

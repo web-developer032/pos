@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import client from "@/lib/db";
+import { getCurrentTimestamp } from "@/lib/utils/dateTime";
+import {
+  serializeSession,
+  SessionRow,
+  SESSION_SELECT_SQL,
+} from "@/lib/utils/cashRegisterHelpers";
 
 // GET /api/cash-register/[id] - Get specific session details
 export async function GET(
@@ -19,14 +25,7 @@ export async function GET(
 
     // Get session details
     const sessionResult = await client.execute({
-      sql: `
-        SELECT 
-          crs.*,
-          u.username as user_name
-        FROM cash_register_sessions crs
-        LEFT JOIN users u ON crs.user_id = u.id
-        WHERE crs.id = ?
-      `,
+      sql: `${SESSION_SELECT_SQL} WHERE crs.id = ?`,
       args: [sessionId],
     });
 
@@ -37,23 +36,19 @@ export async function GET(
       );
     }
 
-    const session = sessionResult.rows[0] as unknown as {
-      id: number;
-      opening_balance: number;
-      opened_at: string;
-      closed_at: string | null;
-    };
+    const session = serializeSession(
+      sessionResult.rows[0] as unknown as SessionRow
+    );
 
+    // Use current timestamp if session is still open
     const openedAt = session.opened_at;
-    const closedAt = session.closed_at || new Date().toISOString();
+    const closedAt = session.closed_at || getCurrentTimestamp();
 
     // Get sales during this session
     const salesResult = await client.execute({
       sql: `
-        SELECT 
-          payment_method,
-          COUNT(*) as transaction_count,
-          COALESCE(SUM(final_amount), 0) as total_amount
+        SELECT payment_method, COUNT(*) as transaction_count,
+               COALESCE(SUM(final_amount), 0) as total_amount
         FROM sales
         WHERE created_at >= ? AND created_at <= ?
         GROUP BY payment_method
@@ -64,10 +59,8 @@ export async function GET(
     // Get returns during this session
     const returnsResult = await client.execute({
       sql: `
-        SELECT 
-          refund_method,
-          COUNT(*) as return_count,
-          COALESCE(SUM(refund_amount), 0) as total_refund
+        SELECT refund_method, COUNT(*) as return_count,
+               COALESCE(SUM(refund_amount), 0) as total_refund
         FROM returns
         WHERE created_at >= ? AND created_at <= ?
         GROUP BY refund_method
@@ -78,11 +71,8 @@ export async function GET(
     // Get expenses during this session
     const expensesResult = await client.execute({
       sql: `
-        SELECT 
-          payment_method,
-          category,
-          COUNT(*) as expense_count,
-          COALESCE(SUM(amount), 0) as total_amount
+        SELECT payment_method, category, COUNT(*) as expense_count,
+               COALESCE(SUM(amount), 0) as total_amount
         FROM expenses
         WHERE created_at >= ? AND created_at <= ?
         GROUP BY payment_method, category
@@ -91,7 +81,7 @@ export async function GET(
     });
 
     return NextResponse.json({
-      session: session,
+      session,
       sales: salesResult.rows,
       returns: returnsResult.rows,
       expenses: expensesResult.rows,
@@ -104,4 +94,3 @@ export async function GET(
     );
   }
 }
-
