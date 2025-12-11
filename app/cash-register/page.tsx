@@ -7,12 +7,14 @@ import {
   useGetCurrentSessionQuery,
   useGetDaySummaryQuery,
   useGetSessionHistoryQuery,
+  CashRegisterSession,
 } from "@/lib/api/cashRegisterApi";
 import { useCurrency } from "@/lib/hooks/useCurrency";
 import { Button } from "@/components/ui/Button";
 import { Pagination } from "@/components/ui/Pagination";
 import { OpenDayModal } from "@/components/cash-register/OpenDayModal";
 import { CloseDayModal } from "@/components/cash-register/CloseDayModal";
+import { EditSessionModal } from "@/components/cash-register/EditSessionModal";
 import { formatDateTime, formatDateOnly } from "@/lib/utils/dateTime";
 
 // Reusable loading spinner
@@ -48,11 +50,33 @@ function SummaryCard({
   );
 }
 
+// Edit icon component
+function EditIcon() {
+  return (
+    <svg
+      className="h-4 w-4"
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+      />
+    </svg>
+  );
+}
+
 export default function CashRegisterPage() {
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
   const [isOpenModalOpen, setIsOpenModalOpen] = useState(false);
   const [isCloseModalOpen, setIsCloseModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [sessionToEdit, setSessionToEdit] =
+    useState<CashRegisterSession | null>(null);
 
   const { data: currentSession, isLoading: isLoadingSession } =
     useGetCurrentSessionQuery();
@@ -68,6 +92,18 @@ export default function CashRegisterPage() {
     useGetSessionHistoryQuery({ page, limit });
 
   const { format: formatCurrency } = useCurrency();
+
+  const handleEditSession = (sessionData: CashRegisterSession) => {
+    setSessionToEdit(sessionData);
+    setIsEditModalOpen(true);
+  };
+
+  const handleEditCurrentSession = () => {
+    if (session) {
+      setSessionToEdit(session);
+      setIsEditModalOpen(true);
+    }
+  };
 
   if (isLoadingSession) {
     return (
@@ -117,23 +153,35 @@ export default function CashRegisterPage() {
                     <span className="font-medium">{session.user_name}</span> at{" "}
                     {formatDateTime(session.opened_at)}
                   </p>
-                  <p>
+                  <p className="flex items-center gap-2">
                     Opening Balance:{" "}
                     <span className="font-semibold text-indigo-600">
                       {formatCurrency(session.opening_balance)}
                     </span>
+                    <button
+                      onClick={handleEditCurrentSession}
+                      className="rounded p-1 text-gray-400 hover:bg-white hover:text-indigo-600"
+                      title="Edit opening balance"
+                    >
+                      <EditIcon />
+                    </button>
                   </p>
                 </div>
               )}
             </div>
             <div className="flex gap-3">
               {isOpen ? (
-                <Button
-                  onClick={() => setIsCloseModalOpen(true)}
-                  className="bg-red-600 hover:bg-red-700"
-                >
-                  Close Day
-                </Button>
+                <>
+                  <Button variant="outline" onClick={handleEditCurrentSession}>
+                    Edit
+                  </Button>
+                  <Button
+                    onClick={() => setIsCloseModalOpen(true)}
+                    className="bg-red-600 hover:bg-red-700"
+                  >
+                    Close Day
+                  </Button>
+                </>
               ) : (
                 <Button onClick={() => setIsOpenModalOpen(true)}>
                   Open Day
@@ -228,6 +276,7 @@ export default function CashRegisterPage() {
                         "Closing",
                         "Variance",
                         "Status",
+                        "Actions",
                       ].map((header, idx) => (
                         <th
                           key={header}
@@ -242,7 +291,7 @@ export default function CashRegisterPage() {
                   </thead>
                   <tbody className="divide-y divide-gray-200 bg-white">
                     {history?.sessions.map((s, index) => (
-                      <tr key={s.id}>
+                      <tr key={s.id} className="hover:bg-gray-50">
                         <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-500">
                           {(page - 1) * limit + index + 1}
                         </td>
@@ -294,12 +343,21 @@ export default function CashRegisterPage() {
                             {s.status}
                           </span>
                         </td>
+                        <td className="whitespace-nowrap px-6 py-4">
+                          <button
+                            onClick={() => handleEditSession(s)}
+                            className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-indigo-600"
+                            title="Edit session"
+                          >
+                            <EditIcon />
+                          </button>
+                        </td>
                       </tr>
                     ))}
                     {(!history?.sessions || history.sessions.length === 0) && (
                       <tr>
                         <td
-                          colSpan={8}
+                          colSpan={9}
                           className="px-6 py-8 text-center text-gray-500"
                         >
                           No sessions found
@@ -337,6 +395,14 @@ export default function CashRegisterPage() {
         <CloseDayModal
           isOpen={isCloseModalOpen}
           onClose={() => setIsCloseModalOpen(false)}
+        />
+        <EditSessionModal
+          isOpen={isEditModalOpen}
+          onClose={() => {
+            setIsEditModalOpen(false);
+            setSessionToEdit(null);
+          }}
+          session={sessionToEdit}
         />
       </DashboardLayout>
     </ProtectedRoute>

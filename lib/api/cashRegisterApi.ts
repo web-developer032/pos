@@ -112,6 +112,13 @@ export interface CloseDayResponse {
   };
 }
 
+export interface UpdateSessionRequest {
+  id: number;
+  opening_balance?: number;
+  closing_balance?: number;
+  notes?: string;
+}
+
 export const cashRegisterApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
     // Get current open session
@@ -167,6 +174,19 @@ export const cashRegisterApi = apiSlice.injectEndpoints({
       query: (id) => `/cash-register/${id}`,
       providesTags: ["CashRegister"],
     }),
+
+    // Update session balances
+    updateSession: builder.mutation<
+      { message: string; session: CashRegisterSession },
+      UpdateSessionRequest
+    >({
+      query: ({ id, ...data }) => ({
+        url: `/cash-register/${id}`,
+        method: "PATCH",
+        body: data,
+      }),
+      invalidatesTags: ["CashRegister"],
+    }),
   }),
 });
 
@@ -177,5 +197,6 @@ export const {
   useGetDaySummaryQuery,
   useGetSessionHistoryQuery,
   useGetSessionDetailsQuery,
+  useUpdateSessionMutation,
 } = cashRegisterApi;
 
