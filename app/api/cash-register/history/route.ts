@@ -20,7 +20,16 @@ export async function GET(request: NextRequest) {
     const result = await client.execute({
       sql: `
         SELECT 
-          crs.*,
+          crs.id,
+          crs.user_id,
+          crs.opening_balance,
+          crs.closing_balance,
+          crs.expected_balance,
+          crs.variance,
+          crs.status,
+          crs.opened_at,
+          crs.closed_at,
+          crs.notes,
           u.username as user_name
         FROM cash_register_sessions crs
         LEFT JOIN users u ON crs.user_id = u.id
@@ -30,8 +39,38 @@ export async function GET(request: NextRequest) {
       args: [limit, offset],
     });
 
+    // Convert rows to plain objects to avoid BigInt serialization issues
+    const sessions = result.rows.map((row) => {
+      const r = row as unknown as {
+        id: number | bigint;
+        user_id: number;
+        opening_balance: number;
+        closing_balance: number | null;
+        expected_balance: number | null;
+        variance: number | null;
+        status: string;
+        opened_at: string;
+        closed_at: string | null;
+        notes: string | null;
+        user_name: string | null;
+      };
+      return {
+        id: Number(r.id),
+        user_id: r.user_id,
+        opening_balance: r.opening_balance,
+        closing_balance: r.closing_balance,
+        expected_balance: r.expected_balance,
+        variance: r.variance,
+        status: r.status,
+        opened_at: r.opened_at,
+        closed_at: r.closed_at,
+        notes: r.notes,
+        user_name: r.user_name,
+      };
+    });
+
     return NextResponse.json({
-      sessions: result.rows,
+      sessions,
       pagination: {
         page,
         limit,

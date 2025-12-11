@@ -10,14 +10,13 @@ import { Modal } from "@/components/ui/Modal";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { Form } from "@/components/ui/Form";
-import { useScrollToError } from "@/lib/hooks/useScrollToError";
 import { useCurrency } from "@/lib/hooks/useCurrency";
+import { handleMutationError } from "@/lib/utils/errorHandler";
 import toast from "react-hot-toast";
 
 interface CloseDayModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess?: () => void;
 }
 
 interface CloseDayFormData {
@@ -25,16 +24,13 @@ interface CloseDayFormData {
   notes: string;
 }
 
-export function CloseDayModal({
-  isOpen,
-  onClose,
-  onSuccess,
-}: CloseDayModalProps) {
+export function CloseDayModal({ isOpen, onClose }: CloseDayModalProps) {
   const [closeDay, { isLoading }] = useCloseDayMutation();
-  const { data: summary, refetch: refetchSummary } = useGetDaySummaryQuery(
-    undefined,
-    { skip: !isOpen }
-  );
+  const { data: summary, isFetching } = useGetDaySummaryQuery(undefined, {
+    skip: !isOpen,
+    // Refetch when modal opens
+    refetchOnMountOrArgChange: true,
+  });
   const { format: formatCurrency } = useCurrency();
 
   const {
@@ -50,21 +46,18 @@ export function CloseDayModal({
     },
   });
 
-  // Auto-scroll to first error on validation failure
-  useScrollToError(errors);
+  // Reset form when modal closes
+  useEffect(() => {
+    if (!isOpen) {
+      reset();
+    }
+  }, [isOpen, reset]);
 
   const closingBalance = watch("closing_balance");
-  const expectedBalance = summary?.cash_summary?.expected_balance || 0;
+  const expectedBalance = summary?.cash_summary?.expected_balance ?? 0;
   const variance = closingBalance
     ? parseFloat(closingBalance) - expectedBalance
     : 0;
-
-  // Refetch summary when modal opens
-  useEffect(() => {
-    if (isOpen) {
-      refetchSummary();
-    }
-  }, [isOpen, refetchSummary]);
 
   const onSubmit = async (data: CloseDayFormData) => {
     try {
@@ -75,13 +68,9 @@ export function CloseDayModal({
 
       toast.success("Day closed successfully");
       reset();
-      onSuccess?.();
       onClose();
     } catch (error) {
-      const errorMessage =
-        (error as { data?: { error?: string } })?.data?.error ||
-        "Failed to close day";
-      toast.error(errorMessage);
+      handleMutationError(error, "Failed to close day");
     }
   };
 
@@ -90,16 +79,23 @@ export function CloseDayModal({
     onClose();
   };
 
-  const getVarianceColor = (value: number) => {
+  const getVarianceColor = (value: number): string => {
     if (Math.abs(value) < 0.01) return "text-green-600";
     if (value > 0) return "text-blue-600";
     return "text-red-600";
   };
 
-  const getVarianceLabel = (value: number) => {
+  const getVarianceLabel = (value: number): string => {
     if (Math.abs(value) < 0.01) return "Balanced";
     if (value > 0) return "Over";
     return "Short";
+  };
+
+  const getVarianceBgClass = (value: number): string => {
+    if (Math.abs(value) < 0.01)
+      return "border border-green-200 bg-green-50";
+    if (value > 0) return "border border-blue-200 bg-blue-50";
+    return "border border-red-200 bg-red-50";
   };
 
   return (
@@ -110,8 +106,15 @@ export function CloseDayModal({
       size="lg"
     >
       <Form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+        {/* Loading State */}
+        {isFetching && (
+          <div className="flex items-center justify-center py-8">
+            <div className="h-6 w-6 animate-spin rounded-full border-b-2 border-indigo-600"></div>
+          </div>
+        )}
+
         {/* Day Summary */}
-        {summary && (
+        {!isFetching && summary && (
           <div className="space-y-4">
             {/* Sales Summary */}
             <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
@@ -258,15 +261,7 @@ export function CloseDayModal({
 
           {/* Variance Display */}
           {closingBalance && parseFloat(closingBalance) >= 0 && (
-            <div
-              className={`rounded-lg p-3 ${
-                Math.abs(variance) < 0.01
-                  ? "border border-green-200 bg-green-50"
-                  : variance > 0
-                    ? "border border-blue-200 bg-blue-50"
-                    : "border border-red-200 bg-red-50"
-              }`}
-            >
+            <div className={`rounded-lg p-3 ${getVarianceBgClass(variance)}`}>
               <div className="flex items-center justify-between">
                 <span className="text-gray-700">Variance:</span>
                 <span className={`font-bold ${getVarianceColor(variance)}`}>
@@ -288,7 +283,7 @@ export function CloseDayModal({
           <Button type="button" variant="outline" onClick={handleClose}>
             Cancel
           </Button>
-          <Button type="submit" disabled={isLoading}>
+          <Button type="submit" disabled={isLoading || isFetching}>
             {isLoading ? "Closing..." : "Close Day"}
           </Button>
         </div>

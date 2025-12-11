@@ -1,21 +1,23 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import { useForm } from "react-hook-form";
-import { useOpenDayMutation } from "@/lib/api/cashRegisterApi";
+import {
+  useOpenDayMutation,
+  useGetSessionHistoryQuery,
+} from "@/lib/api/cashRegisterApi";
 import { useAppSelector } from "@/lib/hooks";
 import { Modal } from "@/components/ui/Modal";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { Form } from "@/components/ui/Form";
-import { useScrollToError } from "@/lib/hooks/useScrollToError";
 import { useCurrency } from "@/lib/hooks/useCurrency";
+import { handleMutationError } from "@/lib/utils/errorHandler";
 import toast from "react-hot-toast";
 
 interface OpenDayModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess?: () => void;
 }
 
 interface OpenDayFormData {
@@ -23,18 +25,20 @@ interface OpenDayFormData {
   notes: string;
 }
 
-export function OpenDayModal({
-  isOpen,
-  onClose,
-  onSuccess,
-}: OpenDayModalProps) {
+export function OpenDayModal({ isOpen, onClose }: OpenDayModalProps) {
   const [openDay, { isLoading }] = useOpenDayMutation();
   const user = useAppSelector((state) => state.auth.user);
   const { format: formatCurrency } = useCurrency();
-  const [lastClosingBalance, setLastClosingBalance] = useState<number | null>(
-    null
+
+  // Use RTK Query to get last closing balance
+  const { data: historyData } = useGetSessionHistoryQuery(
+    { page: 1, limit: 1 },
+    { skip: !isOpen }
   );
-  const [hasFetchedBalance, setHasFetchedBalance] = useState(false);
+
+  const lastSession = historyData?.sessions?.[0];
+  const lastClosingBalance =
+    lastSession?.status === "closed" ? lastSession.closing_balance : null;
 
   const {
     register,
@@ -49,39 +53,12 @@ export function OpenDayModal({
     },
   });
 
-  // Auto-scroll to first error on validation failure
-  useScrollToError(errors);
-
-  // Fetch last closing balance when modal opens
+  // Reset form when modal closes
   useEffect(() => {
-    if (isOpen && !hasFetchedBalance) {
-      const fetchLastClosingBalance = async () => {
-        try {
-          const response = await fetch("/api/cash-register/history?limit=1");
-          const data = await response.json();
-          if (data.sessions && data.sessions.length > 0) {
-            const lastSession = data.sessions[0];
-            if (
-              lastSession.status === "closed" &&
-              lastSession.closing_balance !== null
-            ) {
-              setLastClosingBalance(lastSession.closing_balance);
-            }
-          }
-        } catch (error) {
-          console.error("Failed to fetch last closing balance:", error);
-        }
-        setHasFetchedBalance(true);
-      };
-      fetchLastClosingBalance();
-    }
-
-    // Reset fetch state when modal closes
     if (!isOpen) {
-      setHasFetchedBalance(false);
-      setLastClosingBalance(null);
+      reset();
     }
-  }, [isOpen, hasFetchedBalance]);
+  }, [isOpen, reset]);
 
   const handleUseLastBalance = () => {
     if (lastClosingBalance !== null) {
@@ -98,19 +75,15 @@ export function OpenDayModal({
     try {
       await openDay({
         opening_balance: parseFloat(data.opening_balance) || 0,
-        user_id: user.id,
+        user_id: Number(user.id),
         notes: data.notes || undefined,
       }).unwrap();
 
       toast.success("Day opened successfully");
       reset();
-      onSuccess?.();
       onClose();
     } catch (error) {
-      const errorMessage =
-        (error as { data?: { error?: string } })?.data?.error ||
-        "Failed to open day";
-      toast.error(errorMessage);
+      handleMutationError(error, "Failed to open day");
     }
   };
 
@@ -139,13 +112,11 @@ export function OpenDayModal({
                 />
               </svg>
             </div>
-            <div>
-              <p className="text-sm text-blue-800">
-                Enter the amount of cash currently in your drawer to start the
-                day. This will be used to track your cash balance throughout the
-                day.
-              </p>
-            </div>
+            <p className="text-sm text-blue-800">
+              Enter the amount of cash currently in your drawer to start the
+              day. This will be used to track your cash balance throughout the
+              day.
+            </p>
           </div>
         </div>
 

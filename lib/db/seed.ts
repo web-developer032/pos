@@ -15,12 +15,12 @@ export async function seedDatabase() {
 
   console.log("[DB] Seeding database with default data...");
 
-  // Create default admin user
-  const passwordHash = await bcrypt.hash("admin123", 10);
-  await client.execute({
-    sql: "INSERT INTO users (username, email, password_hash, role) VALUES (?, ?, ?, ?)",
-    args: ["admin", "admin@pos.com", passwordHash, "admin"],
-  });
+    // Create default admin user
+    const passwordHash = await bcrypt.hash("admin123", 10);
+    await client.execute({
+      sql: "INSERT INTO users (username, email, password_hash, role) VALUES (?, ?, ?, ?)",
+      args: ["admin", "admin@pos.com", passwordHash, "admin"],
+    });
 
   // Seed default categories (including "Other" as default)
   const categories = [
@@ -33,17 +33,17 @@ export async function seedDatabase() {
   ];
 
   for (const category of categories) {
-    await client.execute({
+      await client.execute({
       sql: "INSERT OR IGNORE INTO categories (name, description) VALUES (?, ?)",
-      args: [category.name, category.description],
-    });
+        args: [category.name, category.description],
+      });
   }
 
   // Seed default supplier "Other"
-  await client.execute({
+    await client.execute({
     sql: "INSERT OR IGNORE INTO suppliers (name, contact_person, email) VALUES (?, ?, ?)",
-    args: ["Other", "Default Supplier", "other@pos.com"],
-  });
+      args: ["Other", "Default Supplier", "other@pos.com"],
+    });
 
   // Seed default settings
   const settings = [
@@ -54,11 +54,11 @@ export async function seedDatabase() {
   ];
 
   for (const setting of settings) {
-    await client.execute({
+      await client.execute({
       sql: "INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)",
-      args: [setting.key, setting.value],
-    });
-  }
+        args: [setting.key, setting.value],
+      });
+    }
 
   console.log("[DB] Seeding complete");
 }

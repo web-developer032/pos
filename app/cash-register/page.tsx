@@ -15,53 +15,74 @@ import { OpenDayModal } from "@/components/cash-register/OpenDayModal";
 import { CloseDayModal } from "@/components/cash-register/CloseDayModal";
 import { format } from "date-fns";
 
+// Reusable loading spinner
+function LoadingSpinner({ size = "md" }: { size?: "sm" | "md" }) {
+  const sizeClass = size === "sm" ? "h-6 w-6" : "h-8 w-8";
+  return (
+    <div className="flex items-center justify-center py-12">
+      <div
+        className={`${sizeClass} animate-spin rounded-full border-b-2 border-indigo-600`}
+      />
+    </div>
+  );
+}
+
+// Summary card component
+function SummaryCard({
+  label,
+  value,
+  subLabel,
+  colorClass = "text-gray-900",
+}: {
+  label: string;
+  value: string;
+  subLabel: string;
+  colorClass?: string;
+}) {
+  return (
+    <div className="rounded-lg bg-white p-4 shadow">
+      <p className="text-sm text-gray-500">{label}</p>
+      <p className={`text-2xl font-bold ${colorClass}`}>{value}</p>
+      <p className="text-xs text-gray-400">{subLabel}</p>
+    </div>
+  );
+}
+
 export default function CashRegisterPage() {
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
   const [isOpenModalOpen, setIsOpenModalOpen] = useState(false);
   const [isCloseModalOpen, setIsCloseModalOpen] = useState(false);
 
-  const {
-    data: currentSession,
-    isLoading: isLoadingSession,
-    refetch: refetchSession,
-  } = useGetCurrentSessionQuery();
-  const { data: summary, refetch: refetchSummary } = useGetDaySummaryQuery(
-    undefined,
-    { skip: !currentSession?.isOpen }
-  );
-  const {
-    data: history,
-    isLoading: isLoadingHistory,
-    refetch: refetchHistory,
-  } = useGetSessionHistoryQuery({ page, limit });
+  const { data: currentSession, isLoading: isLoadingSession } =
+    useGetCurrentSessionQuery();
+
+  const isOpen = currentSession?.isOpen ?? false;
+  const session = currentSession?.session;
+
+  const { data: summary } = useGetDaySummaryQuery(undefined, {
+    skip: !isOpen,
+  });
+
+  const { data: history, isLoading: isLoadingHistory } =
+    useGetSessionHistoryQuery({ page, limit });
 
   const { format: formatCurrency } = useCurrency();
-
-  const handleSuccess = () => {
-    refetchSession();
-    refetchSummary();
-    refetchHistory();
-  };
 
   if (isLoadingSession) {
     return (
       <ProtectedRoute>
         <DashboardLayout>
-          <div className="flex items-center justify-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-          </div>
+          <LoadingSpinner />
         </DashboardLayout>
       </ProtectedRoute>
     );
   }
 
-  const isOpen = currentSession?.isOpen || false;
-  const session = currentSession?.session;
-
   return (
     <ProtectedRoute>
       <DashboardLayout>
+        {/* Header */}
         <div className="mb-6">
           <h1 className="text-3xl font-bold">Cash Register</h1>
           <p className="mt-2 text-gray-600">
@@ -82,9 +103,9 @@ export default function CashRegisterPage() {
               <div className="flex items-center gap-3">
                 <div
                   className={`h-4 w-4 rounded-full ${
-                    isOpen ? "bg-green-500 animate-pulse" : "bg-gray-400"
+                    isOpen ? "animate-pulse bg-green-500" : "bg-gray-400"
                   }`}
-                ></div>
+                />
                 <h2 className="text-xl font-semibold">
                   {isOpen ? "Day is Open" : "Day is Closed"}
                 </h2>
@@ -125,46 +146,34 @@ export default function CashRegisterPage() {
         {/* Current Day Summary */}
         {isOpen && summary && (
           <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <div className="rounded-lg bg-white p-4 shadow">
-              <p className="text-sm text-gray-500">Sales Today</p>
-              <p className="text-2xl font-bold text-green-600">
-                {formatCurrency(summary.sales.total.total_amount)}
-              </p>
-              <p className="text-xs text-gray-400">
-                {summary.sales.total.transaction_count} transactions
-              </p>
-            </div>
-            <div className="rounded-lg bg-white p-4 shadow">
-              <p className="text-sm text-gray-500">Returns Today</p>
-              <p className="text-2xl font-bold text-orange-600">
-                {formatCurrency(summary.returns.total.total_refund)}
-              </p>
-              <p className="text-xs text-gray-400">
-                {summary.returns.total.return_count} returns
-              </p>
-            </div>
-            <div className="rounded-lg bg-white p-4 shadow">
-              <p className="text-sm text-gray-500">Expenses Today</p>
-              <p className="text-2xl font-bold text-red-600">
-                {formatCurrency(summary.expenses.total.total_amount)}
-              </p>
-              <p className="text-xs text-gray-400">
-                {summary.expenses.total.expense_count} expenses
-              </p>
-            </div>
-            <div className="rounded-lg bg-white p-4 shadow">
-              <p className="text-sm text-gray-500">Expected Cash</p>
-              <p className="text-2xl font-bold text-indigo-600">
-                {formatCurrency(summary.cash_summary.expected_balance)}
-              </p>
-              <p className="text-xs text-gray-400">
-                Based on transactions
-              </p>
-            </div>
+            <SummaryCard
+              label="Sales Today"
+              value={formatCurrency(summary.sales.total.total_amount)}
+              subLabel={`${summary.sales.total.transaction_count} transactions`}
+              colorClass="text-green-600"
+            />
+            <SummaryCard
+              label="Returns Today"
+              value={formatCurrency(summary.returns.total.total_refund)}
+              subLabel={`${summary.returns.total.return_count} returns`}
+              colorClass="text-orange-600"
+            />
+            <SummaryCard
+              label="Expenses Today"
+              value={formatCurrency(summary.expenses.total.total_amount)}
+              subLabel={`${summary.expenses.total.expense_count} expenses`}
+              colorClass="text-red-600"
+            />
+            <SummaryCard
+              label="Expected Cash"
+              value={formatCurrency(summary.cash_summary.expected_balance)}
+              subLabel="Based on transactions"
+              colorClass="text-indigo-600"
+            />
           </div>
         )}
 
-        {/* Sales by Payment Method (if open) */}
+        {/* Sales by Payment Method */}
         {isOpen && summary && summary.sales.by_method.length > 0 && (
           <div className="mb-6 rounded-lg bg-white p-4 shadow">
             <h3 className="mb-4 font-semibold text-gray-800">
@@ -193,43 +202,42 @@ export default function CashRegisterPage() {
 
         {/* Session History */}
         <div className="rounded-lg bg-white shadow">
-          <div className="border-b border-gray-200 px-6 py-4">
+          <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
             <h3 className="font-semibold text-gray-800">Session History</h3>
+            {history?.pagination && (
+              <span className="text-sm text-gray-500">
+                {history.pagination.total} total sessions
+              </span>
+            )}
           </div>
+
           {isLoadingHistory ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-600"></div>
-            </div>
+            <LoadingSpinner size="sm" />
           ) : (
             <>
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                        #
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                        Date
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                        User
-                      </th>
-                      <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">
-                        Opening
-                      </th>
-                      <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">
-                        Expected
-                      </th>
-                      <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">
-                        Closing
-                      </th>
-                      <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">
-                        Variance
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                        Status
-                      </th>
+                      {[
+                        "#",
+                        "Date",
+                        "User",
+                        "Opening",
+                        "Expected",
+                        "Closing",
+                        "Variance",
+                        "Status",
+                      ].map((header, idx) => (
+                        <th
+                          key={header}
+                          className={`px-6 py-3 text-xs font-medium uppercase tracking-wider text-gray-500 ${
+                            idx >= 3 && idx <= 6 ? "text-right" : "text-left"
+                          }`}
+                        >
+                          {header}
+                        </th>
+                      ))}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200 bg-white">
@@ -321,19 +329,16 @@ export default function CashRegisterPage() {
           )}
         </div>
 
-        {/* Modals */}
+        {/* Modals - No onSuccess needed, RTK Query invalidates tags automatically */}
         <OpenDayModal
           isOpen={isOpenModalOpen}
           onClose={() => setIsOpenModalOpen(false)}
-          onSuccess={handleSuccess}
         />
         <CloseDayModal
           isOpen={isCloseModalOpen}
           onClose={() => setIsCloseModalOpen(false)}
-          onSuccess={handleSuccess}
         />
       </DashboardLayout>
     </ProtectedRoute>
   );
 }
-

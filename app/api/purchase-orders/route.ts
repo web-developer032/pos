@@ -105,48 +105,48 @@ async function postHandler(req: AuthRequest) {
     await client.execute("BEGIN TRANSACTION");
 
     try {
-      const poResult = await client.execute({
-        sql: `INSERT INTO purchase_orders (po_number, supplier_id, user_id, total_amount, discount_type, discount_value) 
-              VALUES (?, ?, ?, ?, ?, ?) RETURNING *`,
-        args: [
-          poNumber,
-          validated.supplier_id,
-          user.userId,
-          totalAmount,
-          validated.discount_type || null,
-          validated.discount_value || null,
-        ],
-      });
+    const poResult = await client.execute({
+      sql: `INSERT INTO purchase_orders (po_number, supplier_id, user_id, total_amount, discount_type, discount_value) 
+            VALUES (?, ?, ?, ?, ?, ?) RETURNING *`,
+      args: [
+        poNumber,
+        validated.supplier_id,
+        user.userId,
+        totalAmount,
+        validated.discount_type || null,
+        validated.discount_value || null,
+      ],
+    });
 
-      const poId = (poResult.rows[0] as unknown as { id: number }).id;
+    const poId = (poResult.rows[0] as unknown as { id: number }).id;
 
-      for (const item of validated.items) {
-        const roundedUnitCost = roundPrice(item.unit_cost);
+    for (const item of validated.items) {
+      const roundedUnitCost = roundPrice(item.unit_cost);
         const roundedRetailPrice = item.retail_price
           ? roundPrice(item.retail_price)
           : null;
-        const itemSubtotal = roundPrice(item.quantity * roundedUnitCost);
-        await client.execute({
+      const itemSubtotal = roundPrice(item.quantity * roundedUnitCost);
+      await client.execute({
           sql: `INSERT INTO purchase_order_items (po_id, product_id, product_name, quantity, unit_cost, retail_price, subtotal) 
                 VALUES (?, ?, ?, ?, ?, ?, ?)`,
-          args: [
-            poId,
-            item.product_id,
+        args: [
+          poId,
+          item.product_id,
             item.product_name || null,
-            item.quantity,
-            roundedUnitCost,
-            roundedRetailPrice,
-            itemSubtotal,
-          ],
-        });
-      }
+          item.quantity,
+          roundedUnitCost,
+          roundedRetailPrice,
+          itemSubtotal,
+        ],
+      });
+    }
 
       await client.execute("COMMIT");
 
-      return NextResponse.json(
-        { purchase_order: poResult.rows[0] },
-        { status: 201 }
-      );
+    return NextResponse.json(
+      { purchase_order: poResult.rows[0] },
+      { status: 201 }
+    );
     } catch (txError) {
       await client.execute("ROLLBACK");
       throw txError;

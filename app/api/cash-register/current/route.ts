@@ -22,8 +22,37 @@ export async function GET() {
       return NextResponse.json({ session: null, isOpen: false });
     }
 
+    // Convert Row to plain object to avoid BigInt serialization issues
+    const row = result.rows[0] as unknown as {
+      id: number | bigint;
+      user_id: number;
+      opening_balance: number;
+      closing_balance: number | null;
+      expected_balance: number | null;
+      variance: number | null;
+      status: string;
+      opened_at: string;
+      closed_at: string | null;
+      notes: string | null;
+      user_name: string | null;
+    };
+
+    const session = {
+      id: Number(row.id),
+      user_id: row.user_id,
+      opening_balance: row.opening_balance,
+      closing_balance: row.closing_balance,
+      expected_balance: row.expected_balance,
+      variance: row.variance,
+      status: row.status,
+      opened_at: row.opened_at,
+      closed_at: row.closed_at,
+      notes: row.notes,
+      user_name: row.user_name,
+    };
+
     return NextResponse.json({
-      session: result.rows[0],
+      session,
       isOpen: true,
     });
   } catch (error) {
@@ -34,4 +63,3 @@ export async function GET() {
     );
   }
 }
-

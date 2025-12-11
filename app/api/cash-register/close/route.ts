@@ -46,7 +46,8 @@ export async function POST(request: NextRequest) {
       `,
       args: [openedAt],
     });
-    const cashSales = (cashSalesResult.rows[0] as unknown as { total: number }).total || 0;
+    const cashSales =
+      (cashSalesResult.rows[0] as unknown as { total: number }).total || 0;
 
     // Get cash refunds (refund_method = 'cash')
     const cashRefundsResult = await client.execute({
@@ -103,10 +104,19 @@ export async function POST(request: NextRequest) {
     });
 
     // Fetch the updated session
-    const updatedSession = await client.execute({
+    const updatedSessionResult = await client.execute({
       sql: `
         SELECT 
-          crs.*,
+          crs.id,
+          crs.user_id,
+          crs.opening_balance,
+          crs.closing_balance,
+          crs.expected_balance,
+          crs.variance,
+          crs.status,
+          crs.opened_at,
+          crs.closed_at,
+          crs.notes,
           u.username as user_name
         FROM cash_register_sessions crs
         LEFT JOIN users u ON crs.user_id = u.id
@@ -115,9 +125,38 @@ export async function POST(request: NextRequest) {
       args: [session.id],
     });
 
+    // Convert Row to plain object to avoid BigInt serialization issues
+    const row = updatedSessionResult.rows[0] as unknown as {
+      id: number | bigint;
+      user_id: number;
+      opening_balance: number;
+      closing_balance: number | null;
+      expected_balance: number | null;
+      variance: number | null;
+      status: string;
+      opened_at: string;
+      closed_at: string | null;
+      notes: string | null;
+      user_name: string | null;
+    };
+
+    const updatedSession = {
+      id: Number(row.id),
+      user_id: row.user_id,
+      opening_balance: row.opening_balance,
+      closing_balance: row.closing_balance,
+      expected_balance: row.expected_balance,
+      variance: row.variance,
+      status: row.status,
+      opened_at: row.opened_at,
+      closed_at: row.closed_at,
+      notes: row.notes,
+      user_name: row.user_name,
+    };
+
     return NextResponse.json({
       message: "Day closed successfully",
-      session: updatedSession.rows[0],
+      session: updatedSession,
       summary: {
         opening_balance: session.opening_balance,
         cash_sales: cashSales,
@@ -142,4 +181,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-

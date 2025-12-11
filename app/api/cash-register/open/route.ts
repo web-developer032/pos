@@ -42,10 +42,19 @@ export async function POST(request: NextRequest) {
 
     // Fetch the created session
     const sessionId = Number(result.lastInsertRowid);
-    const session = await client.execute({
+    const sessionResult = await client.execute({
       sql: `
         SELECT 
-          crs.*,
+          crs.id,
+          crs.user_id,
+          crs.opening_balance,
+          crs.closing_balance,
+          crs.expected_balance,
+          crs.variance,
+          crs.status,
+          crs.opened_at,
+          crs.closed_at,
+          crs.notes,
           u.username as user_name
         FROM cash_register_sessions crs
         LEFT JOIN users u ON crs.user_id = u.id
@@ -54,9 +63,38 @@ export async function POST(request: NextRequest) {
       args: [sessionId],
     });
 
+    // Convert Row to plain object to avoid BigInt serialization issues
+    const sessionRow = sessionResult.rows[0] as unknown as {
+      id: number | bigint;
+      user_id: number;
+      opening_balance: number;
+      closing_balance: number | null;
+      expected_balance: number | null;
+      variance: number | null;
+      status: string;
+      opened_at: string;
+      closed_at: string | null;
+      notes: string | null;
+      user_name: string | null;
+    };
+
+    const session = {
+      id: Number(sessionRow.id),
+      user_id: sessionRow.user_id,
+      opening_balance: sessionRow.opening_balance,
+      closing_balance: sessionRow.closing_balance,
+      expected_balance: sessionRow.expected_balance,
+      variance: sessionRow.variance,
+      status: sessionRow.status,
+      opened_at: sessionRow.opened_at,
+      closed_at: sessionRow.closed_at,
+      notes: sessionRow.notes,
+      user_name: sessionRow.user_name,
+    };
+
     return NextResponse.json({
       message: "Day opened successfully",
-      session: session.rows[0],
+      session,
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
