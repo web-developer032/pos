@@ -356,6 +356,22 @@ export function ProductForm({
         quantity_multiplier:
           productData.product.quantity_multiplier?.toString() || "",
       });
+
+      // Load existing sub-products when editing a base product
+      if (productData.sub_products && productData.sub_products.length > 0) {
+        const existingSubProducts: SubProductInput[] =
+          productData.sub_products.map((sp) => ({
+            id: `existing-${sp.id}`,
+            existingId: sp.id,
+            name: sp.name,
+            barcode: sp.barcode || "",
+            quantity_multiplier: sp.quantity_multiplier.toString(),
+            cost_price: sp.cost_price.toString(),
+            selling_price: sp.selling_price.toString(),
+            unit: (sp.unit || "piece") as ProductUnit,
+          }));
+        setSubProducts(existingSubProducts);
+      }
     }
   }, [productData, reset]);
 
@@ -541,30 +557,50 @@ export function ProductForm({
             data: submitData,
           }).unwrap();
 
-          // Create sub-products if any were added while editing
+          // Handle sub-products: update existing ones, create new ones
           if (subProducts.length > 0) {
-            let successCount = 0;
+            let updatedCount = 0;
+            let createdCount = 0;
             let failCount = 0;
 
             for (const sp of subProducts) {
               try {
-                await createProduct({
-                  name: sp.name,
-                  barcode: sp.barcode || undefined,
-                  sku: data.sku || undefined, // Inherit SKU from base
-                  category_id: categoryId,
-                  cost_price: roundPrice(toFloat(sp.cost_price)),
-                  selling_price: roundPrice(toFloat(sp.selling_price)),
-                  stock_quantity: 0, // Sub-products don't hold stock
-                  min_stock_level: 0,
-                  unit: sp.unit || data.unit || "piece",
-                  base_product_id: productId,
-                  quantity_multiplier: toFloat(sp.quantity_multiplier),
-                }).unwrap();
-                successCount++;
+                if (sp.existingId) {
+                  // Update existing sub-product
+                  // Must include base_product_id when updating quantity_multiplier
+                  await updateProduct({
+                    id: sp.existingId,
+                    data: {
+                      name: sp.name,
+                      barcode: sp.barcode || undefined,
+                      cost_price: roundPrice(toFloat(sp.cost_price)),
+                      selling_price: roundPrice(toFloat(sp.selling_price)),
+                      unit: sp.unit || data.unit || "piece",
+                      base_product_id: productId, // Required when updating quantity_multiplier
+                      quantity_multiplier: toFloat(sp.quantity_multiplier),
+                    },
+                  }).unwrap();
+                  updatedCount++;
+                } else {
+                  // Create new sub-product
+                  await createProduct({
+                    name: sp.name,
+                    barcode: sp.barcode || undefined,
+                    sku: data.sku || undefined, // Inherit SKU from base
+                    category_id: categoryId,
+                    cost_price: roundPrice(toFloat(sp.cost_price)),
+                    selling_price: roundPrice(toFloat(sp.selling_price)),
+                    stock_quantity: 0, // Sub-products don't hold stock
+                    min_stock_level: 0,
+                    unit: sp.unit || data.unit || "piece",
+                    base_product_id: productId,
+                    quantity_multiplier: toFloat(sp.quantity_multiplier),
+                  }).unwrap();
+                  createdCount++;
+                }
               } catch (error) {
                 console.error(
-                  `Failed to create sub-product "${sp.name}":`,
+                  `Failed to ${sp.existingId ? "update" : "create"} sub-product "${sp.name}":`,
                   error
                 );
                 failCount++;
@@ -574,11 +610,14 @@ export function ProductForm({
             // Show summary toast for sub-products
             if (failCount > 0) {
               toast.error(
-                `Updated product, but ${failCount} sub-product(s) failed to create`
+                `Updated product, but ${failCount} sub-product(s) failed`
               );
-            } else if (successCount > 0) {
+            } else if (updatedCount > 0 || createdCount > 0) {
+              const messages = [];
+              if (updatedCount > 0) messages.push(`${updatedCount} updated`);
+              if (createdCount > 0) messages.push(`${createdCount} created`);
               toast.success(
-                `Updated product and created ${successCount} sub-product(s)`
+                `Updated product. Sub-products: ${messages.join(", ")}`
               );
             }
           }

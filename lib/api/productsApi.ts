@@ -29,6 +29,16 @@ export interface Product {
   base_product_stock?: number; // Stock from base product (for related products)
 }
 
+export interface SubProduct {
+  id: number;
+  name: string;
+  barcode: string | null;
+  quantity_multiplier: number;
+  cost_price: number;
+  selling_price: number;
+  unit: string;
+}
+
 export interface CreateProductRequest {
   name: string;
   barcode?: string;
@@ -109,7 +119,10 @@ export const productsApi = apiSlice.injectEndpoints({
             ]
           : ["Product"],
     }),
-    getProduct: builder.query<{ product: Product }, number>({
+    getProduct: builder.query<
+      { product: Product; sub_products?: SubProduct[] },
+      number
+    >({
       query: (id) => `/products/${id}`,
       providesTags: (result, error, id) => [{ type: "Product", id }],
     }),

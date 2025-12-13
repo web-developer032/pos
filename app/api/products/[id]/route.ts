@@ -91,7 +91,26 @@ async function getHandler(req: NextRequest, context?: RouteContext) {
     const product = result.rows[0] as unknown as Record<string, unknown>;
     product.additional_barcodes = additionalBarcodes;
 
-    return NextResponse.json({ product });
+    // Fetch sub-products (products that have this product as base_product_id)
+    const subProductsResult = await client.execute({
+      sql: `SELECT id, name, barcode, quantity_multiplier, cost_price, selling_price, unit
+            FROM products 
+            WHERE base_product_id = ? AND deleted_at IS NULL
+            ORDER BY name`,
+      args: [params.id],
+    });
+
+    const subProducts = subProductsResult.rows.map((row) => row as unknown as {
+      id: number;
+      name: string;
+      barcode: string | null;
+      quantity_multiplier: number;
+      cost_price: number;
+      selling_price: number;
+      unit: string;
+    });
+
+    return NextResponse.json({ product, sub_products: subProducts });
   } catch (error) {
     console.error("Error fetching product:", error);
     return NextResponse.json(

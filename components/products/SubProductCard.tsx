@@ -50,6 +50,7 @@ function ProfitDisplay({
 
 export interface SubProductInput {
   id: string;
+  existingId?: number; // ID of existing sub-product in database (for editing)
   name: string;
   barcode: string;
   quantity_multiplier: string;
@@ -97,9 +98,16 @@ export function SubProductCard({
   return (
     <div className="rounded-md border border-green-300 bg-white p-3">
       <div className="mb-2 flex items-center justify-between">
-        <span className="text-xs font-medium text-gray-500">
-          Sub-Product #{displayNumber}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-medium text-gray-500">
+            Sub-Product #{displayNumber}
+          </span>
+          {subProduct.existingId && (
+            <span className="rounded bg-blue-100 px-1.5 py-0.5 text-xs text-blue-700">
+              Existing
+            </span>
+          )}
+        </div>
         <button
           type="button"
           onClick={() => onRemove(subProduct.id)}
