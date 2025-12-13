@@ -148,11 +148,16 @@ export default function BarcodeGeneratorPage() {
       const storeNameEl = card.querySelector(".store-name");
       const storeName = storeNameEl?.textContent || "";
       const productInfoEl = card.querySelector(".product-info");
-      const productInfo = productInfoEl?.textContent || "";
+      const productInfo = productInfoEl?.innerHTML || "";
       const barcodeNumberEl = card.querySelector(".barcode-number");
       const barcodeNumber = barcodeNumberEl?.textContent || "";
+
+      // Get individual date spans for proper formatting
       const datesRowEl = card.querySelector(".dates-row");
-      const datesText = datesRowEl?.textContent || "";
+      const mfgSpan = datesRowEl?.querySelector("span:first-child");
+      const expSpan = datesRowEl?.querySelector("span:last-child");
+      const mfgText = mfgSpan?.textContent || "";
+      const expText = expSpan?.textContent || "";
 
       let canvasDataUrl = "";
       if (canvas) {
@@ -165,7 +170,7 @@ export default function BarcodeGeneratorPage() {
           ${productInfo ? `<div class="product-info">${productInfo}</div>` : ""}
           ${canvasDataUrl ? `<img src="${canvasDataUrl}" alt="${barcodeNumber}" />` : ""}
           <div class="barcode-number">${barcodeNumber}</div>
-          ${datesText ? `<div class="dates-row">${datesText}</div>` : ""}
+          ${mfgText || expText ? `<div class="dates-row"><span>${mfgText}</span><span>${expText}</span></div>` : ""}
         </div>
       `;
     });
@@ -174,11 +179,19 @@ export default function BarcodeGeneratorPage() {
       <!DOCTYPE html>
       <html>
         <head>
-          <title>Barcodes</title>
+          <title>Barcodes - TLP 2844-Z</title>
           <style>
+            /* TLP 2844-Z Label Printer Settings - 3 labels per row */
             @page {
-              size: A4;
-              margin: 5mm;
+              size: 100mm 30mm; /* Approximate label roll width x label height */
+              margin: 0;
+            }
+            @media print {
+              html, body {
+                width: 100mm;
+                margin: 0;
+                padding: 0;
+              }
             }
             * {
               margin: 0;
@@ -186,51 +199,62 @@ export default function BarcodeGeneratorPage() {
               box-sizing: border-box;
             }
             body {
-              font-family: Arial, sans-serif;
-              padding: 5mm;
+              font-family: Arial, Helvetica, sans-serif;
+              padding: 0;
+              margin: 0;
             }
             .grid {
               display: grid;
-              grid-template-columns: repeat(4, 1fr);
-              gap: 2mm;
+              grid-template-columns: repeat(3, 1fr); /* 3 labels per row for TLP 2844-Z */
+              gap: 0;
             }
             .barcode-card {
-              border: 1px solid #999;
-              padding: 2mm;
+              border: none;
+              border-right: 1px dashed #ccc;
+              padding: 1.5mm;
               text-align: center;
               break-inside: avoid;
               page-break-inside: avoid;
+              height: auto;
+              min-height: 25mm;
+            }
+            .barcode-card:nth-child(3n) {
+              border-right: none;
             }
             .store-name {
-              font-size: 8px;
+              font-size: 7px;
               font-weight: bold;
-              margin-bottom: 0.5mm;
+              margin-bottom: 0.3mm;
+              line-height: 1.1;
             }
             .product-info {
-              font-size: 7px;
+              font-size: 6px;
               font-weight: 500;
-              margin-bottom: 0.5mm;
+              margin-bottom: 0.3mm;
               overflow: hidden;
               text-overflow: ellipsis;
               white-space: nowrap;
+              line-height: 1.1;
             }
             .barcode-card img {
               max-width: 100%;
-              height: auto;
-              margin: 1mm 0;
+              height: 12mm;
+              object-fit: contain;
+              margin: 0.5mm 0;
             }
             .barcode-number {
-              font-family: monospace;
-              font-size: 8px;
+              font-family: 'Courier New', monospace;
+              font-size: 7px;
               font-weight: bold;
+              letter-spacing: 0.5px;
             }
             .dates-row {
-              font-size: 6px;
-              color: #666;
-              margin-top: 0.5mm;
+              font-size: 5px;
+              color: #333;
+              margin-top: 0.3mm;
               display: flex;
               justify-content: space-between;
-              padding: 0 1mm;
+              padding: 0 0.5mm;
             }
           </style>
         </head>
@@ -420,7 +444,7 @@ export default function BarcodeGeneratorPage() {
                 Generated Barcodes ({generatedBarcodes.length})
               </h2>
             </div>
-            <div className="barcode-grid grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+            <div className="barcode-grid grid grid-cols-3 gap-3">
               {generatedBarcodes.map((item) => (
                 <BarcodeCard
                   key={item.id}
@@ -562,8 +586,8 @@ function BarcodeCard({
         >
           {productName}
           {quantityMultiplier && (
-            <span className="ml-1 text-gray-500">
-              {quantityMultiplier} {unit || "pc"}
+            <span className="qty-multiplier ml-1 text-gray-500">
+              &nbsp;{quantityMultiplier} {unit || "pc"}
             </span>
           )}
         </div>
