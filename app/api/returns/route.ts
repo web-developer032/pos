@@ -12,7 +12,7 @@ const returnSchema = z.object({
     z.object({
       sale_item_id: z.number(),
       product_id: z.number(),
-      quantity: z.number().min(0.01),
+      quantity: z.number().min(0.001),
       unit_price: z.number().min(0),
     })
   ),

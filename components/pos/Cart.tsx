@@ -161,8 +161,8 @@ export function Cart({ onCheckout, onHoldCart }: CartProps) {
                   <div className="flex items-center gap-2">
                     <input
                       type="number"
-                      step="0.01"
-                      min="0.01"
+                      step="0.001"
+                      min="0.001"
                       value={
                         quantityInputs[item.product_id] !== undefined
                           ? quantityInputs[item.product_id]
@@ -171,7 +171,7 @@ export function Cart({ onCheckout, onHoldCart }: CartProps) {
                       onChange={(e) => {
                         const value = e.target.value;
                         // Allow empty string and intermediate typing states
-                        if (value === "" || value === "." || value === "0") {
+                        if (value === "" || value === "." || value === "0" || value === "0.") {
                           setQuantityInputs((prev) => ({
                             ...prev,
                             [item.product_id]: value,
@@ -191,19 +191,19 @@ export function Cart({ onCheckout, onHoldCart }: CartProps) {
                         const inputValue = quantityInputs[item.product_id];
                         if (inputValue !== undefined) {
                           const newQuantity = parseFloat(inputValue);
-                          if (!isNaN(newQuantity) && newQuantity >= 0.1) {
+                          if (!isNaN(newQuantity) && newQuantity >= 0.001) {
                             dispatch(
                               updateQuantity({
                                 product_id: item.product_id,
                                 quantity: newQuantity,
                               })
                             );
-                          } else if (newQuantity < 0.1) {
-                            // Reset to minimum if below 0.1
+                          } else if (newQuantity < 0.001) {
+                            // Reset to minimum if below 0.001
                             dispatch(
                               updateQuantity({
                                 product_id: item.product_id,
-                                quantity: 0.1,
+                                quantity: 0.001,
                               })
                             );
                           }

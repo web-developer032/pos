@@ -410,8 +410,9 @@ export function ProductForm({
           throw new Error(sellingPriceValidation.error);
         }
 
-        // Only validate stock fields for base products (not related products)
-        if (!isRelatedProduct) {
+        // Only validate stock fields for NEW base products (not related products)
+        // When editing, stock can legitimately be negative (due to sales exceeding stock)
+        if (!isRelatedProduct && !productId) {
           const stockQuantityValidation = validateNonNegative(
             stockQuantity,
             "Stock quantity"
@@ -426,6 +427,14 @@ export function ProductForm({
           );
           if (!minStockLevelValidation.valid) {
             throw new Error(minStockLevelValidation.error);
+          }
+        } else if (!isRelatedProduct && productId) {
+          // For existing products, just check it's a valid number (allow negative)
+          if (isNaN(stockQuantity)) {
+            throw new Error("Stock quantity must be a valid number");
+          }
+          if (isNaN(minStockLevel) || minStockLevel < 0) {
+            throw new Error("Min stock level must be >= 0");
           }
         }
 
@@ -672,7 +681,8 @@ export function ProductForm({
               <Input
                 label="Quantity Multiplier *"
                 type="number"
-                step="0.01"
+                step="0.001"
+                min="0.001"
                 {...register("quantity_multiplier")}
                 error={errors.quantity_multiplier?.message}
                 placeholder="e.g., 0.7 for 700g of 1kg base, or 10 for 10 units per box"

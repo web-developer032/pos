@@ -16,7 +16,7 @@ const saleSchema = z.object({
   items: z.array(
     z.object({
       product_id: z.number(),
-      quantity: z.number().min(0.01), // Allow decimal quantities
+      quantity: z.number().min(0.001), // Allow decimal quantities down to 0.001
       unit_price: z.number().min(0),
       discount: z.number().min(0).optional(),
     })

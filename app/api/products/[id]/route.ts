@@ -22,7 +22,7 @@ const productSchema = z
     category_id: z.number().optional(),
     cost_price: z.number().min(0).optional(),
     selling_price: z.number().min(0).optional(),
-    stock_quantity: z.number().min(0).optional(),
+    stock_quantity: z.number().optional(), // Allow negative (can happen due to sales)
     min_stock_level: z.number().min(0).optional(),
     unit: productUnitEnum.optional(),
     image_url: z.string().optional(),

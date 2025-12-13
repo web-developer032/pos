@@ -71,7 +71,7 @@ const cartSlice = createSlice({
         (item) => item.product_id === action.payload.product_id
       );
       if (item) {
-        item.quantity = Math.max(0.01, action.payload.quantity); // Ensure minimum 0.01
+        item.quantity = Math.max(0.001, action.payload.quantity); // Ensure minimum 0.001
       }
     },
     updatePrice: (

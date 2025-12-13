@@ -137,7 +137,8 @@ export function SubProductCard({
           <Input
             label="Qty Multiplier *"
             type="number"
-            step="0.01"
+            step="0.001"
+            min="0.001"
             value={subProduct.quantity_multiplier}
             onChange={(e) => {
               const newMultiplier = e.target.value;

@@ -228,8 +228,8 @@ export function ReturnForm({ saleId, saleItems, onSuccess }: ReturnFormProps) {
                       </label>
                       <Input
                         type="number"
-                        step="0.01"
-                        min="0.01"
+                        step="0.001"
+                        min="0.001"
                         max={available}
                         value={selectedQty}
                         onChange={(e) =>

@@ -303,7 +303,8 @@ export default function BulkLinkProductsPage() {
               <div className="flex gap-2">
                 <Input
                   type="number"
-                  step="0.01"
+                  step="0.001"
+                  min="0.001"
                   value={defaultMultiplier}
                   onChange={(e) => setDefaultMultiplier(e.target.value)}
                   placeholder="e.g., 0.7"
@@ -404,7 +405,8 @@ export default function BulkLinkProductsPage() {
                             <span className="text-xs text-gray-500">×</span>
                             <Input
                               type="number"
-                              step="0.01"
+                              step="0.001"
+                              min="0.001"
                               value={sp.quantity_multiplier}
                               onChange={(e) =>
                                 handleUpdateMultiplier(
