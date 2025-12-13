@@ -2,6 +2,7 @@
 
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
+import { Button } from "@/components/ui/Button";
 import { UNIT_OPTIONS, ProductUnit } from "@/lib/constants/productUnits";
 
 function ProfitDisplay({
@@ -65,6 +66,8 @@ interface SubProductCardProps {
   baseSellingPrice: number;
   onUpdate: (id: string, field: keyof SubProductInput, value: string) => void;
   onRemove: (id: string) => void;
+  onGenerateBarcode?: (id: string) => Promise<void>;
+  isGeneratingBarcode?: boolean;
 }
 
 // Calculate price based on multiplier and base price
@@ -84,6 +87,8 @@ export function SubProductCard({
   baseSellingPrice,
   onUpdate,
   onRemove,
+  onGenerateBarcode,
+  isGeneratingBarcode,
 }: SubProductCardProps) {
   // Newest items are at the start of array, so reverse the numbering
   // to show newest with highest number
@@ -128,12 +133,35 @@ export function SubProductCard({
 
         {/* Row 2: Barcode, Qty Multiplier, Unit */}
         <div className="grid grid-cols-3 gap-3">
-          <Input
-            label="Barcode"
-            value={subProduct.barcode}
-            onChange={(e) => onUpdate(subProduct.id, "barcode", e.target.value)}
-            placeholder="Scan or enter"
-          />
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">
+              Barcode
+            </label>
+            <div className="flex gap-1">
+              <Input
+                label=""
+                value={subProduct.barcode}
+                onChange={(e) =>
+                  onUpdate(subProduct.id, "barcode", e.target.value)
+                }
+                placeholder="Scan or enter"
+                className="flex-1"
+              />
+              {onGenerateBarcode && (
+                <Button
+                  type="button"
+                  onClick={() => onGenerateBarcode(subProduct.id)}
+                  disabled={isGeneratingBarcode}
+                  variant="outline"
+                  size="sm"
+                  className="self-end whitespace-nowrap px-2"
+                  title="Generate barcode"
+                >
+                  {isGeneratingBarcode ? "..." : "Gen"}
+                </Button>
+              )}
+            </div>
+          </div>
           <Input
             label="Qty Multiplier *"
             type="number"

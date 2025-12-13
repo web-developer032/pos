@@ -10,6 +10,7 @@ import {
   useGetProductQuery,
   useGetProductsQuery,
   useLazyGenerateSKUQuery,
+  useLazyGenerateBarcodeQuery,
 } from "@/lib/api/productsApi";
 import {
   useGetCategoriesQuery,
@@ -173,6 +174,8 @@ export function ProductForm({
   const [updateProduct] = useUpdateProductMutation();
   const [triggerGenerateSKU, { isLoading: isGeneratingSKU }] =
     useLazyGenerateSKUQuery();
+  const [triggerGenerateBarcode, { isLoading: isGeneratingBarcode }] =
+    useLazyGenerateBarcodeQuery();
 
   const {
     register,
@@ -238,17 +241,36 @@ export function ProductForm({
     { skip: !isRelatedProduct && !isLinkingToBase } // Fetch when creating related product or linking existing
   );
 
+  // Fetch the actual base product separately when editing a sub-product
+  // This ensures we have the base product details even if it's not in the search results
+  const { data: existingBaseProductData } = useGetProductQuery(
+    productData?.product?.base_product_id as number,
+    { skip: !productData?.product?.base_product_id }
+  );
+
   // Filter to get only base products (products without base_product_id)
   const baseProducts = useMemo(
     () => baseProductsData?.products.filter((p) => !p.base_product_id) || [],
     [baseProductsData?.products]
   );
 
-  // Get selected base product details
-  const selectedBaseProduct = useMemo(
-    () => baseProducts.find((p) => p.id === baseProductId),
-    [baseProducts, baseProductId]
-  );
+  // Get selected base product details - first check the existing base product, then search results
+  const selectedBaseProduct = useMemo(() => {
+    const baseProductIdNum =
+      typeof baseProductId === "string"
+        ? parseInt(baseProductId, 10)
+        : baseProductId;
+
+    // If editing a sub-product, use the fetched base product data
+    if (
+      existingBaseProductData?.product &&
+      existingBaseProductData.product.id === baseProductIdNum
+    ) {
+      return existingBaseProductData.product;
+    }
+    // Otherwise, find from the search results
+    return baseProducts.find((p) => p.id === baseProductIdNum);
+  }, [baseProducts, baseProductId, existingBaseProductData]);
 
   // Currency formatting
   const { format: formatCurrency } = useCurrency();
@@ -285,15 +307,34 @@ export function ProductForm({
   };
 
   // Create searchable options with barcode in label for better search
-  const baseProductOptions = [
-    { value: "", label: "Select Base Product" },
-    ...baseProducts.map((p) => ({
-      value: p.id,
-      label: `${p.name}${p.barcode ? ` (${p.barcode})` : ""}`,
-      searchText:
-        `${p.name} ${p.barcode || ""} ${p.sku || ""} ${p.additional_barcodes?.join(" ") || ""}`.toLowerCase(),
-    })),
-  ];
+  const baseProductOptions = useMemo(() => {
+    const options = [
+      { value: "", label: "Select Base Product" },
+      ...baseProducts.map((p) => ({
+        value: p.id,
+        label: `${p.name}${p.barcode ? ` (${p.barcode})` : ""}`,
+        searchText:
+          `${p.name} ${p.barcode || ""} ${p.sku || ""} ${p.additional_barcodes?.join(" ") || ""}`.toLowerCase(),
+      })),
+    ];
+
+    // If editing a sub-product, ensure the existing base product is in the options
+    if (existingBaseProductData?.product) {
+      const existingId = existingBaseProductData.product.id;
+      const alreadyExists = options.some((opt) => opt.value === existingId);
+      if (!alreadyExists) {
+        const p = existingBaseProductData.product;
+        options.splice(1, 0, {
+          value: p.id,
+          label: `${p.name}${p.barcode ? ` (${p.barcode})` : ""}`,
+          searchText:
+            `${p.name} ${p.barcode || ""} ${p.sku || ""} ${p.additional_barcodes?.join(" ") || ""}`.toLowerCase(),
+        });
+      }
+    }
+
+    return options;
+  }, [baseProducts, existingBaseProductData]);
 
   useEffect(() => {
     if (productData?.product) {
@@ -353,6 +394,32 @@ export function ProductForm({
       }
     } catch {
       toast.error("Failed to generate SKU");
+    }
+  };
+
+  // Handle Barcode generation
+  const handleGenerateBarcode = async () => {
+    try {
+      const result = await triggerGenerateBarcode().unwrap();
+      if (result.barcode) {
+        setValue("barcode", result.barcode);
+        toast.success("Barcode generated successfully");
+      }
+    } catch {
+      toast.error("Failed to generate barcode");
+    }
+  };
+
+  // Handle Barcode generation for sub-products
+  const handleGenerateSubProductBarcode = async (subProductId: string) => {
+    try {
+      const result = await triggerGenerateBarcode().unwrap();
+      if (result.barcode) {
+        handleUpdateSubProduct(subProductId, "barcode", result.barcode);
+        toast.success("Barcode generated successfully");
+      }
+    } catch {
+      toast.error("Failed to generate barcode");
     }
   };
 
@@ -924,11 +991,30 @@ export function ProductForm({
             )}
           </div>
           <div className="my-2 grid grid-cols-2 gap-4">
-            <Input
-              label="Barcode"
-              {...register("barcode")}
-              error={errors.barcode?.message}
-            />
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">
+                Barcode
+              </label>
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <Input
+                    {...register("barcode")}
+                    error={errors.barcode?.message}
+                    label=""
+                  />
+                </div>
+                <Button
+                  type="button"
+                  onClick={handleGenerateBarcode}
+                  disabled={isGeneratingBarcode}
+                  variant="outline"
+                  className="self-end whitespace-nowrap"
+                  title="Generate unique barcode"
+                >
+                  {isGeneratingBarcode ? "..." : "Generate"}
+                </Button>
+              </div>
+            </div>
             <Input
               label="Image URL"
               {...register("image_url")}
@@ -1130,6 +1216,8 @@ export function ProductForm({
             onAdd={handleAddSubProduct}
             onUpdate={handleUpdateSubProduct}
             onRemove={handleRemoveSubProduct}
+            onGenerateBarcode={handleGenerateSubProductBarcode}
+            isGeneratingBarcode={isGeneratingBarcode}
           />
         )}
 

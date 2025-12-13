@@ -175,6 +175,9 @@ export const productsApi = apiSlice.injectEndpoints({
     generateSKU: builder.query<{ sku: string }, void>({
       query: () => "/products/generate-sku",
     }),
+    generateBarcode: builder.query<{ barcode: string }, void>({
+      query: () => "/products/generate-barcode",
+    }),
   }),
 });
 
@@ -188,4 +191,5 @@ export const {
   useImportProductsMutation,
   useDeleteAllProductsMutation,
   useLazyGenerateSKUQuery,
+  useLazyGenerateBarcodeQuery,
 } = productsApi;

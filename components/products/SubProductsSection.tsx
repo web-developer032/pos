@@ -12,6 +12,8 @@ interface SubProductsSectionProps {
   onAdd: () => void;
   onUpdate: (id: string, field: keyof SubProductInput, value: string) => void;
   onRemove: (id: string) => void;
+  onGenerateBarcode?: (id: string) => Promise<void>;
+  isGeneratingBarcode?: boolean;
 }
 
 export function SubProductsSection({
@@ -21,6 +23,8 @@ export function SubProductsSection({
   onAdd,
   onUpdate,
   onRemove,
+  onGenerateBarcode,
+  isGeneratingBarcode,
 }: SubProductsSectionProps) {
   return (
     <div className="my-4 rounded-lg border border-green-200 bg-green-50 p-4">
@@ -55,6 +59,8 @@ export function SubProductsSection({
               baseSellingPrice={baseSellingPrice}
               onUpdate={onUpdate}
               onRemove={onRemove}
+              onGenerateBarcode={onGenerateBarcode}
+              isGeneratingBarcode={isGeneratingBarcode}
             />
           ))}
           <p className="text-xs text-gray-500">
