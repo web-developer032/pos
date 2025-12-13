@@ -40,9 +40,27 @@ async function getHandler(req: NextRequest, context?: RouteContext) {
       args: [params.id],
     });
 
+    // Get payments made against this purchase order
+    const paymentsResult = await client.execute({
+      sql: `SELECT sp.*, u.username as user_name
+            FROM supplier_payments sp
+            JOIN users u ON sp.user_id = u.id
+            WHERE sp.purchase_order_id = ?
+            ORDER BY sp.created_at DESC`,
+      args: [params.id],
+    });
+
+    // Calculate total paid
+    const totalPaid = paymentsResult.rows.reduce(
+      (sum, payment) => sum + ((payment as unknown as { amount: number }).amount || 0),
+      0
+    );
+
     return NextResponse.json({
       purchase_order: poResult.rows[0],
       items: itemsResult.rows,
+      payments: paymentsResult.rows,
+      total_paid: totalPaid,
     });
   } catch (error) {
     console.error("Error fetching purchase order:", error);

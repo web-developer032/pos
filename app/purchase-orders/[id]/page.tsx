@@ -53,28 +53,47 @@ export default function PurchaseOrderDetailPage() {
     );
   }
 
-  const { purchase_order, items } = data;
-  const po = purchase_order as {
-    id: number;
-    po_number: string;
-    supplier_id: number;
-    user_id: number;
-    total_amount: number;
-    discount_type?: "percentage" | "amount" | null;
-    discount_value?: number | null;
-    status: "pending" | "completed" | "cancelled";
-    created_at: string;
-    updated_at: string;
-    supplier_name?: string;
-    user_name?: string;
+  const { purchase_order, items, payments = [], total_paid = 0 } = data as {
+    purchase_order: {
+      id: number;
+      po_number: string;
+      supplier_id: number;
+      user_id: number;
+      total_amount: number;
+      discount_type?: "percentage" | "amount" | null;
+      discount_value?: number | null;
+      status: "pending" | "completed" | "cancelled";
+      created_at: string;
+      updated_at: string;
+      supplier_name?: string;
+      user_name?: string;
+    };
+    items: Array<{
+      id: number;
+      po_id: number;
+      product_id: number;
+      quantity: number;
+      unit_cost: number;
+      subtotal: number;
+      product_name?: string;
+    }>;
+    payments: Array<{
+      id: number;
+      amount: number;
+      payment_method: string;
+      reference_number?: string;
+      notes?: string;
+      created_at: string;
+      user_name?: string;
+    }>;
+    total_paid: number;
   };
+  const po = purchase_order;
+  const remainingBalance = po.total_amount - total_paid;
 
   // Calculate subtotal and discount amount
   const itemsSubtotal = items.reduce(
-    (sum, item) =>
-      sum +
-      ((item as { quantity: number; unit_cost: number }).quantity || 0) *
-        ((item as { quantity: number; unit_cost: number }).unit_cost || 0),
+    (sum, item) => sum + (item.quantity || 0) * (item.unit_cost || 0),
     0
   );
 
@@ -231,6 +250,140 @@ export default function PurchaseOrderDetailPage() {
                 </dl>
               </div>
             </div>
+
+            {/* Payment Summary */}
+            <div className="mt-6 rounded-lg bg-white shadow">
+              <div className="border-b border-gray-200 px-6 py-4">
+                <h2 className="text-lg font-semibold">Payment Summary</h2>
+              </div>
+              <div className="px-6 py-4">
+                <dl className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <dt className="text-sm font-medium text-gray-500">
+                      Total Amount
+                    </dt>
+                    <dd className="text-sm font-semibold">
+                      {formatCurrency(po.total_amount)}
+                    </dd>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <dt className="text-sm font-medium text-gray-500">
+                      Amount Paid
+                    </dt>
+                    <dd className="text-sm font-semibold text-green-600">
+                      {formatCurrency(total_paid)}
+                    </dd>
+                  </div>
+                  <div className="flex items-center justify-between border-t border-gray-200 pt-3">
+                    <dt className="text-sm font-semibold text-gray-700">
+                      Remaining Balance
+                    </dt>
+                    <dd
+                      className={`text-sm font-bold ${
+                        remainingBalance > 0
+                          ? "text-red-600"
+                          : remainingBalance < 0
+                            ? "text-blue-600"
+                            : "text-green-600"
+                      }`}
+                    >
+                      {remainingBalance < 0 && "(Overpaid) "}
+                      {formatCurrency(Math.abs(remainingBalance))}
+                    </dd>
+                  </div>
+                </dl>
+
+                {/* Payment status indicator */}
+                <div className="mt-4">
+                  {remainingBalance <= 0 ? (
+                    <div className="flex items-center gap-2 rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700">
+                      <svg
+                        className="h-5 w-5"
+                        fill="currentColor"
+                        viewBox="0 0 20 20"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                      <span className="font-medium">Fully Paid</span>
+                    </div>
+                  ) : total_paid > 0 ? (
+                    <div className="flex items-center gap-2 rounded-lg bg-yellow-50 px-3 py-2 text-sm text-yellow-700">
+                      <svg
+                        className="h-5 w-5"
+                        fill="currentColor"
+                        viewBox="0 0 20 20"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                      <span className="font-medium">Partially Paid</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+                      <svg
+                        className="h-5 w-5"
+                        fill="currentColor"
+                        viewBox="0 0 20 20"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                      <span className="font-medium">Unpaid</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Payment History */}
+            {payments.length > 0 && (
+              <div className="mt-6 rounded-lg bg-white shadow">
+                <div className="border-b border-gray-200 px-6 py-4">
+                  <h2 className="text-lg font-semibold">Payment History</h2>
+                </div>
+                <div className="divide-y divide-gray-200">
+                  {payments.map((payment) => (
+                    <div key={payment.id} className="px-6 py-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium">
+                            {formatCurrency(payment.amount)}
+                          </p>
+                          <p className="text-xs text-gray-500 capitalize">
+                            {payment.payment_method.replace("_", " ")}
+                            {payment.reference_number &&
+                              ` • ${payment.reference_number}`}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xs text-gray-500">
+                            {formatDateTime(payment.created_at)}
+                          </p>
+                          <p className="text-xs text-gray-400">
+                            by {payment.user_name}
+                          </p>
+                        </div>
+                      </div>
+                      {payment.notes && (
+                        <p className="mt-1 text-xs text-gray-500 italic">
+                          {payment.notes}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Purchase Order Items */}
@@ -268,36 +421,25 @@ export default function PurchaseOrderDetailPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200 bg-white">
-                    {items.map((item, index) => {
-                      const itemData = item as {
-                        id: number;
-                        po_id: number;
-                        product_id: number;
-                        quantity: number;
-                        unit_cost: number;
-                        subtotal: number;
-                        product_name?: string;
-                      };
-                      return (
-                        <tr key={itemData.id}>
-                          <td className="whitespace-nowrap px-4 py-4 text-center text-sm text-gray-500">
-                            {index + 1}
-                          </td>
-                          <td className="whitespace-nowrap px-6 py-4 text-sm font-medium">
-                            {itemData.product_name || "Deleted Product"}
-                          </td>
-                          <td className="whitespace-nowrap px-6 py-4 text-right text-sm">
-                            {itemData.quantity}
-                          </td>
-                          <td className="whitespace-nowrap px-6 py-4 text-right text-sm">
-                            {formatCurrency(itemData.unit_cost)}
-                          </td>
-                          <td className="whitespace-nowrap px-6 py-4 text-right text-sm font-semibold">
-                            {formatCurrency(itemData.subtotal)}
-                          </td>
-                        </tr>
-                      );
-                    })}
+                    {items.map((item, index) => (
+                      <tr key={item.id}>
+                        <td className="whitespace-nowrap px-4 py-4 text-center text-sm text-gray-500">
+                          {index + 1}
+                        </td>
+                        <td className="whitespace-nowrap px-6 py-4 text-sm font-medium">
+                          {item.product_name || "Deleted Product"}
+                        </td>
+                        <td className="whitespace-nowrap px-6 py-4 text-right text-sm">
+                          {item.quantity}
+                        </td>
+                        <td className="whitespace-nowrap px-6 py-4 text-right text-sm">
+                          {formatCurrency(item.unit_cost)}
+                        </td>
+                        <td className="whitespace-nowrap px-6 py-4 text-right text-sm font-semibold">
+                          {formatCurrency(item.subtotal)}
+                        </td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>

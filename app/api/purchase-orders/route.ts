@@ -62,9 +62,86 @@ async function getHandler(req: NextRequest) {
       offset,
     });
 
+    // Calculate summary totals (for all matching POs, not just current page)
+    let summarySql = `
+      SELECT 
+        COALESCE(SUM(CASE WHEN po.status = 'completed' THEN po.total_amount ELSE 0 END), 0) as total_completed,
+        COALESCE(SUM(CASE WHEN po.status = 'pending' THEN po.total_amount ELSE 0 END), 0) as total_pending,
+        COALESCE(SUM(po.total_amount), 0) as grand_total
+      FROM purchase_orders po
+      JOIN suppliers s ON po.supplier_id = s.id
+      JOIN users u ON po.user_id = u.id
+      WHERE 1=1
+    `;
+    const summaryArgs: (string | number)[] = [];
+
+    if (search) {
+      summarySql += ` AND (po.po_number LIKE ? OR s.name LIKE ? OR u.username LIKE ?)`;
+      const searchPattern = `%${search}%`;
+      summaryArgs.push(searchPattern, searchPattern, searchPattern);
+    }
+
+    if (status && ["pending", "completed", "cancelled"].includes(status)) {
+      summarySql += ` AND po.status = ?`;
+      summaryArgs.push(status);
+    }
+
+    const summaryResult = await client.execute({
+      sql: summarySql,
+      args: summaryArgs,
+    });
+
+    // Get total paid amount - includes both:
+    // 1. Payments linked to specific purchase orders
+    // 2. General payments to suppliers who have purchase orders
+    let paidSql = `
+      SELECT COALESCE(SUM(sp.amount), 0) as total_paid
+      FROM supplier_payments sp
+      WHERE sp.supplier_id IN (
+        SELECT DISTINCT po.supplier_id 
+        FROM purchase_orders po
+        JOIN suppliers s ON po.supplier_id = s.id
+        JOIN users u ON po.user_id = u.id
+        WHERE 1=1
+    `;
+    const paidArgs: (string | number)[] = [];
+
+    if (search) {
+      paidSql += ` AND (po.po_number LIKE ? OR s.name LIKE ? OR u.username LIKE ?)`;
+      const searchPattern = `%${search}%`;
+      paidArgs.push(searchPattern, searchPattern, searchPattern);
+    }
+
+    if (status && ["pending", "completed", "cancelled"].includes(status)) {
+      paidSql += ` AND po.status = ?`;
+      paidArgs.push(status);
+    }
+
+    paidSql += `)`;
+
+    const paidResult = await client.execute({
+      sql: paidSql,
+      args: paidArgs,
+    });
+
+    const summary = summaryResult.rows[0] as unknown as {
+      total_completed: number;
+      total_pending: number;
+      grand_total: number;
+    };
+    const totalPaid =
+      (paidResult.rows[0] as unknown as { total_paid: number }).total_paid || 0;
+
     return NextResponse.json({
       purchase_orders: result.data,
       pagination: result.pagination,
+      summary: {
+        total_completed: summary.total_completed,
+        total_pending: summary.total_pending,
+        grand_total: summary.grand_total,
+        total_paid: totalPaid,
+        outstanding: summary.total_completed - totalPaid,
+      },
     });
   } catch (error) {
     return handleApiError(error, "fetching purchase orders");
@@ -105,48 +182,48 @@ async function postHandler(req: AuthRequest) {
     await client.execute("BEGIN TRANSACTION");
 
     try {
-    const poResult = await client.execute({
-      sql: `INSERT INTO purchase_orders (po_number, supplier_id, user_id, total_amount, discount_type, discount_value) 
+      const poResult = await client.execute({
+        sql: `INSERT INTO purchase_orders (po_number, supplier_id, user_id, total_amount, discount_type, discount_value) 
             VALUES (?, ?, ?, ?, ?, ?) RETURNING *`,
-      args: [
-        poNumber,
-        validated.supplier_id,
-        user.userId,
-        totalAmount,
-        validated.discount_type || null,
-        validated.discount_value || null,
-      ],
-    });
+        args: [
+          poNumber,
+          validated.supplier_id,
+          user.userId,
+          totalAmount,
+          validated.discount_type || null,
+          validated.discount_value || null,
+        ],
+      });
 
-    const poId = (poResult.rows[0] as unknown as { id: number }).id;
+      const poId = (poResult.rows[0] as unknown as { id: number }).id;
 
-    for (const item of validated.items) {
-      const roundedUnitCost = roundPrice(item.unit_cost);
+      for (const item of validated.items) {
+        const roundedUnitCost = roundPrice(item.unit_cost);
         const roundedRetailPrice = item.retail_price
           ? roundPrice(item.retail_price)
           : null;
-      const itemSubtotal = roundPrice(item.quantity * roundedUnitCost);
-      await client.execute({
+        const itemSubtotal = roundPrice(item.quantity * roundedUnitCost);
+        await client.execute({
           sql: `INSERT INTO purchase_order_items (po_id, product_id, product_name, quantity, unit_cost, retail_price, subtotal) 
                 VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        args: [
-          poId,
-          item.product_id,
+          args: [
+            poId,
+            item.product_id,
             item.product_name || null,
-          item.quantity,
-          roundedUnitCost,
-          roundedRetailPrice,
-          itemSubtotal,
-        ],
-      });
-    }
+            item.quantity,
+            roundedUnitCost,
+            roundedRetailPrice,
+            itemSubtotal,
+          ],
+        });
+      }
 
       await client.execute("COMMIT");
 
-    return NextResponse.json(
-      { purchase_order: poResult.rows[0] },
-      { status: 201 }
-    );
+      return NextResponse.json(
+        { purchase_order: poResult.rows[0] },
+        { status: 201 }
+      );
     } catch (txError) {
       await client.execute("ROLLBACK");
       throw txError;

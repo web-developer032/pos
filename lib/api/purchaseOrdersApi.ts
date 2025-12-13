@@ -58,7 +58,17 @@ export interface UpdatePurchaseOrderItemsRequest {
 export const purchaseOrdersApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
     getPurchaseOrders: builder.query<
-      { purchase_orders: PurchaseOrder[]; pagination: PaginationInfo },
+      {
+        purchase_orders: PurchaseOrder[];
+        pagination: PaginationInfo;
+        summary: {
+          total_completed: number;
+          total_pending: number;
+          grand_total: number;
+          total_paid: number;
+          outstanding: number;
+        };
+      },
       { page?: number; limit?: number; search?: string; status?: string } | void
     >({
       query: (params) => {

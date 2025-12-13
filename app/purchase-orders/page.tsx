@@ -146,6 +146,55 @@ export default function PurchaseOrdersPage() {
           </div>
         </div>
 
+        {/* Summary Cards */}
+        {data?.summary && (
+          <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+            <div className="rounded-lg bg-white p-4 shadow">
+              <p className="text-sm font-medium text-gray-500">Grand Total</p>
+              <p className="mt-1 text-2xl font-bold text-gray-900">
+                {formatCurrency(data.summary.grand_total)}
+              </p>
+              <p className="mt-1 text-xs text-gray-400">All purchase orders</p>
+            </div>
+            <div className="rounded-lg bg-white p-4 shadow">
+              <p className="text-sm font-medium text-gray-500">Pending</p>
+              <p className="mt-1 text-2xl font-bold text-yellow-600">
+                {formatCurrency(data.summary.total_pending)}
+              </p>
+              <p className="mt-1 text-xs text-gray-400">Awaiting completion</p>
+            </div>
+            <div className="rounded-lg bg-white p-4 shadow">
+              <p className="text-sm font-medium text-gray-500">Completed</p>
+              <p className="mt-1 text-2xl font-bold text-green-600">
+                {formatCurrency(data.summary.total_completed)}
+              </p>
+              <p className="mt-1 text-xs text-gray-400">Confirmed purchases</p>
+            </div>
+            <div className="rounded-lg bg-white p-4 shadow">
+              <p className="text-sm font-medium text-gray-500">Amount Paid</p>
+              <p className="mt-1 text-2xl font-bold text-blue-600">
+                {formatCurrency(data.summary.total_paid)}
+              </p>
+              <p className="mt-1 text-xs text-gray-400">Payments made</p>
+            </div>
+            <div className="rounded-lg bg-white p-4 shadow">
+              <p className="text-sm font-medium text-gray-500">Outstanding</p>
+              <p
+                className={`mt-1 text-2xl font-bold ${
+                  data.summary.outstanding > 0
+                    ? "text-red-600"
+                    : "text-green-600"
+                }`}
+              >
+                {formatCurrency(Math.max(0, data.summary.outstanding))}
+              </p>
+              <p className="mt-1 text-xs text-gray-400">
+                {data.summary.outstanding > 0 ? "Still owed" : "All paid"}
+              </p>
+            </div>
+          </div>
+        )}
+
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
           <Input
             type="text"
