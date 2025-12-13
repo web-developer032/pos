@@ -5,16 +5,22 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
-import {
-  generateRandomBarcode,
-  formatBarcodeDisplay,
-} from "@/lib/utils/barcodeGenerator";
+import { SearchableSelect } from "@/components/ui/SearchableSelect";
+import { useGetProductsQuery } from "@/lib/api/productsApi";
+import { useDebounce } from "@/lib/hooks/useDebounce";
+import { generateRandomBarcode } from "@/lib/utils/barcodeGenerator";
 import toast from "react-hot-toast";
 // Import jsbarcode - will be loaded dynamically in useEffect
 
 interface GeneratedBarcode {
   id: number;
   barcode: string;
+  productName?: string;
+  quantityMultiplier?: number;
+  unit?: string;
+  storeName?: string;
+  mfgDate?: string;
+  expDate?: string;
   generatedAt: Date;
 }
 
@@ -24,6 +30,40 @@ export default function BarcodeGeneratorPage() {
     GeneratedBarcode[]
   >([]);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [generationMode, setGenerationMode] = useState<"random" | "product">(
+    "random"
+  );
+  const [selectedProductId, setSelectedProductId] = useState<number | null>(
+    null
+  );
+  const [productSearchTerm, setProductSearchTerm] = useState("");
+  const debouncedProductSearch = useDebounce(productSearchTerm, 300);
+
+  // Label settings
+  const [storeName, setStoreName] = useState<string>("");
+  const [mfgDate, setMfgDate] = useState<string>("");
+  const [expDate, setExpDate] = useState<string>("");
+
+  // Fetch products for selection
+  const { data: productsData } = useGetProductsQuery({
+    search: debouncedProductSearch || undefined,
+    limit: 50,
+  });
+
+  // Get selected product details
+  const selectedProduct = productsData?.products.find(
+    (p) => p.id === selectedProductId
+  );
+
+  // Product options for dropdown
+  const productOptions = [
+    { value: "", label: "Select a product..." },
+    ...(productsData?.products || []).map((p) => ({
+      value: p.id,
+      label: `${p.name}${p.barcode ? ` (${p.barcode})` : ""}`,
+      searchText: `${p.name} ${p.barcode || ""} ${p.sku || ""}`.toLowerCase(),
+    })),
+  ];
 
   const handleGenerate = () => {
     const count = parseInt(quantity, 10);
@@ -32,19 +72,57 @@ export default function BarcodeGeneratorPage() {
       return;
     }
 
-    setIsGenerating(true);
-
-    // Generate barcodes synchronously (fast enough for client-side)
-    const newBarcodes: GeneratedBarcode[] = [];
-    for (let i = 0; i < count; i++) {
-      newBarcodes.push({
-        id: Date.now() + i,
-        barcode: generateRandomBarcode(),
-        generatedAt: new Date(),
-      });
+    if (generationMode === "product") {
+      if (!selectedProduct) {
+        toast.error("Please select a product first");
+        return;
+      }
+      if (!selectedProduct.barcode) {
+        toast.error(
+          "Selected product doesn't have a barcode. Please add one first."
+        );
+        return;
+      }
     }
 
-    setGeneratedBarcodes((prev) => [...prev, ...newBarcodes]);
+    setIsGenerating(true);
+
+    // Generate barcodes
+    const newBarcodes: GeneratedBarcode[] = [];
+
+    // For random mode, generate one barcode and repeat it
+    // For product mode, use the product's barcode
+    const barcodeToUse =
+      generationMode === "product" && selectedProduct?.barcode
+        ? selectedProduct.barcode
+        : generateRandomBarcode();
+
+    for (let i = 0; i < count; i++) {
+      if (generationMode === "product" && selectedProduct?.barcode) {
+        newBarcodes.push({
+          id: Date.now() + i,
+          barcode: barcodeToUse,
+          productName: selectedProduct.name,
+          quantityMultiplier: selectedProduct.quantity_multiplier,
+          unit: selectedProduct.unit,
+          storeName: storeName || undefined,
+          mfgDate: mfgDate || undefined,
+          expDate: expDate || undefined,
+          generatedAt: new Date(),
+        });
+      } else {
+        newBarcodes.push({
+          id: Date.now() + i,
+          barcode: barcodeToUse,
+          storeName: storeName || undefined,
+          mfgDate: mfgDate || undefined,
+          expDate: expDate || undefined,
+          generatedAt: new Date(),
+        });
+      }
+    }
+
+    setGeneratedBarcodes(newBarcodes);
     toast.success(`Generated ${newBarcodes.length} barcodes successfully`);
     setIsGenerating(false);
   };
@@ -67,9 +145,14 @@ export default function BarcodeGeneratorPage() {
 
     barcodeCards.forEach((card) => {
       const canvas = card.querySelector("canvas");
-      const barcodeText = card.querySelector(".font-mono")?.textContent || "";
-      const formattedText =
-        card.querySelector(".text-gray-400")?.textContent || "";
+      const storeNameEl = card.querySelector(".store-name");
+      const storeName = storeNameEl?.textContent || "";
+      const productInfoEl = card.querySelector(".product-info");
+      const productInfo = productInfoEl?.textContent || "";
+      const barcodeNumberEl = card.querySelector(".barcode-number");
+      const barcodeNumber = barcodeNumberEl?.textContent || "";
+      const datesRowEl = card.querySelector(".dates-row");
+      const datesText = datesRowEl?.textContent || "";
 
       let canvasDataUrl = "";
       if (canvas) {
@@ -78,9 +161,11 @@ export default function BarcodeGeneratorPage() {
 
       barcodesHTML += `
         <div class="barcode-card">
-          <div class="barcode-text">${barcodeText}</div>
-          <div class="barcode-formatted">${formattedText}</div>
-          ${canvasDataUrl ? `<img src="${canvasDataUrl}" alt="${barcodeText}" />` : ""}
+          ${storeName ? `<div class="store-name">${storeName}</div>` : ""}
+          ${productInfo ? `<div class="product-info">${productInfo}</div>` : ""}
+          ${canvasDataUrl ? `<img src="${canvasDataUrl}" alt="${barcodeNumber}" />` : ""}
+          <div class="barcode-number">${barcodeNumber}</div>
+          ${datesText ? `<div class="dates-row">${datesText}</div>` : ""}
         </div>
       `;
     });
@@ -107,29 +192,45 @@ export default function BarcodeGeneratorPage() {
             .grid {
               display: grid;
               grid-template-columns: repeat(4, 1fr);
-              gap: 3mm;
+              gap: 2mm;
             }
             .barcode-card {
               border: 1px solid #999;
-              padding: 3mm;
+              padding: 2mm;
               text-align: center;
               break-inside: avoid;
               page-break-inside: avoid;
             }
-            .barcode-text {
-              font-family: monospace;
-              font-size: 10px;
-              font-weight: bold;
-              margin-bottom: 1mm;
-            }
-            .barcode-formatted {
+            .store-name {
               font-size: 8px;
-              color: #666;
-              margin-bottom: 2mm;
+              font-weight: bold;
+              margin-bottom: 0.5mm;
+            }
+            .product-info {
+              font-size: 7px;
+              font-weight: 500;
+              margin-bottom: 0.5mm;
+              overflow: hidden;
+              text-overflow: ellipsis;
+              white-space: nowrap;
             }
             .barcode-card img {
               max-width: 100%;
               height: auto;
+              margin: 1mm 0;
+            }
+            .barcode-number {
+              font-family: monospace;
+              font-size: 8px;
+              font-weight: bold;
+            }
+            .dates-row {
+              font-size: 6px;
+              color: #666;
+              margin-top: 0.5mm;
+              display: flex;
+              justify-content: space-between;
+              padding: 0 1mm;
             }
           </style>
         </head>
@@ -169,8 +270,108 @@ export default function BarcodeGeneratorPage() {
 
         {/* Generation Controls */}
         <div className="mb-6 rounded-lg bg-white p-6 shadow">
+          {/* Mode Selection */}
+          <div className="mb-4">
+            <label className="mb-2 block text-sm font-medium text-gray-700">
+              Generation Mode
+            </label>
+            <div className="flex gap-4">
+              <label className="flex cursor-pointer items-center gap-2">
+                <input
+                  type="radio"
+                  name="mode"
+                  value="random"
+                  checked={generationMode === "random"}
+                  onChange={() => setGenerationMode("random")}
+                  className="h-4 w-4 text-indigo-600"
+                />
+                <span className="text-sm">Random Barcodes</span>
+              </label>
+              <label className="flex cursor-pointer items-center gap-2">
+                <input
+                  type="radio"
+                  name="mode"
+                  value="product"
+                  checked={generationMode === "product"}
+                  onChange={() => setGenerationMode("product")}
+                  className="h-4 w-4 text-indigo-600"
+                />
+                <span className="text-sm">Product Barcode</span>
+              </label>
+            </div>
+          </div>
+
+          {/* Product Selection (when in product mode) */}
+          {generationMode === "product" && (
+            <div className="mb-4">
+              <SearchableSelect
+                label="Select Product"
+                options={productOptions}
+                value={selectedProductId || ""}
+                onChange={(value) =>
+                  setSelectedProductId(value ? Number(value) : null)
+                }
+                placeholder="Search by name or barcode..."
+                searchPlaceholder="Type to search products..."
+                onSearch={(term) => setProductSearchTerm(term)}
+              />
+              {selectedProduct && (
+                <div className="mt-2 rounded-lg border border-green-200 bg-green-50 p-3">
+                  <p className="text-sm font-medium text-green-800">
+                    Selected: {selectedProduct.name}
+                    {selectedProduct.quantity_multiplier && (
+                      <span className="ml-2 text-green-600">
+                        ({selectedProduct.quantity_multiplier}{" "}
+                        {selectedProduct.unit || "piece"})
+                      </span>
+                    )}
+                  </p>
+                  {selectedProduct.barcode ? (
+                    <p className="text-sm text-green-600">
+                      Barcode:{" "}
+                      <span className="font-mono font-bold">
+                        {selectedProduct.barcode}
+                      </span>
+                    </p>
+                  ) : (
+                    <p className="text-sm text-red-600">
+                      ⚠️ This product doesn&apos;t have a barcode yet
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Label Settings */}
+          <div className="mb-4 rounded-lg border border-gray-200 bg-gray-50 p-4">
+            <h3 className="mb-3 text-sm font-semibold text-gray-700">
+              Label Settings
+            </h3>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <Input
+                label="Store Name"
+                value={storeName}
+                onChange={(e) => setStoreName(e.target.value)}
+                placeholder="Your Store Name"
+              />
+              <Input
+                label="Mfg Date"
+                type="date"
+                value={mfgDate}
+                onChange={(e) => setMfgDate(e.target.value)}
+              />
+              <Input
+                label="Exp Date"
+                type="date"
+                value={expDate}
+                onChange={(e) => setExpDate(e.target.value)}
+              />
+            </div>
+          </div>
+
           <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
-            <div className="flex-1">
+            <div className="w-32">
               <Input
                 label="Quantity (1-100)"
                 type="number"
@@ -183,7 +384,10 @@ export default function BarcodeGeneratorPage() {
             <div className="flex gap-2">
               <Button
                 onClick={handleGenerate}
-                disabled={isGenerating}
+                disabled={
+                  isGenerating ||
+                  (generationMode === "product" && !selectedProduct?.barcode)
+                }
                 className="bg-indigo-600 hover:bg-indigo-700"
               >
                 {isGenerating ? "Generating..." : "Generate Barcodes"}
@@ -218,7 +422,16 @@ export default function BarcodeGeneratorPage() {
             </div>
             <div className="barcode-grid grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
               {generatedBarcodes.map((item) => (
-                <BarcodeCard key={item.id} barcode={item.barcode} />
+                <BarcodeCard
+                  key={item.id}
+                  barcode={item.barcode}
+                  productName={item.productName}
+                  quantityMultiplier={item.quantityMultiplier}
+                  unit={item.unit}
+                  storeName={item.storeName}
+                  mfgDate={item.mfgDate}
+                  expDate={item.expDate}
+                />
               ))}
             </div>
           </div>
@@ -255,9 +468,37 @@ export default function BarcodeGeneratorPage() {
 }
 
 // Barcode Card Component for printing
-function BarcodeCard({ barcode }: { barcode: string }) {
+interface BarcodeCardProps {
+  barcode: string;
+  productName?: string;
+  quantityMultiplier?: number;
+  unit?: string;
+  storeName?: string;
+  mfgDate?: string;
+  expDate?: string;
+}
+
+function BarcodeCard({
+  barcode,
+  productName,
+  quantityMultiplier,
+  unit,
+  storeName,
+  mfgDate,
+  expDate,
+}: BarcodeCardProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const formattedBarcode = formatBarcodeDisplay(barcode);
+
+  // Format dates for display
+  const formatDate = (dateStr?: string) => {
+    if (!dateStr) return "";
+    const date = new Date(dateStr);
+    return date.toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "2-digit",
+    });
+  };
 
   useEffect(() => {
     if (canvasRef.current && typeof window !== "undefined") {
@@ -283,9 +524,9 @@ function BarcodeCard({ barcode }: { barcode: string }) {
                 JsBarcode(canvasRef.current, barcode, {
                   format: "CODE128",
                   width: 1.5,
-                  height: 40,
+                  height: 35,
                   displayValue: false,
-                  margin: 5,
+                  margin: 2,
                 });
               }
             } catch (error) {
@@ -305,17 +546,50 @@ function BarcodeCard({ barcode }: { barcode: string }) {
   };
 
   return (
-    <div className="barcode-card flex flex-col items-center rounded border border-gray-200 bg-white p-3">
-      {/* Barcode number */}
-      <div className="mb-1 font-mono text-sm font-bold">{barcode}</div>
-      <div className="mb-1 text-xs text-gray-400">{formattedBarcode}</div>
+    <div className="barcode-card flex flex-col items-center rounded border border-gray-300 bg-white p-2">
+      {/* Store Name */}
+      {storeName && (
+        <div className="store-name mb-0.5 w-full truncate text-center text-xs font-bold text-gray-800">
+          {storeName}
+        </div>
+      )}
+
+      {/* Product name with quantity multiplier and unit */}
+      {productName && (
+        <div
+          className="product-info mb-0.5 w-full truncate text-center text-[10px] font-medium text-gray-700"
+          title={productName}
+        >
+          {productName}
+          {quantityMultiplier && (
+            <span className="ml-1 text-gray-500">
+              {quantityMultiplier} {unit || "pc"}
+            </span>
+          )}
+        </div>
+      )}
+
       {/* Barcode image */}
-      <div className="flex w-full items-center justify-center bg-white">
+      <div className="barcode-image flex w-full items-center justify-center bg-white">
         <canvas ref={canvasRef} className="max-w-full" />
       </div>
+
+      {/* Barcode number */}
+      <div className="barcode-number font-mono text-[10px] font-bold">
+        {barcode}
+      </div>
+
+      {/* Mfg and Exp dates */}
+      {(mfgDate || expDate) && (
+        <div className="dates-row mt-0.5 flex w-full justify-between px-1 text-[8px] text-gray-500">
+          {mfgDate && <span>Mfg: {formatDate(mfgDate)}</span>}
+          {expDate && <span>Exp: {formatDate(expDate)}</span>}
+        </div>
+      )}
+
       <button
         onClick={handleCopy}
-        className="mt-2 text-xs text-indigo-600 hover:text-indigo-800 print:hidden"
+        className="mt-1 text-[10px] text-indigo-600 hover:text-indigo-800 print:hidden"
       >
         Copy
       </button>
