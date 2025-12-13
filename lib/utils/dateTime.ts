@@ -6,19 +6,19 @@ import { format, parseISO, isValid } from "date-fns";
  */
 
 /**
- * Get the current timestamp in the server's local timezone
+ * Get the current timestamp in UTC (matches SQLite's CURRENT_TIMESTAMP)
  * Returns format: YYYY-MM-DD HH:MM:SS (for SQLite DATETIME)
  */
 export function getCurrentTimestamp(): string {
   const now = new Date();
-  return format(now, "yyyy-MM-dd HH:mm:ss");
+  // Format in UTC to match SQLite's CURRENT_TIMESTAMP behavior
+  return now.toISOString().slice(0, 19).replace("T", " ");
 }
-
 
 /**
  * Parse a database timestamp string to a Date object
- * Assumes the timestamp is stored in local time (not UTC)
- * @param timestamp - Database timestamp string (YYYY-MM-DD HH:MM:SS)
+ * SQLite's CURRENT_TIMESTAMP stores time in UTC
+ * @param timestamp - Database timestamp string (YYYY-MM-DD HH:MM:SS in UTC)
  */
 export function parseDatabaseTimestamp(timestamp: string | Date): Date {
   if (timestamp instanceof Date) {
@@ -26,24 +26,24 @@ export function parseDatabaseTimestamp(timestamp: string | Date): Date {
   }
 
   // If it's already an ISO string with timezone, parse it directly
-  if (timestamp.includes("Z") || timestamp.includes("+") || timestamp.includes("-", 10)) {
+  if (
+    timestamp.includes("Z") ||
+    timestamp.includes("+") ||
+    timestamp.includes("-", 10)
+  ) {
     return parseISO(timestamp);
   }
 
-  // Database stores in local time format: "YYYY-MM-DD HH:MM:SS"
-  // Parse it as local time by creating a Date object directly
-  // This ensures we don't accidentally treat it as UTC
-  const [datePart, timePart] = timestamp.split(" ");
-  const [year, month, day] = datePart.split("-").map(Number);
-  const [hours, minutes, seconds = 0] = (timePart || "00:00:00").split(":").map(Number);
-  
-  // Create date in local timezone (month is 0-indexed in Date constructor)
-  const date = new Date(year, month - 1, day, hours, minutes, seconds);
-  
+  // Database stores in UTC format: "YYYY-MM-DD HH:MM:SS"
+  // SQLite's CURRENT_TIMESTAMP returns UTC time
+  // Convert to ISO string with Z suffix to properly parse as UTC
+  const isoString = timestamp.replace(" ", "T") + "Z";
+  const date = parseISO(isoString);
+
   if (!isValid(date)) {
     throw new Error(`Invalid timestamp: ${timestamp}`);
   }
-  
+
   return date;
 }
 
@@ -65,9 +65,10 @@ export function formatDateTime(
     const dateObj = parseDatabaseTimestamp(date);
     if (!isValid(dateObj)) return "-";
 
-    const formatStr = options?.hour12 !== false
-      ? `dd MMM yyyy, h:mm${options?.includeSeconds ? ":ss" : ""} a`
-      : `dd MMM yyyy, HH:mm${options?.includeSeconds ? ":ss" : ""}`;
+    const formatStr =
+      options?.hour12 !== false
+        ? `dd MMM yyyy, h:mm${options?.includeSeconds ? ":ss" : ""} a`
+        : `dd MMM yyyy, HH:mm${options?.includeSeconds ? ":ss" : ""}`;
 
     return format(dateObj, formatStr);
   } catch {
@@ -110,9 +111,10 @@ export function formatTimeOnly(
     const dateObj = parseDatabaseTimestamp(date);
     if (!isValid(dateObj)) return "-";
 
-    const formatStr = options?.hour12 !== false
-      ? `h:mm${options?.includeSeconds ? ":ss" : ""} a`
-      : `HH:mm${options?.includeSeconds ? ":ss" : ""}`;
+    const formatStr =
+      options?.hour12 !== false
+        ? `h:mm${options?.includeSeconds ? ":ss" : ""} a`
+        : `HH:mm${options?.includeSeconds ? ":ss" : ""}`;
 
     return format(dateObj, formatStr);
   } catch {
@@ -170,4 +172,3 @@ export function isToday(date: string | Date | null | undefined): boolean {
     return false;
   }
 }
-
