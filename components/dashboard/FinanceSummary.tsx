@@ -17,8 +17,8 @@ export function FinanceSummary() {
 
   if (isLoading) {
     return (
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        {[1, 2, 3].map((i) => (
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {[1, 2, 3, 4].map((i) => (
           <div
             key={i}
             className="h-24 animate-pulse rounded-lg bg-gray-200"
@@ -44,7 +44,7 @@ export function FinanceSummary() {
         </Link>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div className="rounded-lg bg-white p-6 shadow">
           <div className="text-sm font-medium text-gray-500">Total Capital</div>
           <div
@@ -57,6 +57,17 @@ export function FinanceSummary() {
           <div className="mt-1 text-xs text-gray-400">
             Investments - Withdrawals
           </div>
+        </div>
+        <div className="rounded-lg bg-white p-6 shadow">
+          <div className="text-sm font-medium text-gray-500">Total Profit</div>
+          <div
+            className={`mt-2 text-2xl font-bold ${
+              data.total_profit >= 0 ? "text-green-600" : "text-red-600"
+            }`}
+          >
+            {formatCurrency(data.total_profit)}
+          </div>
+          <div className="mt-1 text-xs text-gray-400">From all sales</div>
         </div>
         <div className="rounded-lg bg-white p-6 shadow">
           <div className="text-sm font-medium text-gray-500">
@@ -76,7 +87,7 @@ export function FinanceSummary() {
           >
             {formatCurrency(data.net_balance)}
           </div>
-          <div className="mt-1 text-xs text-gray-400">Capital - Expenses</div>
+          <div className="mt-1 text-xs text-gray-400">Capital + Profit - Expenses</div>
         </div>
       </div>
     </div>

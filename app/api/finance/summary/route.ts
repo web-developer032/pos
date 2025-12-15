@@ -31,12 +31,29 @@ async function getHandler() {
       (expensesResult.rows[0] as unknown as { total_expenses: number | null })
         .total_expenses || 0;
 
-    // Calculate net balance
-    const netBalance = totalCapital - totalExpenses;
+    // Get total profit from sales (selling price - cost price)
+    const profitResult = await client.execute({
+      sql: `
+        SELECT 
+          COALESCE(SUM(si.quantity * (si.unit_price - COALESCE(p.cost_price, 0))), 0) as total_profit
+        FROM sale_items si
+        JOIN sales s ON si.sale_id = s.id
+        LEFT JOIN products p ON si.product_id = p.id
+        WHERE s.payment_status != 'voided'
+      `,
+    });
+
+    const totalProfit =
+      (profitResult.rows[0] as unknown as { total_profit: number | null })
+        .total_profit || 0;
+
+    // Calculate net balance (capital + profit - expenses)
+    const netBalance = totalCapital + totalProfit - totalExpenses;
 
     return NextResponse.json({
       total_capital: totalCapital,
       total_expenses: totalExpenses,
+      total_profit: totalProfit,
       net_balance: netBalance,
     });
   } catch (error) {

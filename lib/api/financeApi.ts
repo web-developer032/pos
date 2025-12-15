@@ -70,6 +70,7 @@ export interface UpdateExpenseRequest {
 export interface FinanceSummary {
   total_capital: number;
   total_expenses: number;
+  total_profit: number;
   net_balance: number;
 }
 
