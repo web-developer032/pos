@@ -86,6 +86,8 @@ const updateItemsSchema = z.object({
     .optional(),
   discount_type: z.enum(["percentage", "amount"]).optional(),
   discount_value: z.number().min(0).optional(),
+  tax_type: z.enum(["percentage", "amount"]).optional(),
+  tax_value: z.number().min(0).optional(),
 });
 
 async function putHandler(req: AuthRequest, context?: RouteContext) {
@@ -117,12 +119,6 @@ async function putHandler(req: AuthRequest, context?: RouteContext) {
 
       const poStatus = (poCheck.rows[0] as unknown as { status: string })
         .status;
-      if (poStatus !== "pending") {
-        return NextResponse.json(
-          { error: "Can only edit pending purchase orders" },
-          { status: 400 }
-        );
-      }
 
       // Update supplier if provided
       if (validated.supplier_id) {
@@ -134,7 +130,178 @@ async function putHandler(req: AuthRequest, context?: RouteContext) {
 
       // Update items if provided
       if (validated.items) {
-        // Delete existing items
+        // For completed POs, we need to handle differential stock changes
+        if (poStatus === "completed") {
+          // Get existing items before making changes
+          const existingItemsResult = await client.execute({
+            sql: "SELECT product_id, quantity, unit_cost, retail_price FROM purchase_order_items WHERE po_id = ?",
+            args: [poId],
+          });
+
+          const oldItems = new Map<
+            number,
+            { quantity: number; unit_cost: number; retail_price: number | null }
+          >();
+          for (const row of existingItemsResult.rows) {
+            const item = row as unknown as {
+              product_id: number;
+              quantity: number;
+              unit_cost: number;
+              retail_price: number | null;
+            };
+            oldItems.set(item.product_id, {
+              quantity: item.quantity,
+              unit_cost: item.unit_cost,
+              retail_price: item.retail_price,
+            });
+          }
+
+          // Build new items map
+          const newItems = new Map<
+            number,
+            { quantity: number; unit_cost: number; retail_price: number | null }
+          >();
+          for (const item of validated.items) {
+            newItems.set(item.product_id, {
+              quantity: item.quantity,
+              unit_cost: item.unit_cost,
+              retail_price: item.retail_price ?? null,
+            });
+          }
+
+          // Calculate and apply differential stock changes
+          // Handle items that were removed (in old but not in new)
+          for (const [productId, oldItem] of oldItems) {
+            if (!newItems.has(productId)) {
+              // Item was removed - subtract full quantity
+              await updateProductQuantity(
+                productId,
+                oldItem.quantity,
+                "subtract",
+                poId,
+                "purchase"
+              );
+            }
+          }
+
+          // Handle items that were added or modified
+          for (const [productId, newItem] of newItems) {
+            const oldItem = oldItems.get(productId);
+
+            if (!oldItem) {
+              // New item added - add full quantity and update prices
+              await updateProductQuantity(
+                productId,
+                newItem.quantity,
+                "add",
+                poId,
+                "purchase"
+              );
+
+              // Update cost price for new items
+              if (newItem.unit_cost > 0) {
+                const productResult = await client.execute({
+                  sql: "SELECT cost_price, stock_quantity FROM products WHERE id = ?",
+                  args: [productId],
+                });
+                if (productResult.rows.length > 0) {
+                  const product = productResult.rows[0] as unknown as {
+                    cost_price: number;
+                    stock_quantity: number;
+                  };
+                  const currentStock = product.stock_quantity || 0;
+                  const currentCost = product.cost_price || 0;
+                  // Weighted average cost
+                  const totalStock = currentStock;
+                  const newCostPrice =
+                    totalStock > 0
+                      ? (currentCost * (totalStock - newItem.quantity) +
+                          newItem.unit_cost * newItem.quantity) /
+                        totalStock
+                      : newItem.unit_cost;
+                  await client.execute({
+                    sql: "UPDATE products SET cost_price = ? WHERE id = ?",
+                    args: [roundPrice(newCostPrice), productId],
+                  });
+                }
+              }
+
+              // Update retail price if specified
+              if (newItem.retail_price && newItem.retail_price > 0) {
+                await client.execute({
+                  sql: "UPDATE products SET selling_price = ? WHERE id = ?",
+                  args: [roundPrice(newItem.retail_price), productId],
+                });
+              }
+            } else {
+              // Existing item - check for quantity/price changes
+              const qtyDiff = newItem.quantity - oldItem.quantity;
+
+              if (qtyDiff !== 0) {
+                // Quantity changed - apply differential
+                if (qtyDiff > 0) {
+                  // Quantity increased - add the difference
+                  await updateProductQuantity(
+                    productId,
+                    qtyDiff,
+                    "add",
+                    poId,
+                    "purchase"
+                  );
+
+                  // Recalculate weighted average cost for the increase
+                  const productResult = await client.execute({
+                    sql: "SELECT cost_price, stock_quantity FROM products WHERE id = ?",
+                    args: [productId],
+                  });
+                  if (productResult.rows.length > 0) {
+                    const product = productResult.rows[0] as unknown as {
+                      cost_price: number;
+                      stock_quantity: number;
+                    };
+                    const currentStock = product.stock_quantity || 0;
+                    const currentCost = product.cost_price || 0;
+                    // Apply weighted average for the additional units
+                    if (currentStock > 0) {
+                      const totalValue =
+                        currentCost * (currentStock - qtyDiff) +
+                        newItem.unit_cost * qtyDiff;
+                      const newCostPrice = totalValue / currentStock;
+                      await client.execute({
+                        sql: "UPDATE products SET cost_price = ? WHERE id = ?",
+                        args: [roundPrice(newCostPrice), productId],
+                      });
+                    }
+                  }
+                } else {
+                  // Quantity decreased - subtract the difference
+                  await updateProductQuantity(
+                    productId,
+                    Math.abs(qtyDiff),
+                    "subtract",
+                    poId,
+                    "purchase"
+                  );
+                  // No cost recalculation needed for decrease
+                }
+              }
+
+              // Update retail price if changed and specified
+              if (
+                newItem.retail_price &&
+                newItem.retail_price > 0 &&
+                newItem.retail_price !== oldItem.retail_price
+              ) {
+                await client.execute({
+                  sql: "UPDATE products SET selling_price = ? WHERE id = ?",
+                  args: [roundPrice(newItem.retail_price), productId],
+                });
+              }
+            }
+          }
+        }
+
+        // Delete existing items (for both pending and completed)
         await client.execute({
           sql: "DELETE FROM purchase_order_items WHERE po_id = ?",
           args: [poId],
@@ -159,7 +326,19 @@ async function putHandler(req: AuthRequest, context?: RouteContext) {
             discountAmount = roundPrice(validated.discount_value);
           }
         }
-        const totalAmount = roundPrice(Math.max(0, subtotal - discountAmount));
+
+        // Calculate tax
+        const afterDiscount = Math.max(0, subtotal - discountAmount);
+        let taxAmount = 0;
+        if (validated.tax_type && validated.tax_value) {
+          if (validated.tax_type === "percentage") {
+            taxAmount = roundPrice((afterDiscount * validated.tax_value) / 100);
+          } else {
+            taxAmount = roundPrice(validated.tax_value);
+          }
+        }
+
+        const totalAmount = roundPrice(afterDiscount + taxAmount);
 
         // Insert new items
         for (const item of validated.items) {
@@ -183,18 +362,22 @@ async function putHandler(req: AuthRequest, context?: RouteContext) {
           });
         }
 
-        // Update total amount and discount
+        // Update total amount, discount, and tax
         await client.execute({
           sql: `UPDATE purchase_orders 
                 SET total_amount = ?, 
                     discount_type = ?, 
-                    discount_value = ?, 
+                    discount_value = ?,
+                    tax_type = ?,
+                    tax_value = ?,
                     updated_at = CURRENT_TIMESTAMP 
                 WHERE id = ?`,
           args: [
             totalAmount,
             validated.discount_type || null,
             validated.discount_value || null,
+            validated.tax_type || null,
+            validated.tax_value || null,
             poId,
           ],
         });

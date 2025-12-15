@@ -293,14 +293,14 @@ export default function PurchaseOrdersPage() {
                       >
                         View
                       </Link>
+                      <button
+                        onClick={() => setEditingPOId(po.id)}
+                        className="text-indigo-600 hover:text-indigo-900"
+                      >
+                        Edit
+                      </button>
                       {po.status === "pending" && (
                         <>
-                          <button
-                            onClick={() => setEditingPOId(po.id)}
-                            className="text-indigo-600 hover:text-indigo-900"
-                          >
-                            Edit
-                          </button>
                           <button
                             onClick={() =>
                               handleStatusChange(po.id, "completed")

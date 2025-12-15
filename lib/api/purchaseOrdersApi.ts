@@ -49,12 +49,15 @@ export interface UpdatePurchaseOrderItemsRequest {
   supplier_id?: number;
   items?: {
     product_id: number;
+    product_name?: string;
     quantity: number;
     unit_cost: number;
     retail_price?: number;
   }[];
   discount_type?: "percentage" | "amount";
   discount_value?: number;
+  tax_type?: "percentage" | "amount";
+  tax_value?: number;
 }
 
 export const purchaseOrdersApi = apiSlice.injectEndpoints({
@@ -137,6 +140,8 @@ export const purchaseOrdersApi = apiSlice.injectEndpoints({
       invalidatesTags: (result, error, { id }) => [
         { type: "PurchaseOrder", id },
         "PurchaseOrder",
+        "Product",
+        "Inventory",
       ],
     }),
     deletePurchaseOrder: builder.mutation<{ message: string }, number>({

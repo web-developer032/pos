@@ -53,7 +53,12 @@ export default function PurchaseOrderDetailPage() {
     );
   }
 
-  const { purchase_order, items, payments = [], total_paid = 0 } = data as {
+  const {
+    purchase_order,
+    items,
+    payments = [],
+    total_paid = 0,
+  } = data as {
     purchase_order: {
       id: number;
       po_number: string;
@@ -161,22 +166,20 @@ export default function PurchaseOrderDetailPage() {
                 Back to Purchase Orders
               </Button>
             </Link>
+            <Button
+              onClick={() => setIsEditModalOpen(true)}
+              className="bg-indigo-600 hover:bg-indigo-700"
+            >
+              Edit
+            </Button>
             {po.status === "pending" && (
-              <>
-                <Button
-                  onClick={() => setIsEditModalOpen(true)}
-                  className="bg-indigo-600 hover:bg-indigo-700"
-                >
-                  Edit
-                </Button>
-                <Button
-                  onClick={handleDelete}
-                  disabled={isDeleting}
-                  className="bg-red-600 hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {isDeleting ? "Deleting..." : "Delete"}
-                </Button>
-              </>
+              <Button
+                onClick={handleDelete}
+                disabled={isDeleting}
+                className="bg-red-600 hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {isDeleting ? "Deleting..." : "Delete"}
+              </Button>
             )}
             {po.status !== "pending" && (
               <Button
@@ -372,7 +375,7 @@ export default function PurchaseOrderDetailPage() {
                           <p className="text-sm font-medium">
                             {formatCurrency(payment.amount)}
                           </p>
-                          <p className="text-xs text-gray-500 capitalize">
+                          <p className="text-xs capitalize text-gray-500">
                             {payment.payment_method.replace("_", " ")}
                             {payment.reference_number &&
                               ` • ${payment.reference_number}`}
@@ -388,7 +391,7 @@ export default function PurchaseOrderDetailPage() {
                         </div>
                       </div>
                       {payment.notes && (
-                        <p className="mt-1 text-xs text-gray-500 italic">
+                        <p className="mt-1 text-xs italic text-gray-500">
                           {payment.notes}
                         </p>
                       )}
@@ -482,22 +485,20 @@ export default function PurchaseOrderDetailPage() {
                         </span>
                       </div>
                     )}
-                  {po.tax_type &&
-                    po.tax_value &&
-                    po.tax_value > 0 && (
-                      <div className="flex items-center justify-end gap-4 text-green-600">
-                        <span className="text-base font-medium">
-                          Tax (
-                          {po.tax_type === "percentage"
-                            ? `${po.tax_value}%`
-                            : formatCurrency(po.tax_value)}
-                          ):
-                        </span>
-                        <span className="text-base font-medium">
-                          +{formatCurrency(taxAmount)}
-                        </span>
-                      </div>
-                    )}
+                  {po.tax_type && po.tax_value && po.tax_value > 0 && (
+                    <div className="flex items-center justify-end gap-4 text-green-600">
+                      <span className="text-base font-medium">
+                        Tax (
+                        {po.tax_type === "percentage"
+                          ? `${po.tax_value}%`
+                          : formatCurrency(po.tax_value)}
+                        ):
+                      </span>
+                      <span className="text-base font-medium">
+                        +{formatCurrency(taxAmount)}
+                      </span>
+                    </div>
+                  )}
                   <div className="flex items-center justify-end gap-4 border-t border-gray-200 pt-2">
                     <span className="text-base font-semibold text-gray-700">
                       Total Amount:
