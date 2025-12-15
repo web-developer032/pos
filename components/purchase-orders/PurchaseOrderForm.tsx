@@ -53,6 +53,8 @@ const purchaseOrderSchema = z.object({
     .min(1, "At least one item required"),
   discount_type: z.enum(["percentage", "amount"]).optional(),
   discount_value: z.number().min(0).optional(),
+  tax_type: z.enum(["percentage", "amount"]).optional(),
+  tax_value: z.number().min(0).optional(),
 });
 
 type PurchaseOrderFormData = z.infer<typeof purchaseOrderSchema>;
@@ -131,6 +133,8 @@ export function PurchaseOrderForm({
       ],
       discount_type: undefined,
       discount_value: undefined,
+      tax_type: undefined,
+      tax_value: undefined,
     },
   });
 
@@ -149,10 +153,24 @@ export function PurchaseOrderForm({
   const watchedItems = watch("items");
   const discountType = watch("discount_type");
   const discountValue = watch("discount_value");
+  const taxType = watch("tax_type");
+  const taxValue = watch("tax_value");
 
   // Calculations
-  const { subtotal, discountAmount, total, discountFactor } =
-    useOrderCalculations(watchedItems, discountType, discountValue);
+  const {
+    subtotal,
+    discountAmount,
+    taxAmount,
+    total,
+    discountFactor,
+    taxFactor,
+  } = useOrderCalculations(
+    watchedItems,
+    discountType,
+    discountValue,
+    taxType,
+    taxValue
+  );
 
   // Cache products from API
   useEffect(() => {
@@ -223,6 +241,8 @@ export function PurchaseOrderForm({
               ],
         discount_type: purchase_order.discount_type || undefined,
         discount_value: purchase_order.discount_value || undefined,
+        tax_type: purchase_order.tax_type || undefined,
+        tax_value: purchase_order.tax_value || undefined,
       });
     }
   }, [purchaseOrderData, isEditMode, reset]);
@@ -323,6 +343,15 @@ export function PurchaseOrderForm({
     [setValue]
   );
 
+  const handleTaxTypeChange = useCallback(
+    (value: string) => {
+      if (value === "") {
+        setValue("tax_value", undefined);
+      }
+    },
+    [setValue]
+  );
+
   const onSubmit = async (data: PurchaseOrderFormData) => {
     if (isSubmitting) return;
     setIsSubmitting(true);
@@ -341,6 +370,12 @@ export function PurchaseOrderForm({
           ? {
               discount_type: data.discount_type,
               discount_value: data.discount_value,
+            }
+          : {}),
+        ...(data.tax_type && data.tax_value
+          ? {
+              tax_type: data.tax_type,
+              tax_value: data.tax_value,
             }
           : {}),
       };
@@ -452,6 +487,7 @@ export function PurchaseOrderForm({
                 unitCost={watchedItems[index]?.unit_cost || 0}
                 retailPrice={watchedItems[index]?.retail_price || 0}
                 discountFactor={discountFactor}
+                taxFactor={taxFactor}
                 productOptions={productOptions}
                 errors={errors.items?.[index]}
                 register={register}
@@ -480,11 +516,15 @@ export function PurchaseOrderForm({
           discountType={discountType}
           discountValue={discountValue}
           discountAmount={discountAmount}
+          taxType={taxType}
+          taxValue={taxValue}
+          taxAmount={taxAmount}
           total={total}
           control={control}
           register={register}
           errors={errors}
           onDiscountTypeChange={handleDiscountTypeChange}
+          onTaxTypeChange={handleTaxTypeChange}
         />
 
         {/* Submit */}

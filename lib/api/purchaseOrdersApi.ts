@@ -9,6 +9,8 @@ export interface PurchaseOrder {
   total_amount: number;
   discount_type?: "percentage" | "amount" | null;
   discount_value?: number | null;
+  tax_type?: "percentage" | "amount" | null;
+  tax_value?: number | null;
   status: "pending" | "completed" | "cancelled";
   created_at: string;
   updated_at: string;

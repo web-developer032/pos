@@ -29,6 +29,7 @@ interface PurchaseOrderItemProps {
   unitCost: number;
   retailPrice: number;
   discountFactor: number;
+  taxFactor: number;
   productOptions: ProductOption[];
   errors?: FieldErrors<PurchaseOrderItemData>;
   register: UseFormRegister<{
@@ -36,6 +37,8 @@ interface PurchaseOrderItemProps {
     supplier_id: number;
     discount_type?: "percentage" | "amount";
     discount_value?: number;
+    tax_type?: "percentage" | "amount";
+    tax_value?: number;
   }>;
   onProductChange: (productId: number) => void;
   onProductSearch: (search: string) => void;
@@ -56,6 +59,7 @@ export const PurchaseOrderItem = memo(
         unitCost,
         retailPrice,
         discountFactor,
+        taxFactor,
         productOptions,
         errors,
         register,
@@ -71,9 +75,16 @@ export const PurchaseOrderItem = memo(
       const subtotal = (quantity || 0) * (unitCost || 0);
       const hasValues = productId > 0 && quantity > 0 && unitCost > 0;
 
-      // Calculate adjusted cost after discount
-      const adjustedCost = (unitCost || 0) * discountFactor;
+      // Calculate adjusted cost after discount and tax
+      const costAfterDiscount = (unitCost || 0) * discountFactor;
+      const adjustedCost = costAfterDiscount * taxFactor;
       const hasDiscount = discountFactor < 1;
+      const hasTax = taxFactor > 1;
+      const hasAdjustment = hasDiscount || hasTax;
+
+      // Calculate actual amounts per unit
+      const discountAmountPerUnit = (unitCost || 0) - costAfterDiscount;
+      const taxAmountPerUnit = adjustedCost - costAfterDiscount;
 
       // Calculate profit based on adjusted cost
       const profit = (retailPrice || 0) - adjustedCost;
@@ -113,7 +124,7 @@ export const PurchaseOrderItem = memo(
           </div>
 
           {/* Fields Grid */}
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-6">
+          <div className="grid grid-cols-2 items-start gap-3 sm:grid-cols-6">
             {/* Product Select - full width on mobile, 2 cols on desktop */}
             <div className="col-span-2">
               <SearchableSelect
@@ -158,7 +169,8 @@ export const PurchaseOrderItem = memo(
               <Input
                 label="Qty"
                 type="number"
-                min="1"
+                step="0.001"
+                min="0"
                 {...register(`items.${index}.quantity`, {
                   valueAsNumber: true,
                 })}
@@ -171,7 +183,7 @@ export const PurchaseOrderItem = memo(
               <Input
                 label="Cost"
                 type="number"
-                step="0.01"
+                step="0.001"
                 min="0"
                 {...register(`items.${index}.unit_cost`, {
                   valueAsNumber: true,
@@ -185,7 +197,7 @@ export const PurchaseOrderItem = memo(
               <Input
                 label="Retail"
                 type="number"
-                step="0.01"
+                step="0.001"
                 min="0"
                 {...register(`items.${index}.retail_price`, {
                   valueAsNumber: true,
@@ -206,21 +218,43 @@ export const PurchaseOrderItem = memo(
               </div>
             </div>
 
-            {/* Summary Row - Adjusted Cost & Profit (only show when discount or values exist) */}
-            {(hasDiscount || (hasValues && retailPrice > 0)) && (
-              <div className="mt-3 flex gap-3">
-                {/* Adjusted Cost (after discount) */}
-                {hasDiscount && unitCost > 0 && (
-                  <div className="rounded-md border-2 border-green-300 bg-green-50 px-3 py-2">
-                    <span className="block text-xs text-gray-500">
-                      Final Cost
-                    </span>
-                    <span className="block text-sm font-bold text-green-700">
-                      {formatCurrency(adjustedCost)}
-                      <span className="ml-1 text-xs font-normal">
-                        (-{((1 - discountFactor) * 100).toFixed(1)}%)
+            {/* Summary Row - Adjusted Cost & Profit (only show when discount/tax or values exist) */}
+            {(hasAdjustment || (hasValues && retailPrice > 0)) && (
+              <>
+                {/* Adjusted Cost (after discount and tax) */}
+                {hasAdjustment && unitCost > 0 && (
+                  <div className="col-span-2 rounded-md border border-gray-200 bg-gradient-to-br from-gray-50 to-white px-3 py-2 shadow-sm">
+                    <div className="flex items-center justify-between gap-4">
+                      <span className="text-xs font-medium text-gray-500">
+                        Final Cost/Unit
                       </span>
-                    </span>
+                      <span className="text-sm font-bold text-indigo-700">
+                        {formatCurrency(adjustedCost)}
+                      </span>
+                    </div>
+                    <div className="mt-2 space-y-1">
+                      {hasDiscount && (
+                        <div className="flex items-center justify-between rounded bg-red-50 px-2 py-1">
+                          <span className="text-xs text-red-600">
+                            Discount ({((1 - discountFactor) * 100).toFixed(1)}
+                            %)
+                          </span>
+                          <span className="text-xs font-semibold text-red-700">
+                            -{formatCurrency(discountAmountPerUnit)}
+                          </span>
+                        </div>
+                      )}
+                      {hasTax && (
+                        <div className="flex items-center justify-between rounded bg-green-50 px-2 py-1">
+                          <span className="text-xs text-green-600">
+                            Tax ({((taxFactor - 1) * 100).toFixed(1)}%)
+                          </span>
+                          <span className="text-xs font-semibold text-green-700">
+                            +{formatCurrency(taxAmountPerUnit)}
+                          </span>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
 
@@ -249,7 +283,7 @@ export const PurchaseOrderItem = memo(
                     </div>
                   </>
                 )}
-              </div>
+              </>
             )}
           </div>
         </div>

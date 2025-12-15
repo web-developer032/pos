@@ -62,6 +62,8 @@ export default function PurchaseOrderDetailPage() {
       total_amount: number;
       discount_type?: "percentage" | "amount" | null;
       discount_value?: number | null;
+      tax_type?: "percentage" | "amount" | null;
+      tax_value?: number | null;
       status: "pending" | "completed" | "cancelled";
       created_at: string;
       updated_at: string;
@@ -103,6 +105,17 @@ export default function PurchaseOrderDetailPage() {
       discountAmount = (itemsSubtotal * po.discount_value) / 100;
     } else {
       discountAmount = po.discount_value;
+    }
+  }
+
+  const afterDiscount = Math.max(0, itemsSubtotal - discountAmount);
+
+  let taxAmount = 0;
+  if (po.tax_type && po.tax_value) {
+    if (po.tax_type === "percentage") {
+      taxAmount = (afterDiscount * po.tax_value) / 100;
+    } else {
+      taxAmount = po.tax_value;
     }
   }
 
@@ -466,6 +479,22 @@ export default function PurchaseOrderDetailPage() {
                         </span>
                         <span className="text-base font-medium">
                           -{formatCurrency(discountAmount)}
+                        </span>
+                      </div>
+                    )}
+                  {po.tax_type &&
+                    po.tax_value &&
+                    po.tax_value > 0 && (
+                      <div className="flex items-center justify-end gap-4 text-green-600">
+                        <span className="text-base font-medium">
+                          Tax (
+                          {po.tax_type === "percentage"
+                            ? `${po.tax_value}%`
+                            : formatCurrency(po.tax_value)}
+                          ):
+                        </span>
+                        <span className="text-base font-medium">
+                          +{formatCurrency(taxAmount)}
                         </span>
                       </div>
                     )}

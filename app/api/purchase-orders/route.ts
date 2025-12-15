@@ -23,6 +23,8 @@ const poSchema = z.object({
   ),
   discount_type: z.enum(["percentage", "amount"]).optional(),
   discount_value: z.number().min(0).optional(),
+  tax_type: z.enum(["percentage", "amount"]).optional(),
+  tax_value: z.number().min(0).optional(),
 });
 
 async function getHandler(req: NextRequest) {
@@ -176,15 +178,27 @@ async function postHandler(req: AuthRequest) {
         discountAmount = roundPrice(validated.discount_value);
       }
     }
-    const totalAmount = roundPrice(Math.max(0, subtotal - discountAmount));
+
+    // Calculate tax (applied to subtotal after discount)
+    const afterDiscount = Math.max(0, subtotal - discountAmount);
+    let taxAmount = 0;
+    if (validated.tax_type && validated.tax_value) {
+      if (validated.tax_type === "percentage") {
+        taxAmount = roundPrice((afterDiscount * validated.tax_value) / 100);
+      } else {
+        taxAmount = roundPrice(validated.tax_value);
+      }
+    }
+
+    const totalAmount = roundPrice(afterDiscount + taxAmount);
 
     // Use transaction to ensure atomicity - if items fail, PO header is rolled back
     await client.execute("BEGIN TRANSACTION");
 
     try {
       const poResult = await client.execute({
-        sql: `INSERT INTO purchase_orders (po_number, supplier_id, user_id, total_amount, discount_type, discount_value) 
-            VALUES (?, ?, ?, ?, ?, ?) RETURNING *`,
+        sql: `INSERT INTO purchase_orders (po_number, supplier_id, user_id, total_amount, discount_type, discount_value, tax_type, tax_value) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`,
         args: [
           poNumber,
           validated.supplier_id,
@@ -192,6 +206,8 @@ async function postHandler(req: AuthRequest) {
           totalAmount,
           validated.discount_type || null,
           validated.discount_value || null,
+          validated.tax_type || null,
+          validated.tax_value || null,
         ],
       });
 

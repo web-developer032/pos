@@ -134,6 +134,8 @@ export async function initializeDatabase() {
       total_amount REAL NOT NULL DEFAULT 0,
       discount_type TEXT CHECK(discount_type IN ('percentage', 'amount')),
       discount_value REAL DEFAULT 0,
+      tax_type TEXT CHECK(tax_type IN ('percentage', 'amount')),
+      tax_value REAL DEFAULT 0,
       status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending', 'completed', 'cancelled')),
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -427,5 +429,26 @@ export async function initializeDatabase() {
       WHERE product_name IS NULL
     `);
     console.log("[DB] Product names backfilled successfully");
+  }
+
+  // Add tax_type and tax_value columns to purchase_orders if they don't exist
+  const poInfo = await client.execute(`PRAGMA table_info(purchase_orders)`);
+  const hasTaxType = poInfo.rows.some(
+    (row) => (row as Record<string, unknown>).name === "tax_type"
+  );
+  if (!hasTaxType) {
+    console.log("[DB] Adding tax_type column to purchase_orders...");
+    await client.execute(
+      `ALTER TABLE purchase_orders ADD COLUMN tax_type TEXT CHECK(tax_type IN ('percentage', 'amount'))`
+    );
+  }
+  const hasTaxValue = poInfo.rows.some(
+    (row) => (row as Record<string, unknown>).name === "tax_value"
+  );
+  if (!hasTaxValue) {
+    console.log("[DB] Adding tax_value column to purchase_orders...");
+    await client.execute(
+      `ALTER TABLE purchase_orders ADD COLUMN tax_value REAL DEFAULT 0`
+    );
   }
 }

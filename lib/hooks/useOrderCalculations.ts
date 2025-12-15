@@ -11,14 +11,18 @@ interface OrderItem {
 interface OrderCalculations {
   subtotal: number;
   discountAmount: number;
+  taxAmount: number;
   total: number;
   discountFactor: number;
+  taxFactor: number;
 }
 
 export function useOrderCalculations(
   items: OrderItem[],
   discountType?: "percentage" | "amount",
-  discountValue?: number
+  discountValue?: number,
+  taxType?: "percentage" | "amount",
+  taxValue?: number
 ): OrderCalculations {
   // Create a stable key from item values to properly trigger recalculations
   // when item contents change (react-hook-form may reuse array references)
@@ -32,22 +36,49 @@ export function useOrderCalculations(
       0
     );
 
+    // Handle NaN values from cleared number inputs
+    const safeDiscountValue = discountValue && !isNaN(discountValue) ? discountValue : 0;
+    const safeTaxValue = taxValue && !isNaN(taxValue) ? taxValue : 0;
+
     let discountAmount = 0;
     let discountFactor = 1;
 
-    if (discountType && discountValue && discountValue > 0 && subtotal > 0) {
+    if (discountType && safeDiscountValue > 0 && subtotal > 0) {
       if (discountType === "percentage") {
-        discountAmount = (subtotal * discountValue) / 100;
-        discountFactor = 1 - discountValue / 100;
+        discountAmount = (subtotal * safeDiscountValue) / 100;
+        discountFactor = 1 - safeDiscountValue / 100;
       } else {
-        discountAmount = discountValue;
-        discountFactor = Math.max(0, (subtotal - discountValue) / subtotal);
+        discountAmount = safeDiscountValue;
+        discountFactor = Math.max(0, (subtotal - safeDiscountValue) / subtotal);
       }
     }
 
-    const total = Math.max(0, subtotal - discountAmount);
+    const afterDiscount = Math.max(0, subtotal - discountAmount);
 
-    return { subtotal, discountAmount, total, discountFactor };
+    // Calculate tax (applied to subtotal after discount)
+    let taxAmount = 0;
+    let taxFactor = 1;
+    if (taxType && safeTaxValue > 0 && afterDiscount > 0) {
+      if (taxType === "percentage") {
+        taxAmount = (afterDiscount * safeTaxValue) / 100;
+        taxFactor = 1 + safeTaxValue / 100;
+      } else {
+        taxAmount = safeTaxValue;
+        taxFactor =
+          afterDiscount > 0 ? (afterDiscount + safeTaxValue) / afterDiscount : 1;
+      }
+    }
+
+    const total = afterDiscount + taxAmount;
+
+    return {
+      subtotal,
+      discountAmount,
+      taxAmount,
+      total,
+      discountFactor,
+      taxFactor,
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [itemsKey, discountType, discountValue]);
+  }, [itemsKey, discountType, discountValue, taxType, taxValue]);
 }
