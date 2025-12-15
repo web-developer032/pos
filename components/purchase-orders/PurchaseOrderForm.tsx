@@ -45,7 +45,7 @@ const purchaseOrderSchema = z.object({
           .number()
           .refine((val) => val > 0, { message: "Product is required" }),
         product_name: z.string().optional(),
-        quantity: z.number().int().min(1, "Min 1"),
+        quantity: z.number().min(0.001, "Min 0.001"),
         unit_cost: z.number().min(0, "Min 0"),
         retail_price: z.number().min(0).optional(),
       })
