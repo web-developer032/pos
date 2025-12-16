@@ -6,39 +6,44 @@ import { format, parseISO, isValid } from "date-fns";
  */
 
 /**
- * Get the current timestamp in UTC (matches SQLite's CURRENT_TIMESTAMP)
+ * Get the current timestamp in local time
  * Returns format: YYYY-MM-DD HH:MM:SS (for SQLite DATETIME)
  */
 export function getCurrentTimestamp(): string {
   const now = new Date();
-  // Format in UTC to match SQLite's CURRENT_TIMESTAMP behavior
-  return now.toISOString().slice(0, 19).replace("T", " ");
+  // Format in local time for consistent display
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  const hours = String(now.getHours()).padStart(2, "0");
+  const minutes = String(now.getMinutes()).padStart(2, "0");
+  const seconds = String(now.getSeconds()).padStart(2, "0");
+  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
 }
 
 /**
  * Parse a database timestamp string to a Date object
- * SQLite's CURRENT_TIMESTAMP stores time in UTC
- * @param timestamp - Database timestamp string (YYYY-MM-DD HH:MM:SS in UTC)
+ * Timestamps are stored in local time
+ * @param timestamp - Database timestamp string (YYYY-MM-DD HH:MM:SS in local time)
  */
 export function parseDatabaseTimestamp(timestamp: string | Date): Date {
   if (timestamp instanceof Date) {
     return timestamp;
   }
 
-  // If it's already an ISO string with timezone, parse it directly
+  // If it's already an ISO string with timezone info, parse it directly
   if (
     timestamp.includes("Z") ||
-    timestamp.includes("+") ||
-    timestamp.includes("-", 10)
+    timestamp.includes("+", 10) ||
+    /\d{2}:\d{2}:\d{2}[+-]/.test(timestamp)
   ) {
     return parseISO(timestamp);
   }
 
-  // Database stores in UTC format: "YYYY-MM-DD HH:MM:SS"
-  // SQLite's CURRENT_TIMESTAMP returns UTC time
-  // Convert to ISO string with Z suffix to properly parse as UTC
-  const isoString = timestamp.replace(" ", "T") + "Z";
-  const date = parseISO(isoString);
+  // Database stores in local time format: "YYYY-MM-DD HH:MM:SS"
+  // Parse as local time (no Z suffix)
+  const isoString = timestamp.replace(" ", "T");
+  const date = new Date(isoString);
 
   if (!isValid(date)) {
     throw new Error(`Invalid timestamp: ${timestamp}`);

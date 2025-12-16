@@ -9,6 +9,7 @@ import {
   handleApiError,
   handleValidationError,
 } from "@/lib/utils/apiHelpers";
+import { getCurrentTimestamp } from "@/lib/utils/dateTime";
 
 const customerSchema = z.object({
   name: z.string().min(1),
@@ -60,13 +61,14 @@ async function postHandler(req: NextRequest) {
     const validated = customerSchema.parse(body);
 
     const result = await client.execute({
-      sql: "INSERT INTO customers (name, email, phone, address, loyalty_points) VALUES (?, ?, ?, ?, ?) RETURNING *",
+      sql: "INSERT INTO customers (name, email, phone, address, loyalty_points, created_at) VALUES (?, ?, ?, ?, ?, ?) RETURNING *",
       args: [
         validated.name,
         validated.email || null,
         validated.phone || null,
         validated.address || null,
         validated.loyalty_points || 0,
+        getCurrentTimestamp(),
       ],
     });
 

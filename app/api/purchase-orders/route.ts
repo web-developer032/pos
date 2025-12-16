@@ -9,6 +9,7 @@ import {
   handleValidationError,
   roundPrice,
 } from "@/lib/utils/apiHelpers";
+import { getCurrentTimestamp } from "@/lib/utils/dateTime";
 
 const poSchema = z.object({
   supplier_id: z.number(),
@@ -197,8 +198,8 @@ async function postHandler(req: AuthRequest) {
 
     try {
       const poResult = await client.execute({
-        sql: `INSERT INTO purchase_orders (po_number, supplier_id, user_id, total_amount, discount_type, discount_value, tax_type, tax_value) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`,
+        sql: `INSERT INTO purchase_orders (po_number, supplier_id, user_id, total_amount, discount_type, discount_value, tax_type, tax_value, created_at) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`,
         args: [
           poNumber,
           validated.supplier_id,
@@ -208,6 +209,7 @@ async function postHandler(req: AuthRequest) {
           validated.discount_value || null,
           validated.tax_type || null,
           validated.tax_value || null,
+          getCurrentTimestamp(),
         ],
       });
 

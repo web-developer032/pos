@@ -9,6 +9,7 @@ import {
   handleValidationError,
   roundPrice,
 } from "@/lib/utils/apiHelpers";
+import { getCurrentTimestamp } from "@/lib/utils/dateTime";
 
 const productUnitEnum = z.enum([
   "piece",
@@ -192,8 +193,8 @@ async function postHandler(req: NextRequest) {
     const result = await client.execute({
       sql: `INSERT INTO products (name, barcode, sku, description, category_id, 
             cost_price, selling_price, stock_quantity, min_stock_level, unit, image_url,
-            base_product_id, quantity_multiplier) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`,
+            base_product_id, quantity_multiplier, created_at, updated_at) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`,
       args: [
         validated.name,
         validated.barcode || null,
@@ -208,6 +209,8 @@ async function postHandler(req: NextRequest) {
         validated.image_url || null,
         validated.base_product_id || null,
         validated.quantity_multiplier || null,
+        getCurrentTimestamp(),
+        getCurrentTimestamp(),
       ],
     });
 

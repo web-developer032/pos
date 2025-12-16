@@ -3,6 +3,7 @@ import { requireAuth, RouteContext, AuthRequest } from "@/lib/middleware/auth";
 import client from "@/lib/db";
 import { z } from "zod";
 import { roundPrice } from "@/lib/utils/apiHelpers";
+import { getCurrentTimestamp } from "@/lib/utils/dateTime";
 
 const paymentSchema = z.object({
   purchase_order_id: z.number().optional(),
@@ -66,8 +67,8 @@ async function postHandler(req: AuthRequest, context?: RouteContext) {
     // Insert payment
     const result = await client.execute({
       sql: `INSERT INTO supplier_payments 
-            (supplier_id, purchase_order_id, amount, payment_method, reference_number, notes, user_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING *`,
+            (supplier_id, purchase_order_id, amount, payment_method, reference_number, notes, user_id, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`,
       args: [
         supplierId,
         validated.purchase_order_id || null,
@@ -76,6 +77,7 @@ async function postHandler(req: AuthRequest, context?: RouteContext) {
         validated.reference_number || null,
         validated.notes || null,
         user.userId,
+        getCurrentTimestamp(),
       ],
     });
 

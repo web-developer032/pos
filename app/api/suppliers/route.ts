@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/middleware/auth";
 import client from "@/lib/db";
 import { z } from "zod";
+import { getCurrentTimestamp } from "@/lib/utils/dateTime";
 
 const supplierSchema = z.object({
   name: z.string().min(1),
@@ -91,13 +92,14 @@ async function postHandler(req: NextRequest) {
     const validated = supplierSchema.parse(body);
 
     const result = await client.execute({
-      sql: "INSERT INTO suppliers (name, contact_person, email, phone, address) VALUES (?, ?, ?, ?, ?) RETURNING *",
+      sql: "INSERT INTO suppliers (name, contact_person, email, phone, address, created_at) VALUES (?, ?, ?, ?, ?, ?) RETURNING *",
       args: [
         validated.name,
         validated.contact_person || null,
         validated.email || null,
         validated.phone || null,
         validated.address || null,
+        getCurrentTimestamp(),
       ],
     });
 
