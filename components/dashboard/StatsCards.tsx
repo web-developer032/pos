@@ -1,6 +1,6 @@
 "use client";
 
-import { useGetSalesQuery } from "@/lib/api/salesApi";
+import { useGetSalesAnalyticsQuery } from "@/lib/api/salesApi";
 import { useGetExpensesQuery } from "@/lib/api/financeApi";
 import { useCurrency } from "@/lib/hooks/useCurrency";
 import type { DateRange } from "@/components/common/DateRangeSelector";
@@ -10,9 +10,10 @@ interface StatsCardsProps {
 }
 
 export function StatsCards({ dateRange }: StatsCardsProps) {
-  const { data, isLoading } = useGetSalesQuery({
+  const { data, isLoading } = useGetSalesAnalyticsQuery({
     startDate: dateRange?.startDate,
     endDate: dateRange?.endDate,
+    groupBy: "day",
   });
   const { data: expensesData, isLoading: isLoadingExpenses } =
     useGetExpensesQuery({
@@ -25,13 +26,15 @@ export function StatsCards({ dateRange }: StatsCardsProps) {
     return <div>Loading stats...</div>;
   }
 
-  const sales = data?.sales || [];
-  const revenue = sales.reduce(
-    (sum, sale) => sum + (sale.final_amount || 0),
-    0
-  );
-  const profit = sales.reduce((sum, sale) => sum + (sale.total_profit || 0), 0);
-  const orders = sales.length;
+  const summary = data?.summary || {
+    totalSales: 0,
+    totalRevenue: 0,
+    totalProfit: 0,
+    averageOrderValue: 0,
+  };
+  const revenue = summary.totalRevenue;
+  const profit = summary.totalProfit;
+  const orders = summary.totalSales;
 
   const getLabel = () => {
     if (!dateRange) return "Today's";
@@ -84,7 +87,7 @@ export function StatsCards({ dateRange }: StatsCardsProps) {
       <div className="rounded-lg bg-white p-6 shadow">
         <h3 className="text-sm font-medium text-gray-500">Average Order</h3>
         <p className="mt-2 text-3xl font-bold">
-          {formatCurrency(orders > 0 ? revenue / orders : 0)}
+          {formatCurrency(summary.averageOrderValue)}
         </p>
       </div>
     </div>
