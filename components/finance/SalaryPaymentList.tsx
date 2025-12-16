@@ -24,6 +24,7 @@ export function SalaryPaymentList() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [employeeFilter, setEmployeeFilter] = useState<number | undefined>();
+  const [searchTerm, setSearchTerm] = useState("");
   const [page, setPage] = useState(1);
   const [dateRange, setDateRange] = useState<DateRange>({
     startDate: "",
@@ -34,13 +35,14 @@ export function SalaryPaymentList() {
   // Reset page when filters change
   useEffect(() => {
     setPage(1);
-  }, [employeeFilter, dateRange]);
+  }, [employeeFilter, dateRange, searchTerm]);
 
   const { data: employeesData } = useGetEmployeesQuery();
   const { data, isLoading, refetch } = useGetSalaryPaymentsQuery({
     employeeId: employeeFilter,
     startDate: dateRange.startDate || undefined,
     endDate: dateRange.endDate || undefined,
+    search: searchTerm || undefined,
     page,
     limit: 20,
   });
@@ -145,6 +147,18 @@ export function SalaryPaymentList() {
       <div className="mb-4 flex flex-col gap-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">
+                Search
+              </label>
+              <input
+                type="text"
+                placeholder="Search employee, period..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="rounded-md border border-gray-300 px-3 py-2 text-sm"
+              />
+            </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">
                 Employee
@@ -276,17 +290,15 @@ export function SalaryPaymentList() {
       </div>
 
       {/* Pagination */}
-      {pagination.totalPages > 1 && (
-        <div className="mt-4">
-          <Pagination
-            currentPage={page}
-            totalPages={pagination.totalPages}
-            onPageChange={setPage}
-            totalItems={pagination.total}
-            itemsPerPage={pagination.limit}
-          />
-        </div>
-      )}
+      <div className="mt-4">
+        <Pagination
+          currentPage={page}
+          totalPages={pagination.totalPages}
+          onPageChange={setPage}
+          totalItems={pagination.total}
+          itemsPerPage={pagination.limit}
+        />
+      </div>
 
       {/* Modal */}
       <Modal

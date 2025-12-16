@@ -22,6 +22,7 @@ async function getHandler(req: NextRequest) {
     const period = searchParams.get("period");
     const startDate = searchParams.get("start_date");
     const endDate = searchParams.get("end_date");
+    const search = searchParams.get("search");
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "20");
     const offset = (page - 1) * limit;
@@ -45,10 +46,15 @@ async function getHandler(req: NextRequest) {
       whereClause += " AND sp.created_at <= ?";
       args.push(`${endDate} 23:59:59`);
     }
+    if (search) {
+      whereClause += " AND (e.name LIKE ? OR sp.period LIKE ? OR sp.notes LIKE ?)";
+      const searchTerm = `%${search}%`;
+      args.push(searchTerm, searchTerm, searchTerm);
+    }
 
     // Get total count
     const countResult = await client.execute({
-      sql: `SELECT COUNT(*) as total FROM salary_payments sp ${whereClause}`,
+      sql: `SELECT COUNT(*) as total FROM salary_payments sp JOIN employees e ON sp.employee_id = e.id ${whereClause}`,
       args,
     });
     const total = (countResult.rows[0] as unknown as { total: number }).total;
@@ -72,12 +78,13 @@ async function getHandler(req: NextRequest) {
     // Get summary (for all matching records, not just current page)
     const summarySql = `
       SELECT 
-        COALESCE(SUM(CASE WHEN payment_type = 'salary' THEN amount ELSE 0 END), 0) as total_salary,
-        COALESCE(SUM(CASE WHEN payment_type = 'advance' THEN amount ELSE 0 END), 0) as total_advance,
-        COALESCE(SUM(CASE WHEN payment_type = 'bonus' THEN amount ELSE 0 END), 0) as total_bonus,
-        COALESCE(SUM(CASE WHEN payment_type = 'deduction' THEN amount ELSE 0 END), 0) as total_deductions,
-        COALESCE(SUM(CASE WHEN payment_type IN ('salary', 'bonus') THEN amount ELSE -amount END), 0) as net_paid
+        COALESCE(SUM(CASE WHEN sp.payment_type = 'salary' THEN sp.amount ELSE 0 END), 0) as total_salary,
+        COALESCE(SUM(CASE WHEN sp.payment_type = 'advance' THEN sp.amount ELSE 0 END), 0) as total_advance,
+        COALESCE(SUM(CASE WHEN sp.payment_type = 'bonus' THEN sp.amount ELSE 0 END), 0) as total_bonus,
+        COALESCE(SUM(CASE WHEN sp.payment_type = 'deduction' THEN sp.amount ELSE 0 END), 0) as total_deductions,
+        COALESCE(SUM(CASE WHEN sp.payment_type IN ('salary', 'bonus') THEN sp.amount ELSE -sp.amount END), 0) as net_paid
       FROM salary_payments sp
+      JOIN employees e ON sp.employee_id = e.id
       ${whereClause}
     `;
 

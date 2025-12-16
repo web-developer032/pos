@@ -20,6 +20,7 @@ async function getHandler(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const status = searchParams.get("status");
+    const search = searchParams.get("search");
 
     let sql = `
       SELECT e.*,
@@ -33,6 +34,12 @@ async function getHandler(req: NextRequest) {
     if (status) {
       sql += " AND e.status = ?";
       args.push(status);
+    }
+
+    if (search) {
+      sql += " AND (e.name LIKE ? OR e.phone LIKE ? OR e.address LIKE ?)";
+      const searchTerm = `%${search}%`;
+      args.push(searchTerm, searchTerm, searchTerm);
     }
 
     sql += " ORDER BY e.name ASC";

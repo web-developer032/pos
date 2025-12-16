@@ -18,10 +18,12 @@ export function EmployeeList() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>("");
+  const [searchTerm, setSearchTerm] = useState("");
 
-  const { data, isLoading, refetch } = useGetEmployeesQuery(
-    statusFilter ? { status: statusFilter } : undefined
-  );
+  const { data, isLoading, refetch } = useGetEmployeesQuery({
+    status: statusFilter || undefined,
+    search: searchTerm || undefined,
+  });
   const [deleteEmployee] = useDeleteEmployeeMutation();
   const { format: formatCurrency } = useCurrency();
 
@@ -98,17 +100,26 @@ export function EmployeeList() {
         </div>
       )}
 
-      {/* Actions */}
+      {/* Filters */}
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          className="rounded-md border border-gray-300 px-3 py-2 text-sm"
-        >
-          <option value="">All Employees</option>
-          <option value="active">Active Only</option>
-          <option value="inactive">Inactive Only</option>
-        </select>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <input
+            type="text"
+            placeholder="Search by name, phone..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="rounded-md border border-gray-300 px-3 py-2 text-sm"
+          />
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="rounded-md border border-gray-300 px-3 py-2 text-sm"
+          >
+            <option value="">All Status</option>
+            <option value="active">Active Only</option>
+            <option value="inactive">Inactive Only</option>
+          </select>
+        </div>
         <Button onClick={() => setIsModalOpen(true)}>+ Add Employee</Button>
       </div>
 

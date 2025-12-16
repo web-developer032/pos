@@ -362,11 +362,12 @@ export const financeApi = apiSlice.injectEndpoints({
     // Employee endpoints
     getEmployees: builder.query<
       { employees: Employee[]; summary: EmployeeSummary },
-      { status?: string } | void
+      { status?: string; search?: string } | void
     >({
       query: (params) => {
         const searchParams = new URLSearchParams();
         if (params?.status) searchParams.append("status", params.status);
+        if (params?.search) searchParams.append("search", params.search);
         const query = searchParams.toString();
         return `/employees${query ? `?${query}` : ""}`;
       },
@@ -429,6 +430,7 @@ export const financeApi = apiSlice.injectEndpoints({
         startDate?: string;
         endDate?: string;
         period?: string;
+        search?: string;
         page?: number;
         limit?: number;
       } | void
@@ -441,6 +443,7 @@ export const financeApi = apiSlice.injectEndpoints({
           searchParams.append("start_date", params.startDate);
         if (params?.endDate) searchParams.append("end_date", params.endDate);
         if (params?.period) searchParams.append("period", params.period);
+        if (params?.search) searchParams.append("search", params.search);
         if (params?.page) searchParams.append("page", params.page.toString());
         if (params?.limit)
           searchParams.append("limit", params.limit.toString());
