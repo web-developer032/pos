@@ -380,6 +380,55 @@ export async function initializeDatabase() {
     `CREATE INDEX IF NOT EXISTS idx_other_income_category ON other_income(category)`
   );
 
+  // Employees table
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS employees (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      phone TEXT,
+      address TEXT,
+      salary_type TEXT NOT NULL CHECK(salary_type IN ('monthly', 'daily')),
+      base_salary REAL NOT NULL DEFAULT 0,
+      join_date DATE,
+      status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active', 'inactive')),
+      notes TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  // Salary Payments table
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS salary_payments (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      employee_id INTEGER NOT NULL,
+      amount REAL NOT NULL,
+      payment_type TEXT NOT NULL CHECK(payment_type IN ('salary', 'advance', 'bonus', 'deduction')),
+      period TEXT NOT NULL,
+      days_worked INTEGER,
+      payment_method TEXT NOT NULL CHECK(payment_method IN ('cash', 'bank_transfer', 'check', 'other')),
+      notes TEXT,
+      user_id INTEGER NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (employee_id) REFERENCES employees(id),
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    )
+  `);
+
+  // Create indexes for employees and salary payments
+  await client.execute(
+    `CREATE INDEX IF NOT EXISTS idx_employees_status ON employees(status)`
+  );
+  await client.execute(
+    `CREATE INDEX IF NOT EXISTS idx_salary_payments_employee ON salary_payments(employee_id)`
+  );
+  await client.execute(
+    `CREATE INDEX IF NOT EXISTS idx_salary_payments_date ON salary_payments(created_at)`
+  );
+  await client.execute(
+    `CREATE INDEX IF NOT EXISTS idx_salary_payments_period ON salary_payments(period)`
+  );
+
   // Cash Register Sessions table
   await client.execute(`
     CREATE TABLE IF NOT EXISTS cash_register_sessions (

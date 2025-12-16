@@ -17,8 +17,8 @@ export function FinanceSummary() {
 
   if (isLoading) {
     return (
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-6">
-        {[1, 2, 3, 4, 5, 6].map((i) => (
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+        {[1, 2, 3, 4, 5, 6, 7].map((i) => (
           <div
             key={i}
             className="h-24 animate-pulse rounded-lg bg-gray-200"
@@ -44,8 +44,8 @@ export function FinanceSummary() {
         </Link>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-        <div className="rounded-lg bg-white p-6 shadow">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="rounded-lg bg-white p-3 shadow">
           <div className="text-sm font-medium text-gray-500">Total Capital</div>
           <div
             className={`mt-2 text-2xl font-bold ${
@@ -58,14 +58,14 @@ export function FinanceSummary() {
             Investments - Withdrawals
           </div>
         </div>
-        <div className="rounded-lg bg-white p-6 shadow">
+        <div className="rounded-lg bg-white p-3 shadow">
           <div className="text-sm font-medium text-gray-500">Total Revenue</div>
           <div className="mt-2 text-2xl font-bold text-blue-600">
             {formatCurrency(data.total_revenue)}
           </div>
           <div className="mt-1 text-xs text-gray-400">All sales amount</div>
         </div>
-        <div className="rounded-lg bg-white p-6 shadow">
+        <div className="rounded-lg bg-white p-3 shadow">
           <div className="text-sm font-medium text-gray-500">Total Profit</div>
           <div
             className={`mt-2 text-2xl font-bold ${
@@ -76,14 +76,14 @@ export function FinanceSummary() {
           </div>
           <div className="mt-1 text-xs text-gray-400">Revenue - Cost</div>
         </div>
-        <div className="rounded-lg bg-white p-6 shadow">
+        <div className="rounded-lg bg-white p-3 shadow">
           <div className="text-sm font-medium text-gray-500">Other Income</div>
           <div className="mt-2 text-2xl font-bold text-emerald-600">
             {formatCurrency(data.total_other_income || 0)}
           </div>
           <div className="mt-1 text-xs text-gray-400">Misc. income</div>
         </div>
-        <div className="rounded-lg bg-white p-6 shadow">
+        <div className="rounded-lg bg-white p-3 shadow">
           <div className="text-sm font-medium text-gray-500">
             Total Expenses
           </div>
@@ -92,7 +92,14 @@ export function FinanceSummary() {
           </div>
           <div className="mt-1 text-xs text-gray-400">All time expenses</div>
         </div>
-        <div className="rounded-lg bg-white p-6 shadow">
+        <div className="rounded-lg bg-white p-3 shadow">
+          <div className="text-sm font-medium text-gray-500">Salaries Paid</div>
+          <div className="mt-2 text-2xl font-bold text-orange-600">
+            {formatCurrency(data.total_salaries_paid || 0)}
+          </div>
+          <div className="mt-1 text-xs text-gray-400">Employee salaries</div>
+        </div>
+        <div className="rounded-lg bg-white p-3 shadow">
           <div className="text-sm font-medium text-gray-500">Net Balance</div>
           <div
             className={`mt-2 text-2xl font-bold ${
@@ -101,7 +108,9 @@ export function FinanceSummary() {
           >
             {formatCurrency(data.net_balance)}
           </div>
-          <div className="mt-1 text-xs text-gray-400">Capital + Profit + Other - Expenses</div>
+          <div className="mt-1 text-xs text-gray-400">
+            Capital + Profit - Expenses - Salaries
+          </div>
         </div>
       </div>
     </div>

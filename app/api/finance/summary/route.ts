@@ -81,8 +81,25 @@ async function getHandler() {
       (otherIncomeResult.rows[0] as unknown as { total_other_income: number | null })
         .total_other_income || 0;
 
-    // Calculate net balance (capital + profit + other income - expenses)
-    const netBalance = totalCapital + totalProfit + totalOtherIncome - totalExpenses;
+    // Get total salaries paid (salaries + bonuses + advances - deductions)
+    const salariesResult = await client.execute({
+      sql: `
+        SELECT COALESCE(SUM(
+          CASE 
+            WHEN payment_type = 'deduction' THEN -amount
+            ELSE amount
+          END
+        ), 0) as total_salaries_paid
+        FROM salary_payments
+      `,
+    });
+
+    const totalSalariesPaid =
+      (salariesResult.rows[0] as unknown as { total_salaries_paid: number | null })
+        .total_salaries_paid || 0;
+
+    // Calculate net balance (capital + profit + other income - expenses - salaries)
+    const netBalance = totalCapital + totalProfit + totalOtherIncome - totalExpenses - totalSalariesPaid;
 
     return NextResponse.json({
       total_capital: totalCapital,
@@ -90,6 +107,7 @@ async function getHandler() {
       total_expenses: totalExpenses,
       total_profit: totalProfit,
       total_other_income: totalOtherIncome,
+      total_salaries_paid: totalSalariesPaid,
       net_balance: netBalance,
     });
   } catch (error) {

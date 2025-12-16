@@ -33,6 +33,8 @@ export const apiSlice = createApi({
     "Return",
     "CashRegister",
     "OtherIncome",
+    "Employee",
+    "SalaryPayment",
   ],
   endpoints: () => ({}),
 });

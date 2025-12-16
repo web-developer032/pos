@@ -103,12 +103,101 @@ export interface UpdateOtherIncomeRequest {
   notes?: string;
 }
 
+// Employee interfaces
+export interface Employee {
+  id: number;
+  name: string;
+  phone?: string;
+  address?: string;
+  salary_type: "monthly" | "daily";
+  base_salary: number;
+  join_date?: string;
+  status: "active" | "inactive";
+  notes?: string;
+  created_at: string;
+  updated_at: string;
+  total_paid?: number;
+}
+
+export interface EmployeeSummary {
+  total_employees: number;
+  active_employees: number;
+  monthly_salary_total: number;
+  daily_rate_total: number;
+}
+
+export interface CreateEmployeeRequest {
+  name: string;
+  phone?: string;
+  address?: string;
+  salary_type: "monthly" | "daily";
+  base_salary: number;
+  join_date?: string;
+  status?: "active" | "inactive";
+  notes?: string;
+}
+
+export interface UpdateEmployeeRequest {
+  name?: string;
+  phone?: string;
+  address?: string;
+  salary_type?: "monthly" | "daily";
+  base_salary?: number;
+  join_date?: string;
+  status?: "active" | "inactive";
+  notes?: string;
+}
+
+// Salary Payment interfaces
+export interface SalaryPayment {
+  id: number;
+  employee_id: number;
+  amount: number;
+  payment_type: "salary" | "advance" | "bonus" | "deduction";
+  period: string;
+  days_worked?: number;
+  payment_method: "cash" | "bank_transfer" | "check" | "other";
+  notes?: string;
+  user_id: number;
+  created_at: string;
+  employee_name?: string;
+  salary_type?: string;
+  user_name?: string;
+}
+
+export interface SalaryPaymentSummary {
+  total_paid: number;
+  total_advance: number;
+  total_deductions: number;
+  total_bonus: number;
+}
+
+export interface CreateSalaryPaymentRequest {
+  employee_id: number;
+  amount: number;
+  payment_type: "salary" | "advance" | "bonus" | "deduction";
+  period: string;
+  days_worked?: number;
+  payment_method: "cash" | "bank_transfer" | "check" | "other";
+  notes?: string;
+}
+
+export interface UpdateSalaryPaymentRequest {
+  amount?: number;
+  payment_type?: "salary" | "advance" | "bonus" | "deduction";
+  period?: string;
+  days_worked?: number;
+  payment_method?: "cash" | "bank_transfer" | "check" | "other";
+  notes?: string;
+}
+
 export interface FinanceSummary {
   total_capital: number;
   total_revenue: number;
   total_expenses: number;
   total_profit: number;
   total_other_income: number;
+  total_salaries_paid: number;
   net_balance: number;
 }
 
@@ -259,6 +348,116 @@ export const financeApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ["OtherIncome", "Finance"],
     }),
+    // Employee endpoints
+    getEmployees: builder.query<
+      { employees: Employee[]; summary: EmployeeSummary },
+      { status?: string } | void
+    >({
+      query: (params) => {
+        const searchParams = new URLSearchParams();
+        if (params?.status) searchParams.append("status", params.status);
+        const query = searchParams.toString();
+        return `/employees${query ? `?${query}` : ""}`;
+      },
+      providesTags: ["Employee"],
+    }),
+    getEmployee: builder.query<
+      { employee: Employee; recent_payments: SalaryPayment[] },
+      number
+    >({
+      query: (id) => `/employees/${id}`,
+      providesTags: (result, error, id) => [{ type: "Employee", id }],
+    }),
+    createEmployee: builder.mutation<{ employee: Employee }, CreateEmployeeRequest>({
+      query: (body) => ({
+        url: "/employees",
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: ["Employee", "Finance"],
+    }),
+    updateEmployee: builder.mutation<
+      { employee: Employee },
+      { id: number; data: UpdateEmployeeRequest }
+    >({
+      query: ({ id, data }) => ({
+        url: `/employees/${id}`,
+        method: "PUT",
+        body: data,
+      }),
+      invalidatesTags: (result, error, { id }) => [
+        { type: "Employee", id },
+        "Employee",
+        "Finance",
+      ],
+    }),
+    deleteEmployee: builder.mutation<{ message: string }, number>({
+      query: (id) => ({
+        url: `/employees/${id}`,
+        method: "DELETE",
+      }),
+      invalidatesTags: ["Employee", "Finance"],
+    }),
+    // Salary Payment endpoints
+    getSalaryPayments: builder.query<
+      { payments: SalaryPayment[]; summary: SalaryPaymentSummary },
+      {
+        employeeId?: number;
+        startDate?: string;
+        endDate?: string;
+        period?: string;
+      } | void
+    >({
+      query: (params) => {
+        const searchParams = new URLSearchParams();
+        if (params?.employeeId)
+          searchParams.append("employee_id", params.employeeId.toString());
+        if (params?.startDate) searchParams.append("start_date", params.startDate);
+        if (params?.endDate) searchParams.append("end_date", params.endDate);
+        if (params?.period) searchParams.append("period", params.period);
+        const query = searchParams.toString();
+        return `/salary-payments${query ? `?${query}` : ""}`;
+      },
+      providesTags: ["SalaryPayment"],
+    }),
+    getSalaryPayment: builder.query<{ payment: SalaryPayment }, number>({
+      query: (id) => `/salary-payments/${id}`,
+      providesTags: (result, error, id) => [{ type: "SalaryPayment", id }],
+    }),
+    createSalaryPayment: builder.mutation<
+      { payment: SalaryPayment },
+      CreateSalaryPaymentRequest
+    >({
+      query: (body) => ({
+        url: "/salary-payments",
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: ["SalaryPayment", "Employee", "Finance"],
+    }),
+    updateSalaryPayment: builder.mutation<
+      { payment: SalaryPayment },
+      { id: number; data: UpdateSalaryPaymentRequest }
+    >({
+      query: ({ id, data }) => ({
+        url: `/salary-payments/${id}`,
+        method: "PUT",
+        body: data,
+      }),
+      invalidatesTags: (result, error, { id }) => [
+        { type: "SalaryPayment", id },
+        "SalaryPayment",
+        "Employee",
+        "Finance",
+      ],
+    }),
+    deleteSalaryPayment: builder.mutation<{ message: string }, number>({
+      query: (id) => ({
+        url: `/salary-payments/${id}`,
+        method: "DELETE",
+      }),
+      invalidatesTags: ["SalaryPayment", "Employee", "Finance"],
+    }),
   }),
 });
 
@@ -279,5 +478,15 @@ export const {
   useCreateOtherIncomeMutation,
   useUpdateOtherIncomeMutation,
   useDeleteOtherIncomeMutation,
+  useGetEmployeesQuery,
+  useGetEmployeeQuery,
+  useCreateEmployeeMutation,
+  useUpdateEmployeeMutation,
+  useDeleteEmployeeMutation,
+  useGetSalaryPaymentsQuery,
+  useGetSalaryPaymentQuery,
+  useCreateSalaryPaymentMutation,
+  useUpdateSalaryPaymentMutation,
+  useDeleteSalaryPaymentMutation,
 } = financeApi;
 

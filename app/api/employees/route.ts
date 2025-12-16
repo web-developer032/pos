@@ -1,0 +1,94 @@
+import { NextRequest, NextResponse } from "next/server";
+import { requireAuth, AuthRequest } from "@/lib/middleware/auth";
+import client from "@/lib/db";
+import { z } from "zod";
+import { handleApiError, handleValidationError } from "@/lib/utils/apiHelpers";
+import { getCurrentTimestamp } from "@/lib/utils/dateTime";
+
+const employeeSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  phone: z.string().optional(),
+  address: z.string().optional(),
+  salary_type: z.enum(["monthly", "daily"]),
+  base_salary: z.number().min(0, "Base salary must be >= 0"),
+  join_date: z.string().optional(),
+  status: z.enum(["active", "inactive"]).optional(),
+  notes: z.string().optional(),
+});
+
+async function getHandler(req: NextRequest) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const status = searchParams.get("status");
+
+    let sql = `
+      SELECT e.*,
+        (SELECT COALESCE(SUM(CASE WHEN payment_type IN ('salary', 'bonus') THEN amount ELSE -amount END), 0)
+         FROM salary_payments sp WHERE sp.employee_id = e.id) as total_paid
+      FROM employees e
+      WHERE 1=1
+    `;
+    const args: (string | number)[] = [];
+
+    if (status) {
+      sql += " AND e.status = ?";
+      args.push(status);
+    }
+
+    sql += " ORDER BY e.name ASC";
+
+    const result = await client.execute({ sql, args });
+
+    // Get summary
+    const summaryResult = await client.execute(`
+      SELECT 
+        COUNT(*) as total_employees,
+        SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as active_employees,
+        SUM(CASE WHEN salary_type = 'monthly' THEN base_salary ELSE 0 END) as monthly_salary_total,
+        SUM(CASE WHEN salary_type = 'daily' THEN base_salary ELSE 0 END) as daily_rate_total
+      FROM employees
+    `);
+
+    return NextResponse.json({
+      employees: result.rows,
+      summary: summaryResult.rows[0],
+    });
+  } catch (error) {
+    return handleApiError(error, "fetching employees");
+  }
+}
+
+async function postHandler(req: AuthRequest) {
+  try {
+    const body = await req.json();
+    const validated = employeeSchema.parse(body);
+
+    const timestamp = getCurrentTimestamp();
+
+    const result = await client.execute({
+      sql: `INSERT INTO employees (name, phone, address, salary_type, base_salary, join_date, status, notes, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`,
+      args: [
+        validated.name,
+        validated.phone || null,
+        validated.address || null,
+        validated.salary_type,
+        validated.base_salary,
+        validated.join_date || null,
+        validated.status || "active",
+        validated.notes || null,
+        timestamp,
+        timestamp,
+      ],
+    });
+
+    return NextResponse.json({ employee: result.rows[0] }, { status: 201 });
+  } catch (error) {
+    const validationError = handleValidationError(error);
+    if (validationError) return validationError;
+    return handleApiError(error, "creating employee");
+  }
+}
+
+export const GET = requireAuth(getHandler);
+export const POST = requireAuth(postHandler);

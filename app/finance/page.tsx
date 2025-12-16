@@ -6,8 +6,10 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { CapitalList } from "@/components/finance/CapitalList";
 import { ExpenseList } from "@/components/finance/ExpenseList";
 import { OtherIncomeList } from "@/components/finance/OtherIncomeList";
+import { EmployeeList } from "@/components/finance/EmployeeList";
+import { SalaryPaymentList } from "@/components/finance/SalaryPaymentList";
 
-type TabType = "capital" | "expenses" | "other-income";
+type TabType = "capital" | "expenses" | "other-income" | "employees" | "salaries";
 
 export default function FinancePage() {
   const [activeTab, setActiveTab] = useState<TabType>("capital");
@@ -16,6 +18,8 @@ export default function FinancePage() {
     { key: "capital", label: "Capital/Investment" },
     { key: "expenses", label: "Expenses" },
     { key: "other-income", label: "Other Income" },
+    { key: "employees", label: "Employees" },
+    { key: "salaries", label: "Salary Payments" },
   ];
 
   return (
@@ -51,6 +55,8 @@ export default function FinancePage() {
         {activeTab === "capital" && <CapitalList />}
         {activeTab === "expenses" && <ExpenseList />}
         {activeTab === "other-income" && <OtherIncomeList />}
+        {activeTab === "employees" && <EmployeeList />}
+        {activeTab === "salaries" && <SalaryPaymentList />}
       </DashboardLayout>
     </ProtectedRoute>
   );
