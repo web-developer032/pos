@@ -24,6 +24,7 @@ const saleSchema = z.object({
   discount_amount: z.number().min(0).optional(),
   tax_amount: z.number().min(0).optional(),
   payment_method: z.enum(["cash", "card", "digital"]),
+  amount_paid: z.number().min(0).optional(), // For partial/credit payments
 });
 
 async function getHandler(req: NextRequest) {
@@ -137,6 +138,31 @@ async function postHandler(req: AuthRequest) {
     const taxAmount = roundPrice(validated.tax_amount || 0);
     const finalAmount = roundPrice(totalAmount - discountAmount + taxAmount);
 
+    // Handle partial/credit payments
+    const amountPaid =
+      validated.amount_paid !== undefined
+        ? roundPrice(Math.min(validated.amount_paid, finalAmount))
+        : finalAmount;
+    const creditAmount = roundPrice(finalAmount - amountPaid);
+
+    // Determine payment status
+    let paymentStatus = "completed";
+    if (creditAmount > 0) {
+      if (amountPaid === 0) {
+        paymentStatus = "pending"; // Full credit
+      } else {
+        paymentStatus = "partial"; // Partial payment
+      }
+    }
+
+    // Validate: credit sales require a customer
+    if (creditAmount > 0 && !validated.customer_id) {
+      return NextResponse.json(
+        { error: "Customer is required for credit sales" },
+        { status: 400 }
+      );
+    }
+
     // Create sale with explicit timestamp to avoid timezone issues
     // Use getCurrentTimestamp from dateTime utility for consistency
     const { getCurrentTimestamp } = await import("@/lib/utils/dateTime");
@@ -144,8 +170,8 @@ async function postHandler(req: AuthRequest) {
 
     const saleResult = await client.execute({
       sql: `INSERT INTO sales (sale_number, customer_id, user_id, total_amount, 
-            discount_amount, tax_amount, final_amount, payment_method, created_at) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`,
+            discount_amount, tax_amount, final_amount, payment_method, payment_status, created_at) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`,
       args: [
         saleNumber,
         validated.customer_id || null,
@@ -155,6 +181,7 @@ async function postHandler(req: AuthRequest) {
         taxAmount,
         finalAmount,
         validated.payment_method,
+        paymentStatus,
         timestamp,
       ],
     });
@@ -196,14 +223,30 @@ async function postHandler(req: AuthRequest) {
       });
 
       // Update inventory with relationship logic
-      await updateProductQuantity(item.product_id, item.quantity, 'subtract', saleId, 'sale');
+      await updateProductQuantity(
+        item.product_id,
+        item.quantity,
+        "subtract",
+        saleId,
+        "sale"
+      );
     }
 
-    // Create payment record
-    await client.execute({
-      sql: "INSERT INTO payments (sale_id, payment_method, amount) VALUES (?, ?, ?)",
-      args: [saleId, validated.payment_method, roundPrice(finalAmount)],
-    });
+    // Create payment record (only for amount actually paid)
+    if (amountPaid > 0) {
+      await client.execute({
+        sql: "INSERT INTO payments (sale_id, payment_method, amount) VALUES (?, ?, ?)",
+        args: [saleId, validated.payment_method, amountPaid],
+      });
+    }
+
+    // Update customer's credit balance if this is a credit sale
+    if (creditAmount > 0 && validated.customer_id) {
+      await client.execute({
+        sql: "UPDATE customers SET credit_balance = credit_balance + ?, updated_at = ? WHERE id = ?",
+        args: [creditAmount, timestamp, validated.customer_id],
+      });
+    }
 
     // Get full sale details
     const fullSaleResult = await client.execute({

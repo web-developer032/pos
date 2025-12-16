@@ -21,6 +21,7 @@ export const apiSlice = createApi({
     "Category",
     "Supplier",
     "Customer",
+    "CustomerPayment",
     "Sale",
     "PurchaseOrder",
     "Inventory",

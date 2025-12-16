@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useRef, useEffect, useMemo, forwardRef } from "react";
+import { useState, useRef, useEffect, useMemo, forwardRef, ReactNode } from "react";
 import { createPortal } from "react-dom";
 
 interface SearchableSelectProps {
-  label?: string;
+  label?: ReactNode;
   error?: string;
   options: { value: string | number; label: string; searchText?: string }[];
   value?: string | number;

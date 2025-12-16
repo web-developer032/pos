@@ -42,6 +42,7 @@ export interface CreateSaleRequest {
   discount_amount?: number;
   tax_amount?: number;
   payment_method: "cash" | "card" | "digital";
+  amount_paid?: number; // For partial/credit payments
 }
 
 export interface SalesAnalytics {
@@ -128,7 +129,7 @@ export const salesApi = apiSlice.injectEndpoints({
         method: "POST",
         body,
       }),
-      invalidatesTags: ["Sale", "Inventory", "Product", "Report"],
+      invalidatesTags: ["Sale", "Inventory", "Product", "Report", "Customer"],
     }),
     deleteSale: builder.mutation<{ message: string }, number>({
       query: (id) => ({

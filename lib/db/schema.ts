@@ -457,7 +457,43 @@ export async function initializeDatabase() {
     `CREATE INDEX IF NOT EXISTS idx_cash_register_sessions_opened_at ON cash_register_sessions(opened_at)`
   );
 
+  // Customer Payments table (for recording payments against customer credit balance)
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS customer_payments (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      customer_id INTEGER NOT NULL,
+      amount REAL NOT NULL,
+      payment_method TEXT NOT NULL CHECK(payment_method IN ('cash', 'card', 'bank_transfer', 'other')),
+      reference_number TEXT,
+      notes TEXT,
+      user_id INTEGER NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (customer_id) REFERENCES customers(id),
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    )
+  `);
+
+  // Create indexes for customer_payments
+  await client.execute(
+    `CREATE INDEX IF NOT EXISTS idx_customer_payments_customer ON customer_payments(customer_id)`
+  );
+  await client.execute(
+    `CREATE INDEX IF NOT EXISTS idx_customer_payments_date ON customer_payments(created_at)`
+  );
+
   // ============ MIGRATIONS ============
+  // Add credit_balance column to customers if it doesn't exist
+  const customersInfo = await client.execute(`PRAGMA table_info(customers)`);
+  const hasCreditBalance = customersInfo.rows.some(
+    (row) => (row as Record<string, unknown>).name === "credit_balance"
+  );
+  if (!hasCreditBalance) {
+    console.log("[DB] Adding credit_balance column to customers...");
+    await client.execute(
+      `ALTER TABLE customers ADD COLUMN credit_balance REAL DEFAULT 0`
+    );
+  }
+
   // Add retail_price column to purchase_order_items if it doesn't exist
   const poItemsInfo = await client.execute(
     `PRAGMA table_info(purchase_order_items)`

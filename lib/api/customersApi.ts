@@ -8,8 +8,56 @@ export interface Customer {
   phone?: string;
   address?: string;
   loyalty_points: number;
+  credit_balance: number;
   created_at?: string;
   updated_at?: string;
+}
+
+export interface CustomerPayment {
+  id: number;
+  customer_id: number;
+  amount: number;
+  payment_method: string;
+  reference_number?: string;
+  notes?: string;
+  user_id: number;
+  recorded_by?: string;
+  created_at: string;
+}
+
+export interface CreateCustomerPaymentRequest {
+  amount: number;
+  payment_method: "cash" | "card" | "bank_transfer" | "other";
+  reference_number?: string;
+  notes?: string;
+}
+
+export interface UnpaidSale {
+  id: number;
+  sale_number: string;
+  final_amount: number;
+  payment_status: string;
+  payment_method: string;
+  created_at: string;
+  amount_paid: number;
+  amount_due: number;
+}
+
+export interface CustomerCreditSummary {
+  customer: {
+    id: number;
+    name: string;
+    phone: string | null;
+    credit_balance: number;
+  };
+  unpaid_sales: UnpaidSale[];
+  recent_payments: CustomerPayment[];
+  summary: {
+    total_credit_sales: number;
+    total_credit_amount: number;
+    total_payments_received: number;
+    current_balance: number;
+  };
 }
 
 export interface CreateCustomerRequest {
@@ -101,6 +149,48 @@ export const customersApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ["Customer"],
     }),
+    // Credit management endpoints
+    getCustomerCredit: builder.query<CustomerCreditSummary, number>({
+      query: (id) => `/customers/${id}/credit`,
+      providesTags: (result, error, id) => [
+        { type: "Customer", id },
+        { type: "CustomerPayment", id: `customer-${id}` },
+      ],
+    }),
+    getCustomerPayments: builder.query<
+      {
+        payments: CustomerPayment[];
+        total_paid: number;
+        pagination: PaginationInfo;
+      },
+      { customerId: number; page?: number; limit?: number }
+    >({
+      query: ({ customerId, page, limit }) => {
+        const params = new URLSearchParams();
+        if (page) params.append("page", page.toString());
+        if (limit) params.append("limit", limit.toString());
+        const query = params.toString();
+        return `/customers/${customerId}/payments${query ? `?${query}` : ""}`;
+      },
+      providesTags: (result, error, { customerId }) => [
+        { type: "CustomerPayment", id: `customer-${customerId}` },
+      ],
+    }),
+    createCustomerPayment: builder.mutation<
+      { payment: CustomerPayment; new_balance: number; message: string },
+      { customerId: number; data: CreateCustomerPaymentRequest }
+    >({
+      query: ({ customerId, data }) => ({
+        url: `/customers/${customerId}/payments`,
+        method: "POST",
+        body: data,
+      }),
+      invalidatesTags: (result, error, { customerId }) => [
+        { type: "Customer", id: customerId },
+        { type: "CustomerPayment", id: `customer-${customerId}` },
+        "Customer", // Refresh customer list to update balance column
+      ],
+    }),
   }),
 });
 
@@ -112,4 +202,7 @@ export const {
   useDeleteCustomerMutation,
   useImportCustomersMutation,
   useDeleteAllCustomersMutation,
+  useGetCustomerCreditQuery,
+  useGetCustomerPaymentsQuery,
+  useCreateCustomerPaymentMutation,
 } = customersApi;

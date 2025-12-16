@@ -1,24 +1,30 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   useGetCustomersQuery,
   useDeleteCustomerMutation,
   useDeleteAllCustomersMutation,
   useImportCustomersMutation,
   CreateCustomerRequest,
+  Customer,
 } from "@/lib/api/customersApi";
 import { useListManagement } from "@/lib/hooks/useListManagement";
+import { useCurrency } from "@/lib/hooks/useCurrency";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
 import { Pagination } from "@/components/ui/Pagination";
 import { CustomerForm } from "./CustomerForm";
+import { CustomerCreditDetail } from "./CustomerCreditDetail";
 import { ImportExport } from "@/components/common/ImportExport";
 import toast from "react-hot-toast";
 
 export function CustomerList() {
   const [isDeletingAll, setIsDeletingAll] = useState(false);
+  const [viewingCreditCustomer, setViewingCreditCustomer] =
+    useState<Customer | null>(null);
+  const { format: formatCurrency } = useCurrency();
 
   // Use list management hook
   const {
@@ -46,6 +52,19 @@ export function CustomerList() {
   const [deleteCustomer] = useDeleteCustomerMutation();
   const [deleteAllCustomers] = useDeleteAllCustomersMutation();
   const [importCustomers] = useImportCustomersMutation();
+
+  // Calculate total receivables
+  const totalReceivables = useMemo(() => {
+    return (
+      data?.customers.reduce((sum, c) => sum + (c.credit_balance || 0), 0) || 0
+    );
+  }, [data?.customers]);
+
+  const customersWithCredit = useMemo(() => {
+    return (
+      data?.customers.filter((c) => (c.credit_balance || 0) > 0).length || 0
+    );
+  }, [data?.customers]);
 
   const handleDelete = async (id: number) => {
     if (deletingId === id) return; // Prevent double click
@@ -150,6 +169,24 @@ export function CustomerList() {
 
   return (
     <div>
+      {/* Summary Cards */}
+      {totalReceivables > 0 && (
+        <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+            <p className="text-sm font-medium text-amber-600">
+              Total Receivables
+            </p>
+            <p className="mt-1 text-2xl font-bold text-amber-700">
+              {formatCurrency(totalReceivables)}
+            </p>
+            <p className="mt-1 text-xs text-amber-600">
+              From {customersWithCredit} customer
+              {customersWithCredit !== 1 ? "s" : ""}
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="text-xl font-semibold">All Customers</h2>
         <div className="flex flex-col gap-2 sm:flex-row">
@@ -210,8 +247,11 @@ export function CustomerList() {
               <th className="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 sm:px-6">
                 Phone
               </th>
-              <th className="hidden px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 sm:table-cell sm:px-6">
-                Loyalty Points
+              <th className="px-3 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 sm:px-6">
+                Balance Owed
+              </th>
+              <th className="hidden px-3 py-3 text-center text-xs font-medium uppercase tracking-wider text-gray-500 sm:table-cell sm:px-6">
+                Loyalty
               </th>
               <th className="px-3 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 sm:px-6">
                 Actions
@@ -220,7 +260,12 @@ export function CustomerList() {
           </thead>
           <tbody className="divide-y divide-gray-200 bg-white">
             {data?.customers.map((customer, index) => (
-              <tr key={customer.id}>
+              <tr
+                key={customer.id}
+                className={
+                  (customer.credit_balance || 0) > 0 ? "bg-amber-50" : ""
+                }
+              >
                 <td className="whitespace-nowrap px-3 py-4 text-center text-sm text-gray-500 sm:px-4">
                   {(page - 1) * limit + index + 1}
                 </td>
@@ -233,11 +278,31 @@ export function CustomerList() {
                 <td className="px-3 py-4 text-sm text-gray-500 sm:px-6">
                   {customer.phone || "-"}
                 </td>
-                <td className="hidden px-3 py-4 text-sm sm:table-cell sm:px-6">
+                <td className="whitespace-nowrap px-3 py-4 text-right text-sm sm:px-6">
+                  {(customer.credit_balance || 0) > 0 ? (
+                    <button
+                      onClick={() => setViewingCreditCustomer(customer)}
+                      className="font-semibold text-amber-600 hover:text-amber-800 hover:underline"
+                    >
+                      {formatCurrency(customer.credit_balance || 0)}
+                    </button>
+                  ) : (
+                    <span className="text-gray-400">—</span>
+                  )}
+                </td>
+                <td className="hidden px-3 py-4 text-center text-sm sm:table-cell sm:px-6">
                   {customer.loyalty_points}
                 </td>
                 <td className="whitespace-nowrap px-3 py-4 text-right text-sm font-medium sm:px-6">
-                  <div className="flex flex-col gap-1 sm:flex-row sm:justify-end">
+                  <div className="flex flex-col gap-1 sm:flex-row sm:justify-end sm:gap-2">
+                    {(customer.credit_balance || 0) > 0 && (
+                      <button
+                        onClick={() => setViewingCreditCustomer(customer)}
+                        className="text-amber-600 hover:text-amber-800"
+                      >
+                        Credit
+                      </button>
+                    )}
                     <button
                       onClick={() => openEditModal(customer.id)}
                       className="text-indigo-600 hover:text-indigo-900"
@@ -284,6 +349,23 @@ export function CustomerList() {
             refetch();
           }}
         />
+      </Modal>
+
+      {/* Credit Detail Modal */}
+      <Modal
+        isOpen={!!viewingCreditCustomer}
+        onClose={() => setViewingCreditCustomer(null)}
+        title={`Credit Details - ${viewingCreditCustomer?.name || ""}`}
+        size="lg"
+      >
+        {viewingCreditCustomer && (
+          <CustomerCreditDetail
+            customerId={viewingCreditCustomer.id}
+            onPaymentSuccess={() => {
+              refetch();
+            }}
+          />
+        )}
       </Modal>
     </div>
   );
