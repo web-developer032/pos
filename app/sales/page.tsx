@@ -12,13 +12,31 @@ import { useCurrency } from "@/lib/hooks/useCurrency";
 import { Pagination } from "@/components/ui/Pagination";
 import { Button } from "@/components/ui/Button";
 import { formatDateTime } from "@/lib/utils/dateTime";
+import {
+  DateRangeSelector,
+  type DateRange,
+} from "@/components/common/DateRangeSelector";
+import { AllTimeSummaryCards } from "@/components/common/AllTimeSummaryCards";
+import { PeriodStatsCards } from "@/components/common/PeriodStatsCards";
 import Link from "next/link";
 import toast from "react-hot-toast";
 
 export default function SalesPage() {
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(25);
-  const { data, isLoading, refetch } = useGetSalesQuery({ page, limit });
+  const [dateRange, setDateRange] = useState<DateRange>({
+    startDate: "",
+    endDate: "",
+    type: "month",
+  });
+
+  const { data, isLoading, refetch } = useGetSalesQuery({
+    page,
+    limit,
+    startDate: dateRange.startDate,
+    endDate: dateRange.endDate,
+  });
+
   const [deleteSale] = useDeleteSaleMutation();
   const [deleteAllSales] = useDeleteAllSalesMutation();
   const [isDeletingAll, setIsDeletingAll] = useState(false);
@@ -71,15 +89,10 @@ export default function SalesPage() {
     }
   };
 
-  if (isLoading) {
-    return (
-      <ProtectedRoute>
-        <DashboardLayout>
-          <div>Loading...</div>
-        </DashboardLayout>
-      </ProtectedRoute>
-    );
-  }
+  const handleDateRangeChange = (newRange: DateRange) => {
+    setDateRange(newRange);
+    setPage(1); // Reset to first page when date range changes
+  };
 
   return (
     <ProtectedRoute>
@@ -101,6 +114,25 @@ export default function SalesPage() {
           </Button>
         </div>
 
+        {/* All Time Summary */}
+        <AllTimeSummaryCards className="mb-6" compact />
+
+        {/* Date Range Filter */}
+        <div className="mb-6">
+          <DateRangeSelector value={dateRange} onChange={handleDateRangeChange} />
+        </div>
+
+        {/* Period Summary Cards */}
+        <PeriodStatsCards
+          dateRange={dateRange}
+          showExpenses={false}
+          showProfitMargin={true}
+          showAverageOrder={false}
+          compact
+          className="mb-6"
+        />
+
+        {/* Sales Table */}
         <div className="overflow-x-auto rounded-lg bg-white shadow">
           <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3 sm:px-6">
             <span className="text-sm text-gray-500">
@@ -115,97 +147,104 @@ export default function SalesPage() {
               sales
             </span>
           </div>
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-3 py-3 text-center text-xs font-medium uppercase tracking-wider text-gray-500 sm:px-4">
-                  #
-                </th>
-                <th className="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 sm:px-6">
-                  Sale Number
-                </th>
-                <th className="hidden px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 sm:table-cell sm:px-6">
-                  Customer
-                </th>
-                <th className="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 sm:px-6">
-                  Date
-                </th>
-                <th className="hidden px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 sm:table-cell sm:px-6">
-                  Payment Method
-                </th>
-                <th className="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 sm:px-6">
-                  Total
-                </th>
-                <th className="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 sm:px-6">
-                  Profit
-                </th>
-                <th className="px-3 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 sm:px-6">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200 bg-white">
-              {data?.sales.map((sale, index) => (
-                <tr key={sale.id}>
-                  <td className="whitespace-nowrap px-3 py-4 text-center text-sm text-gray-500 sm:px-4">
-                    {(page - 1) * limit + index + 1}
-                  </td>
-                  <td className="whitespace-nowrap px-3 py-4 text-sm font-medium sm:px-6">
-                    {sale.sale_number}
-                  </td>
-                  <td className="hidden px-3 py-4 text-sm text-gray-500 sm:table-cell sm:px-6">
-                    {sale.customer_name || "Walk-in"}
-                  </td>
-                  <td className="px-3 py-4 text-sm text-gray-500 sm:px-6">
-                    {formatDateTime(sale.created_at)}
-                  </td>
-                  <td className="hidden px-3 py-4 text-sm capitalize text-gray-500 sm:table-cell sm:px-6">
-                    {sale.payment_method}
-                  </td>
-                  <td className="px-3 py-4 text-sm font-semibold sm:px-6">
-                    {formatCurrency(sale.final_amount)}
-                  </td>
-                  <td className="px-3 py-4 text-sm font-semibold text-green-600 sm:px-6">
-                    {formatCurrency(sale.total_profit || 0)}
-                  </td>
-                  <td className="whitespace-nowrap px-3 py-4 text-right text-sm font-medium sm:px-6">
-                    <div className="flex items-center justify-end gap-2">
-                      <Link
-                        href={`/sales/${sale.id}`}
-                        className="text-indigo-600 hover:text-indigo-900"
-                      >
-                        View
-                      </Link>
-                      <button
-                        onClick={() => handleDelete(sale.id, sale.sale_number)}
-                        disabled={deletingId === sale.id}
-                        className="text-red-600 hover:text-red-900 disabled:opacity-50"
-                        title="Delete sale"
-                      >
-                        {deletingId === sale.id ? (
-                          "Deleting..."
-                        ) : (
-                          <svg
-                            className="h-4 w-4"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                            />
-                          </svg>
-                        )}
-                      </button>
-                    </div>
-                  </td>
+
+          {isLoading ? (
+            <div className="flex h-64 items-center justify-center">
+              <div className="text-gray-500">Loading sales...</div>
+            </div>
+          ) : (
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-3 py-3 text-center text-xs font-medium uppercase tracking-wider text-gray-500 sm:px-4">
+                    #
+                  </th>
+                  <th className="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 sm:px-6">
+                    Sale Number
+                  </th>
+                  <th className="hidden px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 sm:table-cell sm:px-6">
+                    Customer
+                  </th>
+                  <th className="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 sm:px-6">
+                    Date
+                  </th>
+                  <th className="hidden px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 sm:table-cell sm:px-6">
+                    Payment Method
+                  </th>
+                  <th className="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 sm:px-6">
+                    Total
+                  </th>
+                  <th className="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 sm:px-6">
+                    Profit
+                  </th>
+                  <th className="px-3 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 sm:px-6">
+                    Actions
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-gray-200 bg-white">
+                {data?.sales.map((sale, index) => (
+                  <tr key={sale.id}>
+                    <td className="whitespace-nowrap px-3 py-4 text-center text-sm text-gray-500 sm:px-4">
+                      {(page - 1) * limit + index + 1}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-4 text-sm font-medium sm:px-6">
+                      {sale.sale_number}
+                    </td>
+                    <td className="hidden px-3 py-4 text-sm text-gray-500 sm:table-cell sm:px-6">
+                      {sale.customer_name || "Walk-in"}
+                    </td>
+                    <td className="px-3 py-4 text-sm text-gray-500 sm:px-6">
+                      {formatDateTime(sale.created_at)}
+                    </td>
+                    <td className="hidden px-3 py-4 text-sm capitalize text-gray-500 sm:table-cell sm:px-6">
+                      {sale.payment_method}
+                    </td>
+                    <td className="px-3 py-4 text-sm font-semibold sm:px-6">
+                      {formatCurrency(sale.final_amount)}
+                    </td>
+                    <td className="px-3 py-4 text-sm font-semibold text-green-600 sm:px-6">
+                      {formatCurrency(sale.total_profit || 0)}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-4 text-right text-sm font-medium sm:px-6">
+                      <div className="flex items-center justify-end gap-2">
+                        <Link
+                          href={`/sales/${sale.id}`}
+                          className="text-indigo-600 hover:text-indigo-900"
+                        >
+                          View
+                        </Link>
+                        <button
+                          onClick={() => handleDelete(sale.id, sale.sale_number)}
+                          disabled={deletingId === sale.id}
+                          className="text-red-600 hover:text-red-900 disabled:opacity-50"
+                          title="Delete sale"
+                        >
+                          {deletingId === sale.id ? (
+                            "..."
+                          ) : (
+                            <svg
+                              className="h-4 w-4"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                              />
+                            </svg>
+                          )}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
 
         {data?.pagination && (
