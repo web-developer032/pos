@@ -44,14 +44,26 @@ async function getHandler() {
       (revenueResult.rows[0] as unknown as { total_revenue: number | null })
         .total_revenue || 0;
 
-    // Get total profit from sales (selling price - cost price)
+    // Get total profit from sales (selling price - cost price at time of sale)
+    // Uses si.cost_price which is stored when the sale is made, not current product price
     const profitResult = await client.execute({
       sql: `
         SELECT 
-          COALESCE(SUM(si.quantity * (si.unit_price - COALESCE(p.cost_price, 0))), 0) as total_profit
+          COALESCE(
+            SUM((si.unit_price - si.cost_price) * si.quantity)
+            -
+            COALESCE(
+              (SELECT SUM((ri.unit_price - si2.cost_price) * ri.quantity)
+               FROM return_items ri
+               JOIN returns r ON ri.return_id = r.id
+               JOIN sale_items si2 ON ri.sale_item_id = si2.id
+               WHERE r.sale_id = s.id),
+              0
+            ),
+            0
+          ) as total_profit
         FROM sale_items si
         JOIN sales s ON si.sale_id = s.id
-        LEFT JOIN products p ON si.product_id = p.id
         WHERE s.payment_status != 'voided'
       `,
     });
