@@ -1,7 +1,12 @@
 "use client";
 
 import { memo } from "react";
-import { Controller, Control, UseFormRegister, FieldErrors } from "react-hook-form";
+import {
+  Controller,
+  Control,
+  UseFormRegister,
+  FieldErrors,
+} from "react-hook-form";
 import { Select } from "@/components/ui/Select";
 import { Input } from "@/components/ui/Input";
 import { useCurrency } from "@/lib/hooks/useCurrency";
@@ -58,6 +63,7 @@ export const OrderSummary = memo(function OrderSummary({
           render={({ field }) => (
             <Select
               label="Discount"
+              direction="column"
               options={[
                 { value: "", label: "No Discount" },
                 { value: "percentage", label: "Percentage (%)" },
@@ -65,7 +71,9 @@ export const OrderSummary = memo(function OrderSummary({
               ]}
               value={field.value || ""}
               onChange={(e) => {
-                field.onChange(e.target.value === "" ? undefined : e.target.value);
+                field.onChange(
+                  e.target.value === "" ? undefined : e.target.value
+                );
                 onDiscountTypeChange(e.target.value);
               }}
               error={errors.discount_type?.message}
@@ -74,7 +82,9 @@ export const OrderSummary = memo(function OrderSummary({
         />
         {discountType && (
           <Input
-            label={discountType === "percentage" ? "Discount %" : "Discount Amount"}
+            label={
+              discountType === "percentage" ? "Discount %" : "Discount Amount"
+            }
             type="number"
             step="0.01"
             min="0"
@@ -85,7 +95,11 @@ export const OrderSummary = memo(function OrderSummary({
                 if (discountType && (!val || val <= 0)) {
                   return "Required";
                 }
-                if (discountType === "percentage" && val !== undefined && val > 100) {
+                if (
+                  discountType === "percentage" &&
+                  val !== undefined &&
+                  val > 100
+                ) {
                   return "Max 100%";
                 }
                 return true;
@@ -104,6 +118,7 @@ export const OrderSummary = memo(function OrderSummary({
           render={({ field }) => (
             <Select
               label="Tax"
+              direction="column"
               options={[
                 { value: "", label: "No Tax" },
                 { value: "percentage", label: "Percentage (%)" },
@@ -111,7 +126,9 @@ export const OrderSummary = memo(function OrderSummary({
               ]}
               value={field.value || ""}
               onChange={(e) => {
-                field.onChange(e.target.value === "" ? undefined : e.target.value);
+                field.onChange(
+                  e.target.value === "" ? undefined : e.target.value
+                );
                 onTaxTypeChange(e.target.value);
               }}
               error={errors.tax_type?.message}
@@ -131,7 +148,11 @@ export const OrderSummary = memo(function OrderSummary({
                 if (taxType && (!val || val <= 0)) {
                   return "Required";
                 }
-                if (taxType === "percentage" && val !== undefined && val > 100) {
+                if (
+                  taxType === "percentage" &&
+                  val !== undefined &&
+                  val > 100
+                ) {
                   return "Max 100%";
                 }
                 return true;
@@ -146,36 +167,55 @@ export const OrderSummary = memo(function OrderSummary({
       <div className="space-y-2 border-t border-gray-200 pt-4">
         <div className="flex items-center justify-between text-sm">
           <span className="text-gray-600">Subtotal</span>
-          <span className="font-medium text-gray-900">{formatCurrency(subtotal)}</span>
+          <span className="font-medium text-gray-900">
+            {formatCurrency(subtotal)}
+          </span>
         </div>
 
-        {discountType && discountValue && !isNaN(discountValue) && discountValue > 0 && (
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-red-600">
-              Discount{" "}
-              <span className="text-gray-500">
-                ({discountType === "percentage" ? `${discountValue}%` : formatCurrency(discountValue)})
+        {discountType &&
+          discountValue &&
+          !isNaN(discountValue) &&
+          discountValue > 0 && (
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-red-600">
+                Discount{" "}
+                <span className="text-gray-500">
+                  (
+                  {discountType === "percentage"
+                    ? `${discountValue}%`
+                    : formatCurrency(discountValue)}
+                  )
+                </span>
               </span>
-            </span>
-            <span className="font-medium text-red-600">-{formatCurrency(discountAmount)}</span>
-          </div>
-        )}
+              <span className="font-medium text-red-600">
+                -{formatCurrency(discountAmount)}
+              </span>
+            </div>
+          )}
 
         {taxType && taxValue && !isNaN(taxValue) && taxValue > 0 && (
           <div className="flex items-center justify-between text-sm">
             <span className="text-green-600">
               Tax{" "}
               <span className="text-gray-500">
-                ({taxType === "percentage" ? `${taxValue}%` : formatCurrency(taxValue)})
+                (
+                {taxType === "percentage"
+                  ? `${taxValue}%`
+                  : formatCurrency(taxValue)}
+                )
               </span>
             </span>
-            <span className="font-medium text-green-600">+{formatCurrency(taxAmount)}</span>
+            <span className="font-medium text-green-600">
+              +{formatCurrency(taxAmount)}
+            </span>
           </div>
         )}
 
         <div className="flex items-center justify-between border-t border-gray-300 pt-2">
           <span className="text-base font-semibold text-gray-900">Total</span>
-          <span className="text-lg font-bold text-indigo-600">{formatCurrency(total)}</span>
+          <span className="text-lg font-bold text-indigo-600">
+            {formatCurrency(total)}
+          </span>
         </div>
       </div>
     </div>

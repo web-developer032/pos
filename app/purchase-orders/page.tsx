@@ -379,7 +379,7 @@ export default function PurchaseOrdersPage() {
             setEditingPOId(null);
           }}
           title={editingPOId ? "Edit Purchase Order" : "Create Purchase Order"}
-          size="lg"
+          size="2xl"
         >
           <PurchaseOrderForm
             purchaseOrderId={editingPOId || undefined}

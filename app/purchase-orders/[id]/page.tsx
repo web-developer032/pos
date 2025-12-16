@@ -517,7 +517,7 @@ export default function PurchaseOrderDetailPage() {
           isOpen={isEditModalOpen}
           onClose={() => setIsEditModalOpen(false)}
           title="Edit Purchase Order"
-          size="lg"
+          size="2xl"
         >
           <PurchaseOrderForm
             purchaseOrderId={poId}

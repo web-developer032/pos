@@ -82,10 +82,6 @@ export const PurchaseOrderItem = memo(
       const hasTax = taxFactor > 1;
       const hasAdjustment = hasDiscount || hasTax;
 
-      // Calculate actual amounts per unit
-      const discountAmountPerUnit = (unitCost || 0) - costAfterDiscount;
-      const taxAmountPerUnit = adjustedCost - costAfterDiscount;
-
       // Calculate profit based on adjusted cost
       const profit = (retailPrice || 0) - adjustedCost;
       const profitMargin = adjustedCost > 0 ? (profit / adjustedCost) * 100 : 0;
@@ -123,10 +119,9 @@ export const PurchaseOrderItem = memo(
             )}
           </div>
 
-          {/* Fields Grid */}
-          <div className="grid grid-cols-2 items-start gap-3 sm:grid-cols-6">
-            {/* Product Select - full width on mobile, 2 cols on desktop */}
-            <div className="col-span-2">
+          {/* Row 1: Product Select | Product Name */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
               <SearchableSelect
                 ref={ref}
                 label="Product"
@@ -153,138 +148,128 @@ export const PurchaseOrderItem = memo(
                 + New Product
               </button>
             </div>
-
-            {/* Product Name - editable */}
-            <div className="col-span-2">
+            <div>
               <Input
-                label="Name"
-                placeholder="Product name"
+                label="Updated Name"
+                placeholder="Product name (editable)"
                 {...register(`items.${index}.product_name`)}
                 error={errors?.product_name?.message}
               />
             </div>
+          </div>
 
-            {/* Quantity */}
-            <div className="col-span-1">
-              <Input
-                label="Qty"
-                type="number"
-                step="0.001"
-                min="0"
-                {...register(`items.${index}.quantity`, {
-                  valueAsNumber: true,
-                })}
-                error={errors?.quantity?.message}
-              />
-            </div>
+          {/* Row 2: Qty | Cost | Retail */}
+          <div className="mt-3 grid grid-cols-3 gap-3">
+            <Input
+              label="Qty"
+              type="number"
+              step="0.001"
+              min="0"
+              {...register(`items.${index}.quantity`, {
+                valueAsNumber: true,
+              })}
+              error={errors?.quantity?.message}
+            />
+            <Input
+              label="Cost"
+              type="number"
+              step="0.001"
+              min="0"
+              {...register(`items.${index}.unit_cost`, {
+                valueAsNumber: true,
+              })}
+              error={errors?.unit_cost?.message}
+            />
+            <Input
+              label="Retail"
+              type="number"
+              step="0.001"
+              min="0"
+              {...register(`items.${index}.retail_price`, {
+                valueAsNumber: true,
+              })}
+              error={errors?.retail_price?.message}
+            />
+          </div>
 
-            {/* Cost Price */}
-            <div className="col-span-1">
-              <Input
-                label="Cost"
-                type="number"
-                step="0.001"
-                min="0"
-                {...register(`items.${index}.unit_cost`, {
-                  valueAsNumber: true,
-                })}
-                error={errors?.unit_cost?.message}
-              />
-            </div>
-
-            {/* Retail Price */}
-            <div className="col-span-1">
-              <Input
-                label="Retail"
-                type="number"
-                step="0.001"
-                min="0"
-                {...register(`items.${index}.retail_price`, {
-                  valueAsNumber: true,
-                })}
-                error={errors?.retail_price?.message}
-              />
-            </div>
-
+          {/* Row 3: Subtotal, Final Cost, Profit, Margin */}
+          <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
             {/* Subtotal */}
-            <div className="col-span-1 flex items-end">
-              <div className="w-full rounded-md bg-gray-50 px-3 py-2">
-                <span className="block text-xs text-gray-500">Subtotal</span>
+            <div className="flex flex-col items-center justify-center rounded-md bg-gray-50 px-3 py-2">
+              <span className="block text-xs text-gray-500">Subtotal</span>
+              <span
+                className={`block text-sm font-semibold ${hasValues ? "text-gray-900" : "text-gray-400"}`}
+              >
+                {hasValues ? formatCurrency(subtotal) : "—"}
+              </span>
+            </div>
+
+            {/* Final Cost (after discount and tax) */}
+            {hasAdjustment && unitCost > 0 ? (
+              <div className="rounded-md border border-gray-200 bg-gradient-to-br from-gray-50 to-white px-3 py-2 shadow-sm">
+                <div className="flex flex-col items-center justify-between">
+                  <span className="text-xs text-gray-500">Final Cost/Unit</span>{" "}
+                  <span className="text-sm font-bold text-indigo-700">
+                    {formatCurrency(adjustedCost)}
+                  </span>
+                </div>
+                <div className="mt-1 flex flex-wrap items-center justify-center gap-1">
+                  {hasDiscount && (
+                    <span className="rounded bg-red-50 px-1.5 py-0.5 text-xs text-red-600">
+                      -{((1 - discountFactor) * 100).toFixed(0)}% disc
+                    </span>
+                  )}
+                  {hasTax && (
+                    <span className="rounded bg-green-50 px-1.5 py-0.5 text-xs text-green-600">
+                      +{((taxFactor - 1) * 100).toFixed(0)}% tax
+                    </span>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-md bg-gray-50 px-3 py-2">
+                <span className="block text-xs text-gray-500">Final Cost</span>
                 <span
                   className={`block text-sm font-semibold ${hasValues ? "text-gray-900" : "text-gray-400"}`}
                 >
-                  {hasValues ? formatCurrency(subtotal) : "—"}
+                  {hasValues ? formatCurrency(unitCost) : "—"}
                 </span>
               </div>
+            )}
+
+            {/* Profit Display */}
+            <div className="flex flex-col items-center justify-center rounded-md bg-gray-50 px-3 py-2">
+              <span className="block text-xs text-gray-500">Profit/Unit</span>
+              <span
+                className={`block text-sm font-semibold ${
+                  hasValues && retailPrice > 0
+                    ? profit >= 0
+                      ? "text-green-600"
+                      : "text-red-600"
+                    : "text-gray-400"
+                }`}
+              >
+                {hasValues && retailPrice > 0 ? formatCurrency(profit) : "—"}
+              </span>
             </div>
 
-            {/* Summary Row - Adjusted Cost & Profit (only show when discount/tax or values exist) */}
-            {(hasAdjustment || (hasValues && retailPrice > 0)) && (
-              <>
-                {/* Adjusted Cost (after discount and tax) */}
-                {hasAdjustment && unitCost > 0 && (
-                  <div className="col-span-2 rounded-md border border-gray-200 bg-gradient-to-br from-gray-50 to-white px-3 py-2 shadow-sm">
-                    <div className="flex items-center justify-between gap-4">
-                      <span className="text-xs font-medium text-gray-500">
-                        Final Cost/Unit
-                      </span>
-                      <span className="text-sm font-bold text-indigo-700">
-                        {formatCurrency(adjustedCost)}
-                      </span>
-                    </div>
-                    <div className="mt-2 space-y-1">
-                      {hasDiscount && (
-                        <div className="flex items-center justify-between rounded bg-red-50 px-2 py-1">
-                          <span className="text-xs text-red-600">
-                            Discount ({((1 - discountFactor) * 100).toFixed(1)}
-                            %)
-                          </span>
-                          <span className="text-xs font-semibold text-red-700">
-                            -{formatCurrency(discountAmountPerUnit)}
-                          </span>
-                        </div>
-                      )}
-                      {hasTax && (
-                        <div className="flex items-center justify-between rounded bg-green-50 px-2 py-1">
-                          <span className="text-xs text-green-600">
-                            Tax ({((taxFactor - 1) * 100).toFixed(1)}%)
-                          </span>
-                          <span className="text-xs font-semibold text-green-700">
-                            +{formatCurrency(taxAmountPerUnit)}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* Profit Display */}
-                {hasValues && retailPrice > 0 && (
-                  <>
-                    <div className="rounded-md bg-gray-50 px-3 py-2">
-                      <span className="block text-xs text-gray-500">
-                        Profit/Unit
-                      </span>
-                      <span
-                        className={`block text-sm font-semibold ${profit >= 0 ? "text-green-600" : "text-red-600"}`}
-                      >
-                        {formatCurrency(profit)}
-                      </span>
-                    </div>
-                    <div className="rounded-md bg-gray-50 px-3 py-2">
-                      <span className="block text-xs text-gray-500">
-                        Margin
-                      </span>
-                      <span
-                        className={`block text-sm font-semibold ${profitMargin >= 0 ? "text-green-600" : "text-red-600"}`}
-                      >
-                        {profitMargin.toFixed(1)}%
-                      </span>
-                    </div>
-                  </>
-                )}
-              </>
-            )}
+            {/* Margin Display */}
+            <div className="flex flex-col items-center justify-center rounded-md bg-gray-50 px-3 py-2">
+              <span className="block text-xs text-gray-500">Margin</span>
+              <span
+                className={`block text-sm font-semibold ${
+                  hasValues && retailPrice > 0
+                    ? profitMargin >= 0
+                      ? "text-green-600"
+                      : "text-red-600"
+                    : "text-gray-400"
+                }`}
+              >
+                {hasValues && retailPrice > 0
+                  ? `${profitMargin.toFixed(1)}%`
+                  : "—"}
+              </span>
+            </div>
           </div>
         </div>
       );
