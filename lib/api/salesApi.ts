@@ -15,6 +15,7 @@ export interface Sale {
   created_at: string;
   user_name?: string;
   customer_name?: string;
+  customer_phone?: string;
   total_profit?: number;
 }
 

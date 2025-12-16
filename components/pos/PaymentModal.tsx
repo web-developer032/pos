@@ -5,6 +5,7 @@ import { useAppSelector, useAppDispatch } from "@/lib/hooks";
 import { useCurrency } from "@/lib/hooks/useCurrency";
 import { useCreateSaleMutation } from "@/lib/api/salesApi";
 import { useGetCustomersQuery } from "@/lib/api/customersApi";
+import { CustomerForm } from "@/components/customers/CustomerForm";
 import { roundPrice } from "@/lib/utils/formHelpers";
 import type { Sale, SaleItem } from "@/lib/api/salesApi";
 import { clearCart, setCustomer } from "@/lib/slices/cartSlice";
@@ -44,12 +45,14 @@ export function PaymentModal({
   const receiptRef = useRef<ReceiptRef>(null);
   const { format: formatCurrency } = useCurrency();
 
-  // Customer search
+  // Customer search and add
   const [customerSearch, setCustomerSearch] = useState("");
-  const { data: customersData } = useGetCustomersQuery({
-    search: customerSearch || undefined,
-    limit: 50,
-  });
+  const [showCustomerModal, setShowCustomerModal] = useState(false);
+  const { data: customersData, refetch: refetchCustomers } =
+    useGetCustomersQuery({
+      search: customerSearch || undefined,
+      limit: 50,
+    });
 
   const subtotal = roundPrice(
     items.reduce((sum, item) => sum + item.price * item.quantity, 0)
@@ -205,6 +208,13 @@ export function PaymentModal({
               placeholder="Select or search customer..."
               searchPlaceholder="Type name or phone..."
             />
+            <button
+              type="button"
+              onClick={() => setShowCustomerModal(true)}
+              className="mt-1 text-xs text-indigo-600 hover:text-indigo-800"
+            >
+              + Add New Customer
+            </button>
             {selectedCustomer && selectedCustomer.credit_balance > 0 && (
               <p className="mt-1 text-xs text-amber-600">
                 This customer already owes{" "}
@@ -315,6 +325,26 @@ export function PaymentModal({
             </Button>
           </div>
         </div>
+      </Modal>
+
+      {/* Add Customer Modal */}
+      <Modal
+        isOpen={showCustomerModal}
+        onClose={() => setShowCustomerModal(false)}
+        title="Add New Customer"
+      >
+        <CustomerForm
+          onCustomerCreated={(customer) => {
+            refetchCustomers();
+            dispatch(setCustomer(customer.id));
+            setShowCustomerModal(false);
+            toast.success(`${customer.name} created and selected`);
+          }}
+          onSuccess={() => {
+            // Also close modal on success (for updates)
+            setShowCustomerModal(false);
+          }}
+        />
       </Modal>
 
       {/* Receipt Modal */}

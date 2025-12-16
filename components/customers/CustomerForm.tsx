@@ -28,9 +28,10 @@ type CustomerFormData = z.infer<typeof customerSchema>;
 interface CustomerFormProps {
   customerId?: number | null;
   onSuccess?: () => void;
+  onCustomerCreated?: (customer: { id: number; name: string }) => void;
 }
 
-export function CustomerForm({ customerId, onSuccess }: CustomerFormProps) {
+export function CustomerForm({ customerId, onSuccess, onCustomerCreated }: CustomerFormProps) {
   const { data: customerData } = useGetCustomerQuery(customerId!, {
     skip: !customerId,
   });
@@ -84,7 +85,15 @@ export function CustomerForm({ customerId, onSuccess }: CustomerFormProps) {
           data: submitData,
         }).unwrap();
       } else {
-        return await createCustomer(submitData).unwrap();
+        const result = await createCustomer(submitData).unwrap();
+        // Call onCustomerCreated for newly created customers
+        if (result.customer && onCustomerCreated) {
+          onCustomerCreated({
+            id: result.customer.id,
+            name: result.customer.name,
+          });
+        }
+        return result;
       }
     },
     onSuccess: () => {

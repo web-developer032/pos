@@ -39,6 +39,7 @@ async function getHandler(req: NextRequest) {
       SELECT s.*, 
              u.username as user_name, 
              c.name as customer_name,
+             c.phone as customer_phone,
              COALESCE(
                (SELECT SUM((si.unit_price - si.cost_price) * si.quantity)
                 FROM sale_items si
@@ -250,7 +251,7 @@ async function postHandler(req: AuthRequest) {
 
     // Get full sale details
     const fullSaleResult = await client.execute({
-      sql: `SELECT s.*, u.username as user_name, c.name as customer_name
+      sql: `SELECT s.*, u.username as user_name, c.name as customer_name, c.phone as customer_phone
             FROM sales s
             LEFT JOIN users u ON s.user_id = u.id
             LEFT JOIN customers c ON s.customer_id = c.id

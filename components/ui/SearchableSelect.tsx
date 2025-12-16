@@ -172,8 +172,9 @@ export const SearchableSelect = forwardRef<
     };
 
     const handleSelect = (optionValue: string | number) => {
-      // Don't select the placeholder option
-      if (optionValue === 0 || optionValue === "") {
+      // Allow selection of any value (including 0 for walk-in customers, etc.)
+      // Only block empty string as that's typically a true placeholder
+      if (optionValue === "") {
         return;
       }
       onChange?.(optionValue);

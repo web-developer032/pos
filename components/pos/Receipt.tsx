@@ -109,6 +109,26 @@ export const Receipt = forwardRef<ReceiptRef, ReceiptProps>(
               {formattedDate} {formattedTime}
             </span>
           </div>
+          {sale.customer_name && (
+            <>
+              <div className="mb-1 flex justify-between">
+                <span>CUSTOMER:</span>
+                <span>{sale.customer_name}</span>
+              </div>
+              {sale.customer_phone && (
+                <div className="mb-1 flex justify-between">
+                  <span>PHONE:</span>
+                  <span>{sale.customer_phone}</span>
+                </div>
+              )}
+              {sale.customer_id && (
+                <div className="mb-1 flex justify-between">
+                  <span>CUST ID:</span>
+                  <span>{sale.customer_id}</span>
+                </div>
+              )}
+            </>
+          )}
         </div>
 
         {/* Items Table */}
@@ -185,16 +205,6 @@ export const Receipt = forwardRef<ReceiptRef, ReceiptProps>(
             </div>
           )}
         </div>
-
-        {/* Customer Info for Credit Sales */}
-        {sale.customer_name && sale.payment_status !== "completed" && (
-          <div className="mb-3 rounded border border-amber-300 bg-amber-50 p-2 text-xs">
-            <div className="flex justify-between">
-              <span className="font-semibold">CUSTOMER:</span>
-              <span>{sale.customer_name}</span>
-            </div>
-          </div>
-        )}
 
         {/* Terms & Conditions */}
         {termsLines.length > 0 && (
