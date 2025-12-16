@@ -14,7 +14,7 @@ import {
 import { Select } from "@/components/ui/Select";
 import { Input } from "@/components/ui/Input";
 
-export type DateRangeType = "day" | "week" | "month" | "custom";
+export type DateRangeType = "all" | "day" | "week" | "month" | "custom";
 
 export interface DateRange {
   startDate: string;
@@ -54,6 +54,11 @@ export function DateRangeSelector({
     let endDate: string;
 
     switch (rangeType) {
+      case "all":
+        // Empty strings = no date filter (all time)
+        startDate = "";
+        endDate = "";
+        break;
       case "day":
         startDate = format(startOfDay(today), "yyyy-MM-dd");
         endDate = format(endOfDay(today), "yyyy-MM-dd");
@@ -83,7 +88,10 @@ export function DateRangeSelector({
 
   // Initialize on mount
   useEffect(() => {
-    if (!value.startDate || !value.endDate) {
+    // For "all" type, empty strings are valid
+    if (type === "all") {
+      onChange({ startDate: "", endDate: "", type: "all" });
+    } else if (!value.startDate || !value.endDate) {
       const defaultRange = getDateRange(type);
       onChange(defaultRange);
     }
@@ -121,6 +129,7 @@ export function DateRangeSelector({
           value={type}
           onChange={(e) => setType(e.target.value as DateRangeType)}
           options={[
+            { value: "all", label: "All Time" },
             { value: "day", label: "This Day" },
             { value: "week", label: "This Week" },
             { value: "month", label: "This Month" },

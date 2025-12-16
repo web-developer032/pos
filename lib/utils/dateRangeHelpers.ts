@@ -9,6 +9,8 @@ export function getDateRangeLabel(
   style: "short" | "full" = "short"
 ): string {
   switch (dateRange.type) {
+    case "all":
+      return "All Time";
     case "day":
       return style === "full" ? "This Day" : "Today";
     case "week":
@@ -31,6 +33,8 @@ export function getDateRangeLabel(
 export function getDateRangeLabelPossessive(dateRange?: DateRange): string {
   if (!dateRange) return "Today's";
   switch (dateRange.type) {
+    case "all":
+      return "All Time";
     case "day":
       return "This Day's";
     case "week":
