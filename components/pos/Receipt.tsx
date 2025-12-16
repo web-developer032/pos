@@ -17,6 +17,7 @@ import { format } from "date-fns";
 interface ReceiptProps {
   sale: Sale;
   items: SaleItem[];
+  amountPaid?: number; // For partial/credit payments
 }
 
 export interface ReceiptRef {
@@ -24,7 +25,7 @@ export interface ReceiptRef {
 }
 
 export const Receipt = forwardRef<ReceiptRef, ReceiptProps>(
-  ({ sale, items }, ref) => {
+  ({ sale, items, amountPaid }, ref) => {
     const receiptRef = useRef<HTMLDivElement>(null);
     const { format: formatCurrency } = useCurrency();
     const { data: settingsData } = useGetSettingsQuery();
@@ -158,11 +159,42 @@ export const Receipt = forwardRef<ReceiptRef, ReceiptProps>(
               <span>{formatCurrency(sale.tax_amount)}</span>
             </div>
           )}
-          <div className="flex justify-between">
-            <span>CASH-PAID-IN:</span>
+          <div className="flex justify-between font-semibold">
+            <span>TOTAL:</span>
             <span>{formatCurrency(sale.final_amount)}</span>
           </div>
+
+          {/* Payment Details */}
+          {amountPaid !== undefined ? (
+            <>
+              <div className="flex justify-between pt-1">
+                <span>{sale.payment_method?.toUpperCase()}-PAID:</span>
+                <span>{formatCurrency(amountPaid)}</span>
+              </div>
+              {amountPaid < sale.final_amount && (
+                <div className="flex justify-between font-semibold text-amber-600">
+                  <span>CREDIT (OWED):</span>
+                  <span>{formatCurrency(sale.final_amount - amountPaid)}</span>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="flex justify-between">
+              <span>{sale.payment_method?.toUpperCase()}-PAID:</span>
+              <span>{formatCurrency(sale.final_amount)}</span>
+            </div>
+          )}
         </div>
+
+        {/* Customer Info for Credit Sales */}
+        {sale.customer_name && sale.payment_status !== "completed" && (
+          <div className="mb-3 rounded border border-amber-300 bg-amber-50 p-2 text-xs">
+            <div className="flex justify-between">
+              <span className="font-semibold">CUSTOMER:</span>
+              <span>{sale.customer_name}</span>
+            </div>
+          </div>
+        )}
 
         {/* Terms & Conditions */}
         {termsLines.length > 0 && (

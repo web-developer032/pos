@@ -39,6 +39,7 @@ export function PaymentModal({
   const [saleData, setSaleData] = useState<{
     sale: Sale;
     items: SaleItem[];
+    amountPaid: number;
   } | null>(null);
   const receiptRef = useRef<ReceiptRef>(null);
   const { format: formatCurrency } = useCurrency();
@@ -122,8 +123,8 @@ export function PaymentModal({
         amount_paid: amountPayingNum,
       }).unwrap();
 
-      // Store sale data for receipt
-      setSaleData(result);
+      // Store sale data for receipt (including amount paid for proper display)
+      setSaleData({ ...result, amountPaid: amountPayingNum });
       dispatch(clearCart());
 
       if (isPartialPayment) {
@@ -335,6 +336,7 @@ export function PaymentModal({
             ref={receiptRef}
             sale={saleData.sale}
             items={saleData.items}
+            amountPaid={saleData.amountPaid}
           />
         </Modal>
       )}
