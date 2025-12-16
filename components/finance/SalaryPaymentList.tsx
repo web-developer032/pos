@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   useGetSalaryPaymentsQuery,
   useDeleteSalaryPaymentMutation,
@@ -16,6 +16,7 @@ import {
   DateRangeSelector,
   DateRange,
 } from "@/components/common/DateRangeSelector";
+import { Pagination } from "@/components/ui/Pagination";
 import toast from "react-hot-toast";
 
 export function SalaryPaymentList() {
@@ -23,17 +24,25 @@ export function SalaryPaymentList() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [employeeFilter, setEmployeeFilter] = useState<number | undefined>();
+  const [page, setPage] = useState(1);
   const [dateRange, setDateRange] = useState<DateRange>({
     startDate: "",
     endDate: "",
     type: "all",
   });
 
+  // Reset page when filters change
+  useEffect(() => {
+    setPage(1);
+  }, [employeeFilter, dateRange]);
+
   const { data: employeesData } = useGetEmployeesQuery();
   const { data, isLoading, refetch } = useGetSalaryPaymentsQuery({
     employeeId: employeeFilter,
     startDate: dateRange.startDate || undefined,
     endDate: dateRange.endDate || undefined,
+    page,
+    limit: 20,
   });
   const [deletePayment] = useDeleteSalaryPaymentMutation();
   const { format: formatCurrency } = useCurrency();
@@ -71,7 +80,11 @@ export function SalaryPaymentList() {
     return <div className="text-center">Loading...</div>;
   }
 
-  const { payments, summary } = data || { payments: [], summary: null };
+  const { payments, summary, pagination } = data || {
+    payments: [],
+    summary: null,
+    pagination: { page: 1, limit: 20, total: 0, totalPages: 1 },
+  };
 
   const getPaymentTypeColor = (type: string) => {
     switch (type) {
@@ -261,6 +274,19 @@ export function SalaryPaymentList() {
           </tbody>
         </table>
       </div>
+
+      {/* Pagination */}
+      {pagination.totalPages > 1 && (
+        <div className="mt-4">
+          <Pagination
+            currentPage={page}
+            totalPages={pagination.totalPages}
+            onPageChange={setPage}
+            totalItems={pagination.total}
+            itemsPerPage={pagination.limit}
+          />
+        </div>
+      )}
 
       {/* Modal */}
       <Modal

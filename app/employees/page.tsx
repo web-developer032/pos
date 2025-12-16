@@ -3,28 +3,26 @@
 import { useState } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
-import { CapitalList } from "@/components/finance/CapitalList";
-import { ExpenseList } from "@/components/finance/ExpenseList";
-import { OtherIncomeList } from "@/components/finance/OtherIncomeList";
+import { EmployeeList } from "@/components/finance/EmployeeList";
+import { SalaryPaymentList } from "@/components/finance/SalaryPaymentList";
 
-type TabType = "capital" | "expenses" | "other-income";
+type TabType = "employees" | "salaries";
 
-export default function FinancePage() {
-  const [activeTab, setActiveTab] = useState<TabType>("capital");
+export default function EmployeesPage() {
+  const [activeTab, setActiveTab] = useState<TabType>("employees");
 
   const tabs: { key: TabType; label: string }[] = [
-    { key: "capital", label: "Capital/Investment" },
-    { key: "expenses", label: "Expenses" },
-    { key: "other-income", label: "Other Income" },
+    { key: "employees", label: "Employees" },
+    { key: "salaries", label: "Salary Payments" },
   ];
 
   return (
     <ProtectedRoute allowedRoles={["admin", "manager"]}>
       <DashboardLayout>
         <div className="mb-6">
-          <h1 className="text-3xl font-bold">Finance Management</h1>
+          <h1 className="text-3xl font-bold">Employee Management</h1>
           <p className="mt-2 text-gray-600">
-            Track your capital, expenses, and other income
+            Manage employees and track salary payments
           </p>
         </div>
 
@@ -48,9 +46,8 @@ export default function FinancePage() {
         </div>
 
         {/* Tab Content */}
-        {activeTab === "capital" && <CapitalList />}
-        {activeTab === "expenses" && <ExpenseList />}
-        {activeTab === "other-income" && <OtherIncomeList />}
+        {activeTab === "employees" && <EmployeeList />}
+        {activeTab === "salaries" && <SalaryPaymentList />}
       </DashboardLayout>
     </ProtectedRoute>
   );

@@ -414,12 +414,23 @@ export const financeApi = apiSlice.injectEndpoints({
     }),
     // Salary Payment endpoints
     getSalaryPayments: builder.query<
-      { payments: SalaryPayment[]; summary: SalaryPaymentSummary },
+      {
+        payments: SalaryPayment[];
+        summary: SalaryPaymentSummary;
+        pagination: {
+          page: number;
+          limit: number;
+          total: number;
+          totalPages: number;
+        };
+      },
       {
         employeeId?: number;
         startDate?: string;
         endDate?: string;
         period?: string;
+        page?: number;
+        limit?: number;
       } | void
     >({
       query: (params) => {
@@ -430,6 +441,9 @@ export const financeApi = apiSlice.injectEndpoints({
           searchParams.append("start_date", params.startDate);
         if (params?.endDate) searchParams.append("end_date", params.endDate);
         if (params?.period) searchParams.append("period", params.period);
+        if (params?.page) searchParams.append("page", params.page.toString());
+        if (params?.limit)
+          searchParams.append("limit", params.limit.toString());
         const query = searchParams.toString();
         return `/salary-payments${query ? `?${query}` : ""}`;
       },

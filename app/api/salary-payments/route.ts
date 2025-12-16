@@ -22,75 +22,79 @@ async function getHandler(req: NextRequest) {
     const period = searchParams.get("period");
     const startDate = searchParams.get("start_date");
     const endDate = searchParams.get("end_date");
+    const page = parseInt(searchParams.get("page") || "1");
+    const limit = parseInt(searchParams.get("limit") || "20");
+    const offset = (page - 1) * limit;
 
-    let sql = `
+    let whereClause = " WHERE 1=1";
+    const args: (string | number)[] = [];
+
+    if (employeeId) {
+      whereClause += " AND sp.employee_id = ?";
+      args.push(parseInt(employeeId));
+    }
+    if (period) {
+      whereClause += " AND sp.period = ?";
+      args.push(period);
+    }
+    if (startDate) {
+      whereClause += " AND sp.created_at >= ?";
+      args.push(`${startDate} 00:00:00`);
+    }
+    if (endDate) {
+      whereClause += " AND sp.created_at <= ?";
+      args.push(`${endDate} 23:59:59`);
+    }
+
+    // Get total count
+    const countResult = await client.execute({
+      sql: `SELECT COUNT(*) as total FROM salary_payments sp ${whereClause}`,
+      args,
+    });
+    const total = (countResult.rows[0] as unknown as { total: number }).total;
+
+    // Get paginated data
+    const sql = `
       SELECT sp.*, e.name as employee_name, e.salary_type, u.username as user_name
       FROM salary_payments sp
       JOIN employees e ON sp.employee_id = e.id
       LEFT JOIN users u ON sp.user_id = u.id
-      WHERE 1=1
+      ${whereClause}
+      ORDER BY sp.created_at DESC
+      LIMIT ? OFFSET ?
     `;
-    const args: (string | number)[] = [];
 
-    if (employeeId) {
-      sql += " AND sp.employee_id = ?";
-      args.push(parseInt(employeeId));
-    }
-    if (period) {
-      sql += " AND sp.period = ?";
-      args.push(period);
-    }
-    if (startDate) {
-      sql += " AND sp.created_at >= ?";
-      args.push(`${startDate} 00:00:00`);
-    }
-    if (endDate) {
-      sql += " AND sp.created_at <= ?";
-      args.push(`${endDate} 23:59:59`);
-    }
+    const result = await client.execute({
+      sql,
+      args: [...args, limit, offset],
+    });
 
-    sql += " ORDER BY sp.created_at DESC";
-
-    const result = await client.execute({ sql, args });
-
-    // Get summary
-    let summarySql = `
+    // Get summary (for all matching records, not just current page)
+    const summarySql = `
       SELECT 
         COALESCE(SUM(CASE WHEN payment_type = 'salary' THEN amount ELSE 0 END), 0) as total_salary,
         COALESCE(SUM(CASE WHEN payment_type = 'advance' THEN amount ELSE 0 END), 0) as total_advance,
         COALESCE(SUM(CASE WHEN payment_type = 'bonus' THEN amount ELSE 0 END), 0) as total_bonus,
-        COALESCE(SUM(CASE WHEN payment_type = 'deduction' THEN amount ELSE 0 END), 0) as total_deduction,
+        COALESCE(SUM(CASE WHEN payment_type = 'deduction' THEN amount ELSE 0 END), 0) as total_deductions,
         COALESCE(SUM(CASE WHEN payment_type IN ('salary', 'bonus') THEN amount ELSE -amount END), 0) as net_paid
       FROM salary_payments sp
-      WHERE 1=1
+      ${whereClause}
     `;
-    const summaryArgs: (string | number)[] = [];
-
-    if (employeeId) {
-      summarySql += " AND sp.employee_id = ?";
-      summaryArgs.push(parseInt(employeeId));
-    }
-    if (period) {
-      summarySql += " AND sp.period = ?";
-      summaryArgs.push(period);
-    }
-    if (startDate) {
-      summarySql += " AND sp.created_at >= ?";
-      summaryArgs.push(`${startDate} 00:00:00`);
-    }
-    if (endDate) {
-      summarySql += " AND sp.created_at <= ?";
-      summaryArgs.push(`${endDate} 23:59:59`);
-    }
 
     const summaryResult = await client.execute({
       sql: summarySql,
-      args: summaryArgs,
+      args,
     });
 
     return NextResponse.json({
       payments: result.rows,
       summary: summaryResult.rows[0],
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
     });
   } catch (error) {
     return handleApiError(error, "fetching salary payments");
