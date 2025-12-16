@@ -12,6 +12,10 @@ import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { SalaryPaymentForm } from "./SalaryPaymentForm";
 import { formatDateTime } from "@/lib/utils/dateTime";
+import {
+  DateRangeSelector,
+  DateRange,
+} from "@/components/common/DateRangeSelector";
 import toast from "react-hot-toast";
 
 export function SalaryPaymentList() {
@@ -19,11 +23,18 @@ export function SalaryPaymentList() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [employeeFilter, setEmployeeFilter] = useState<number | undefined>();
+  const [dateRange, setDateRange] = useState<DateRange>({
+    startDate: "",
+    endDate: "",
+    type: "all",
+  });
 
   const { data: employeesData } = useGetEmployeesQuery();
-  const { data, isLoading, refetch } = useGetSalaryPaymentsQuery(
-    employeeFilter ? { employeeId: employeeFilter } : undefined
-  );
+  const { data, isLoading, refetch } = useGetSalaryPaymentsQuery({
+    employeeId: employeeFilter,
+    startDate: dateRange.startDate || undefined,
+    endDate: dateRange.endDate || undefined,
+  });
   const [deletePayment] = useDeleteSalaryPaymentMutation();
   const { format: formatCurrency } = useCurrency();
 
@@ -83,7 +94,9 @@ export function SalaryPaymentList() {
       {summary && (
         <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-5">
           <div className="rounded-lg bg-white p-4 shadow">
-            <div className="text-sm font-medium text-gray-500">Total Salary</div>
+            <div className="text-sm font-medium text-gray-500">
+              Total Salary
+            </div>
             <div className="mt-1 text-2xl font-bold text-green-600">
               {formatCurrency(summary.total_salary || 0)}
             </div>
@@ -103,7 +116,7 @@ export function SalaryPaymentList() {
           <div className="rounded-lg bg-white p-4 shadow">
             <div className="text-sm font-medium text-gray-500">Deductions</div>
             <div className="mt-1 text-2xl font-bold text-red-600">
-              {formatCurrency(summary.total_deduction || 0)}
+              {formatCurrency(summary.total_deductions || 0)}
             </div>
           </div>
           <div className="rounded-lg bg-white p-4 shadow">
@@ -115,23 +128,35 @@ export function SalaryPaymentList() {
         </div>
       )}
 
-      {/* Actions */}
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <select
-          value={employeeFilter || ""}
-          onChange={(e) =>
-            setEmployeeFilter(e.target.value ? parseInt(e.target.value) : undefined)
-          }
-          className="rounded-md border border-gray-300 px-3 py-2 text-sm"
-        >
-          <option value="">All Employees</option>
-          {employeesData?.employees.map((emp) => (
-            <option key={emp.id} value={emp.id}>
-              {emp.name}
-            </option>
-          ))}
-        </select>
-        <Button onClick={() => setIsModalOpen(true)}>+ Record Payment</Button>
+      {/* Filters */}
+      <div className="mb-4 flex flex-col gap-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">
+                Employee
+              </label>
+              <select
+                value={employeeFilter || ""}
+                onChange={(e) =>
+                  setEmployeeFilter(
+                    e.target.value ? parseInt(e.target.value) : undefined
+                  )
+                }
+                className="rounded-md border border-gray-300 px-3 py-2 text-sm"
+              >
+                <option value="">All Employees</option>
+                {employeesData?.employees.map((emp) => (
+                  <option key={emp.id} value={emp.id}>
+                    {emp.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <DateRangeSelector value={dateRange} onChange={setDateRange} />
+          </div>
+          <Button onClick={() => setIsModalOpen(true)}>+ Record Payment</Button>
+        </div>
       </div>
 
       {/* Table */}

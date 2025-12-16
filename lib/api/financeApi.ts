@@ -166,10 +166,11 @@ export interface SalaryPayment {
 }
 
 export interface SalaryPaymentSummary {
-  total_paid: number;
+  total_salary: number;
   total_advance: number;
   total_deductions: number;
   total_bonus: number;
+  net_paid: number;
 }
 
 export interface CreateSalaryPaymentRequest {
@@ -209,7 +210,8 @@ export const financeApi = apiSlice.injectEndpoints({
     >({
       query: (params) => {
         const searchParams = new URLSearchParams();
-        if (params?.startDate) searchParams.append("start_date", params.startDate);
+        if (params?.startDate)
+          searchParams.append("start_date", params.startDate);
         if (params?.endDate) searchParams.append("end_date", params.endDate);
         const query = searchParams.toString();
         return `/capital${query ? `?${query}` : ""}`;
@@ -220,14 +222,16 @@ export const financeApi = apiSlice.injectEndpoints({
       query: (id) => `/capital/${id}`,
       providesTags: (result, error, id) => [{ type: "Capital", id }],
     }),
-    createCapital: builder.mutation<{ capital: Capital }, CreateCapitalRequest>({
-      query: (body) => ({
-        url: "/capital",
-        method: "POST",
-        body,
-      }),
-      invalidatesTags: ["Capital", "Finance"],
-    }),
+    createCapital: builder.mutation<{ capital: Capital }, CreateCapitalRequest>(
+      {
+        query: (body) => ({
+          url: "/capital",
+          method: "POST",
+          body,
+        }),
+        invalidatesTags: ["Capital", "Finance"],
+      }
+    ),
     updateCapital: builder.mutation<
       { capital: Capital },
       { id: number; data: UpdateCapitalRequest }
@@ -255,7 +259,8 @@ export const financeApi = apiSlice.injectEndpoints({
     >({
       query: (params) => {
         const searchParams = new URLSearchParams();
-        if (params?.startDate) searchParams.append("start_date", params.startDate);
+        if (params?.startDate)
+          searchParams.append("start_date", params.startDate);
         if (params?.endDate) searchParams.append("end_date", params.endDate);
         if (params?.category) searchParams.append("category", params.category);
         const query = searchParams.toString();
@@ -267,14 +272,16 @@ export const financeApi = apiSlice.injectEndpoints({
       query: (id) => `/expenses/${id}`,
       providesTags: (result, error, id) => [{ type: "Expense", id }],
     }),
-    createExpense: builder.mutation<{ expense: Expense }, CreateExpenseRequest>({
-      query: (body) => ({
-        url: "/expenses",
-        method: "POST",
-        body,
-      }),
-      invalidatesTags: ["Expense", "Finance"],
-    }),
+    createExpense: builder.mutation<{ expense: Expense }, CreateExpenseRequest>(
+      {
+        query: (body) => ({
+          url: "/expenses",
+          method: "POST",
+          body,
+        }),
+        invalidatesTags: ["Expense", "Finance"],
+      }
+    ),
     updateExpense: builder.mutation<
       { expense: Expense },
       { id: number; data: UpdateExpenseRequest }
@@ -307,7 +314,8 @@ export const financeApi = apiSlice.injectEndpoints({
     >({
       query: (params) => {
         const searchParams = new URLSearchParams();
-        if (params?.startDate) searchParams.append("start_date", params.startDate);
+        if (params?.startDate)
+          searchParams.append("start_date", params.startDate);
         if (params?.endDate) searchParams.append("end_date", params.endDate);
         if (params?.category) searchParams.append("category", params.category);
         const query = searchParams.toString();
@@ -319,7 +327,10 @@ export const financeApi = apiSlice.injectEndpoints({
       query: (id) => `/other-income/${id}`,
       providesTags: (result, error, id) => [{ type: "OtherIncome", id }],
     }),
-    createOtherIncome: builder.mutation<{ income: OtherIncome }, CreateOtherIncomeRequest>({
+    createOtherIncome: builder.mutation<
+      { income: OtherIncome },
+      CreateOtherIncomeRequest
+    >({
       query: (body) => ({
         url: "/other-income",
         method: "POST",
@@ -368,7 +379,10 @@ export const financeApi = apiSlice.injectEndpoints({
       query: (id) => `/employees/${id}`,
       providesTags: (result, error, id) => [{ type: "Employee", id }],
     }),
-    createEmployee: builder.mutation<{ employee: Employee }, CreateEmployeeRequest>({
+    createEmployee: builder.mutation<
+      { employee: Employee },
+      CreateEmployeeRequest
+    >({
       query: (body) => ({
         url: "/employees",
         method: "POST",
@@ -412,7 +426,8 @@ export const financeApi = apiSlice.injectEndpoints({
         const searchParams = new URLSearchParams();
         if (params?.employeeId)
           searchParams.append("employee_id", params.employeeId.toString());
-        if (params?.startDate) searchParams.append("start_date", params.startDate);
+        if (params?.startDate)
+          searchParams.append("start_date", params.startDate);
         if (params?.endDate) searchParams.append("end_date", params.endDate);
         if (params?.period) searchParams.append("period", params.period);
         const query = searchParams.toString();
@@ -489,4 +504,3 @@ export const {
   useUpdateSalaryPaymentMutation,
   useDeleteSalaryPaymentMutation,
 } = financeApi;
-
