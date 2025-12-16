@@ -31,6 +31,19 @@ async function getHandler() {
       (expensesResult.rows[0] as unknown as { total_expenses: number | null })
         .total_expenses || 0;
 
+    // Get total revenue (total sales amount)
+    const revenueResult = await client.execute({
+      sql: `
+        SELECT COALESCE(SUM(final_amount), 0) as total_revenue
+        FROM sales
+        WHERE payment_status != 'voided'
+      `,
+    });
+
+    const totalRevenue =
+      (revenueResult.rows[0] as unknown as { total_revenue: number | null })
+        .total_revenue || 0;
+
     // Get total profit from sales (selling price - cost price)
     const profitResult = await client.execute({
       sql: `
@@ -52,6 +65,7 @@ async function getHandler() {
 
     return NextResponse.json({
       total_capital: totalCapital,
+      total_revenue: totalRevenue,
       total_expenses: totalExpenses,
       total_profit: totalProfit,
       net_balance: netBalance,

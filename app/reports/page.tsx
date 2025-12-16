@@ -4,7 +4,10 @@ import { useState } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { useGetSalesAnalyticsQuery } from "@/lib/api/salesApi";
-import { useGetExpensesQuery } from "@/lib/api/financeApi";
+import {
+  useGetExpensesQuery,
+  useGetFinanceSummaryQuery,
+} from "@/lib/api/financeApi";
 import { useCurrency } from "@/lib/hooks/useCurrency";
 import {
   DateRangeSelector,
@@ -48,9 +51,11 @@ export default function ReportsPage() {
       startDate: dateRange.startDate,
       endDate: dateRange.endDate,
     });
+  const { data: financeSummary, isLoading: isLoadingFinanceSummary } =
+    useGetFinanceSummaryQuery();
   const { format: formatCurrency } = useCurrency();
 
-  if (isLoading || isLoadingExpenses) {
+  if (isLoading || isLoadingExpenses || isLoadingFinanceSummary) {
     return (
       <ProtectedRoute>
         <DashboardLayout>
@@ -99,14 +104,37 @@ export default function ReportsPage() {
           <h1 className="text-3xl font-bold">Reports</h1>
         </div>
 
+        {/* All Time Summary */}
+        <div className="mb-6 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-2">
+          <div className="rounded-lg bg-gradient-to-r from-blue-500 to-blue-600 p-6 text-white shadow">
+            <h3 className="text-sm font-medium text-blue-100">
+              All Time Revenue
+            </h3>
+            <p className="mt-2 text-3xl font-bold">
+              {formatCurrency(financeSummary?.total_revenue || 0)}
+            </p>
+            <p className="mt-1 text-xs text-blue-100">Total from all sales</p>
+          </div>
+          <div className="rounded-lg bg-gradient-to-r from-green-500 to-green-600 p-6 text-white shadow">
+            <h3 className="text-sm font-medium text-green-100">
+              All Time Profit
+            </h3>
+            <p className="mt-2 text-3xl font-bold">
+              {formatCurrency(financeSummary?.total_profit || 0)}
+            </p>
+            <p className="mt-1 text-xs text-green-100">Total profit earned</p>
+          </div>
+        </div>
+
         <div className="mb-6">
           <DateRangeSelector value={dateRange} onChange={setDateRange} />
         </div>
 
+        {/* Period Summary */}
         <div className="mb-6 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-5">
           <div className="rounded-lg bg-white p-6 shadow">
             <h3 className="text-sm font-medium text-gray-500">
-              Total Revenue ({getDateRangeLabel()})
+              Revenue ({getDateRangeLabel()})
             </h3>
             <p className="mt-2 text-3xl font-bold">
               {formatCurrency(summary.totalRevenue)}
@@ -114,7 +142,7 @@ export default function ReportsPage() {
           </div>
           <div className="rounded-lg bg-white p-6 shadow">
             <h3 className="text-sm font-medium text-gray-500">
-              Total Profit ({getDateRangeLabel()})
+              Profit ({getDateRangeLabel()})
             </h3>
             <p className="mt-2 text-3xl font-bold text-green-600">
               {formatCurrency(summary.totalProfit)}
@@ -122,7 +150,7 @@ export default function ReportsPage() {
           </div>
           <div className="rounded-lg bg-white p-6 shadow">
             <h3 className="text-sm font-medium text-gray-500">
-              Total Expenses ({getDateRangeLabel()})
+              Expenses ({getDateRangeLabel()})
             </h3>
             <p className="mt-2 text-3xl font-bold text-red-600">
               {formatCurrency(expensesData?.summary.total_expenses || 0)}
@@ -130,7 +158,7 @@ export default function ReportsPage() {
           </div>
           <div className="rounded-lg bg-white p-6 shadow">
             <h3 className="text-sm font-medium text-gray-500">
-              Total Sales ({getDateRangeLabel()})
+              Sales ({getDateRangeLabel()})
             </h3>
             <p className="mt-2 text-3xl font-bold">{summary.totalSales}</p>
           </div>

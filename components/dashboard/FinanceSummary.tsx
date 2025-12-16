@@ -17,8 +17,8 @@ export function FinanceSummary() {
 
   if (isLoading) {
     return (
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {[1, 2, 3, 4].map((i) => (
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+        {[1, 2, 3, 4, 5].map((i) => (
           <div
             key={i}
             className="h-24 animate-pulse rounded-lg bg-gray-200"
@@ -44,7 +44,7 @@ export function FinanceSummary() {
         </Link>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <div className="rounded-lg bg-white p-6 shadow">
           <div className="text-sm font-medium text-gray-500">Total Capital</div>
           <div
@@ -59,6 +59,13 @@ export function FinanceSummary() {
           </div>
         </div>
         <div className="rounded-lg bg-white p-6 shadow">
+          <div className="text-sm font-medium text-gray-500">Total Revenue</div>
+          <div className="mt-2 text-2xl font-bold text-blue-600">
+            {formatCurrency(data.total_revenue)}
+          </div>
+          <div className="mt-1 text-xs text-gray-400">All sales amount</div>
+        </div>
+        <div className="rounded-lg bg-white p-6 shadow">
           <div className="text-sm font-medium text-gray-500">Total Profit</div>
           <div
             className={`mt-2 text-2xl font-bold ${
@@ -67,7 +74,7 @@ export function FinanceSummary() {
           >
             {formatCurrency(data.total_profit)}
           </div>
-          <div className="mt-1 text-xs text-gray-400">From all sales</div>
+          <div className="mt-1 text-xs text-gray-400">Revenue - Cost</div>
         </div>
         <div className="rounded-lg bg-white p-6 shadow">
           <div className="text-sm font-medium text-gray-500">
