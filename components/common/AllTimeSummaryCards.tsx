@@ -6,20 +6,29 @@ import { useCurrency } from "@/lib/hooks/useCurrency";
 interface AllTimeSummaryCardsProps {
   className?: string;
   compact?: boolean;
+  showOtherIncome?: boolean;
 }
 
 export function AllTimeSummaryCards({
   className = "",
   compact = false,
+  showOtherIncome = false,
 }: AllTimeSummaryCardsProps) {
   const { data: financeSummary, isLoading } = useGetFinanceSummaryQuery();
   const { format: formatCurrency } = useCurrency();
 
+  const gridCols = showOtherIncome
+    ? "grid-cols-1 sm:grid-cols-3"
+    : "grid-cols-1 sm:grid-cols-2";
+
   if (isLoading) {
     return (
-      <div className={`grid grid-cols-1 gap-4 sm:grid-cols-2 ${className}`}>
+      <div className={`grid ${gridCols} gap-4 ${className}`}>
         <div className="h-24 animate-pulse rounded-lg bg-blue-200"></div>
         <div className="h-24 animate-pulse rounded-lg bg-green-200"></div>
+        {showOtherIncome && (
+          <div className="h-24 animate-pulse rounded-lg bg-emerald-200"></div>
+        )}
       </div>
     );
   }
@@ -28,7 +37,7 @@ export function AllTimeSummaryCards({
   const valueSize = compact ? "text-2xl" : "text-3xl";
 
   return (
-    <div className={`grid grid-cols-1 gap-4 sm:grid-cols-2 ${className}`}>
+    <div className={`grid ${gridCols} gap-4 ${className}`}>
       <div
         className={`rounded-lg bg-gradient-to-r from-blue-500 to-blue-600 ${padding} text-white shadow`}
       >
@@ -47,6 +56,17 @@ export function AllTimeSummaryCards({
         </p>
         <p className="mt-1 text-xs text-green-100">Total profit earned</p>
       </div>
+      {showOtherIncome && (
+        <div
+          className={`rounded-lg bg-gradient-to-r from-emerald-500 to-emerald-600 ${padding} text-white shadow`}
+        >
+          <h3 className="text-sm font-medium text-emerald-100">All Time Other Income</h3>
+          <p className={`mt-1 ${valueSize} font-bold`}>
+            {formatCurrency(financeSummary?.total_other_income || 0)}
+          </p>
+          <p className="mt-1 text-xs text-emerald-100">Misc. income earned</p>
+        </div>
+      )}
     </div>
   );
 }

@@ -338,6 +338,22 @@ export async function initializeDatabase() {
     )
   `);
 
+  // Other Income table (for miscellaneous income like selling cardboard, etc.)
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS other_income (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      amount REAL NOT NULL,
+      category TEXT NOT NULL,
+      description TEXT,
+      payment_method TEXT NOT NULL CHECK(payment_method IN ('cash', 'card', 'bank_transfer', 'other')),
+      reference_number TEXT,
+      notes TEXT,
+      user_id INTEGER NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    )
+  `);
+
   // Create indexes
   await client.execute(
     `CREATE INDEX IF NOT EXISTS idx_capital_user ON capital(user_id)`
@@ -353,6 +369,15 @@ export async function initializeDatabase() {
   );
   await client.execute(
     `CREATE INDEX IF NOT EXISTS idx_expenses_category ON expenses(category)`
+  );
+  await client.execute(
+    `CREATE INDEX IF NOT EXISTS idx_other_income_user ON other_income(user_id)`
+  );
+  await client.execute(
+    `CREATE INDEX IF NOT EXISTS idx_other_income_date ON other_income(created_at)`
+  );
+  await client.execute(
+    `CREATE INDEX IF NOT EXISTS idx_other_income_category ON other_income(category)`
   );
 
   // Cash Register Sessions table

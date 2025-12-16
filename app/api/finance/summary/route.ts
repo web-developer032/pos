@@ -72,14 +72,24 @@ async function getHandler() {
       (profitResult.rows[0] as unknown as { total_profit: number | null })
         .total_profit || 0;
 
-    // Calculate net balance (capital + profit - expenses)
-    const netBalance = totalCapital + totalProfit - totalExpenses;
+    // Get total other income
+    const otherIncomeResult = await client.execute({
+      sql: "SELECT COALESCE(SUM(amount), 0) as total_other_income FROM other_income",
+    });
+
+    const totalOtherIncome =
+      (otherIncomeResult.rows[0] as unknown as { total_other_income: number | null })
+        .total_other_income || 0;
+
+    // Calculate net balance (capital + profit + other income - expenses)
+    const netBalance = totalCapital + totalProfit + totalOtherIncome - totalExpenses;
 
     return NextResponse.json({
       total_capital: totalCapital,
       total_revenue: totalRevenue,
       total_expenses: totalExpenses,
       total_profit: totalProfit,
+      total_other_income: totalOtherIncome,
       net_balance: netBalance,
     });
   } catch (error) {

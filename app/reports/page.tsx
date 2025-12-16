@@ -53,7 +53,7 @@ export default function ReportsPage() {
         </div>
 
         {/* All Time Summary */}
-        <AllTimeSummaryCards className="mb-6" />
+        <AllTimeSummaryCards className="mb-6" showOtherIncome />
 
         {/* Date Range Filter */}
         <div className="mb-6">
@@ -64,6 +64,7 @@ export default function ReportsPage() {
         <PeriodStatsCards
           dateRange={dateRange}
           showExpenses={true}
+          showOtherIncome={true}
           showProfitMargin={true}
           showAverageOrder={false}
           className="mb-6"

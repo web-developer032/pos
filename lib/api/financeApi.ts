@@ -67,11 +67,48 @@ export interface UpdateExpenseRequest {
   notes?: string;
 }
 
+export interface OtherIncome {
+  id: number;
+  amount: number;
+  category: string;
+  description?: string;
+  payment_method: "cash" | "card" | "bank_transfer" | "other";
+  reference_number?: string;
+  notes?: string;
+  user_id: number;
+  created_at: string;
+  user_name?: string;
+}
+
+export interface OtherIncomeSummary {
+  total_income: number;
+  by_category: Array<{ category: string; category_total: number }>;
+}
+
+export interface CreateOtherIncomeRequest {
+  amount: number;
+  category: string;
+  description?: string;
+  payment_method: "cash" | "card" | "bank_transfer" | "other";
+  reference_number?: string;
+  notes?: string;
+}
+
+export interface UpdateOtherIncomeRequest {
+  amount?: number;
+  category?: string;
+  description?: string;
+  payment_method?: "cash" | "card" | "bank_transfer" | "other";
+  reference_number?: string;
+  notes?: string;
+}
+
 export interface FinanceSummary {
   total_capital: number;
   total_revenue: number;
   total_expenses: number;
   total_profit: number;
+  total_other_income: number;
   net_balance: number;
 }
 
@@ -174,6 +211,54 @@ export const financeApi = apiSlice.injectEndpoints({
       query: () => "/finance/summary",
       providesTags: ["Finance"],
     }),
+    // Other Income endpoints
+    getOtherIncome: builder.query<
+      { income: OtherIncome[]; summary: OtherIncomeSummary },
+      { startDate?: string; endDate?: string; category?: string } | void
+    >({
+      query: (params) => {
+        const searchParams = new URLSearchParams();
+        if (params?.startDate) searchParams.append("start_date", params.startDate);
+        if (params?.endDate) searchParams.append("end_date", params.endDate);
+        if (params?.category) searchParams.append("category", params.category);
+        const query = searchParams.toString();
+        return `/other-income${query ? `?${query}` : ""}`;
+      },
+      providesTags: ["OtherIncome"],
+    }),
+    getOtherIncomeRecord: builder.query<{ income: OtherIncome }, number>({
+      query: (id) => `/other-income/${id}`,
+      providesTags: (result, error, id) => [{ type: "OtherIncome", id }],
+    }),
+    createOtherIncome: builder.mutation<{ income: OtherIncome }, CreateOtherIncomeRequest>({
+      query: (body) => ({
+        url: "/other-income",
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: ["OtherIncome", "Finance"],
+    }),
+    updateOtherIncome: builder.mutation<
+      { income: OtherIncome },
+      { id: number; data: UpdateOtherIncomeRequest }
+    >({
+      query: ({ id, data }) => ({
+        url: `/other-income/${id}`,
+        method: "PUT",
+        body: data,
+      }),
+      invalidatesTags: (result, error, { id }) => [
+        { type: "OtherIncome", id },
+        "Finance",
+      ],
+    }),
+    deleteOtherIncome: builder.mutation<{ message: string }, number>({
+      query: (id) => ({
+        url: `/other-income/${id}`,
+        method: "DELETE",
+      }),
+      invalidatesTags: ["OtherIncome", "Finance"],
+    }),
   }),
 });
 
@@ -189,5 +274,10 @@ export const {
   useUpdateExpenseMutation,
   useDeleteExpenseMutation,
   useGetFinanceSummaryQuery,
+  useGetOtherIncomeQuery,
+  useGetOtherIncomeRecordQuery,
+  useCreateOtherIncomeMutation,
+  useUpdateOtherIncomeMutation,
+  useDeleteOtherIncomeMutation,
 } = financeApi;
 
