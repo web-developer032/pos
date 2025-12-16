@@ -1,6 +1,13 @@
 "use client";
 
-import { useState, useRef, useEffect, useMemo, forwardRef, ReactNode } from "react";
+import {
+  useState,
+  useRef,
+  useEffect,
+  useMemo,
+  forwardRef,
+  ReactNode,
+} from "react";
 import { createPortal } from "react-dom";
 
 interface SearchableSelectProps {
@@ -14,6 +21,7 @@ interface SearchableSelectProps {
   searchPlaceholder?: string;
   onSearch?: (searchTerm: string) => void;
   onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
+  disabled?: boolean;
 }
 
 export const SearchableSelect = forwardRef<
@@ -32,6 +40,7 @@ export const SearchableSelect = forwardRef<
       searchPlaceholder = "Type to search...",
       onSearch,
       onKeyDown: customOnKeyDown,
+      disabled = false,
     },
     ref
   ) => {
@@ -266,6 +275,7 @@ export const SearchableSelect = forwardRef<
             onChange={handleInputChange}
             onFocus={handleInputFocus}
             onKeyDown={handleKeyDown}
+            disabled={disabled}
             placeholder={
               isOpen
                 ? searchPlaceholder
@@ -275,7 +285,7 @@ export const SearchableSelect = forwardRef<
             }
             className={`w-full rounded-md border bg-white px-3 py-2 pr-10 text-gray-900 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 ${
               error ? "border-red-300" : "border-gray-300"
-            }`}
+            } ${disabled ? "cursor-not-allowed bg-gray-100 text-gray-500" : ""}`}
           />
           <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
             <svg

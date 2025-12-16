@@ -34,8 +34,10 @@ export function SalaryPaymentForm({
     skip: !paymentId,
   });
   const { data: employeesData } = useGetEmployeesQuery({ status: "active" });
-  const [createPayment, { isLoading: isCreating }] = useCreateSalaryPaymentMutation();
-  const [updatePayment, { isLoading: isUpdating }] = useUpdateSalaryPaymentMutation();
+  const [createPayment, { isLoading: isCreating }] =
+    useCreateSalaryPaymentMutation();
+  const [updatePayment, { isLoading: isUpdating }] =
+    useUpdateSalaryPaymentMutation();
   const { format: formatCurrency } = useCurrency();
 
   const currentPeriod = format(new Date(), "MMM yyyy");
@@ -70,7 +72,10 @@ export function SalaryPaymentForm({
     if (selectedEmployee?.salary_type === "daily" && daysWorked) {
       return selectedEmployee.base_salary * daysWorked;
     }
-    if (selectedEmployee?.salary_type === "monthly" && paymentType === "salary") {
+    if (
+      selectedEmployee?.salary_type === "monthly" &&
+      paymentType === "salary"
+    ) {
       return selectedEmployee.base_salary;
     }
     return 0;
@@ -140,7 +145,7 @@ export function SalaryPaymentForm({
         </label>
         <SearchableSelect
           options={employeeOptions}
-          value={selectedEmployeeId || null}
+          value={selectedEmployeeId || undefined}
           onChange={(value) => setValue("employee_id", value as number)}
           placeholder="Select employee..."
           disabled={!!paymentId}
