@@ -8,6 +8,7 @@ import {
   SalaryPayment,
 } from "@/lib/api/financeApi";
 import { useCurrency } from "@/lib/hooks/useCurrency";
+import { useDebounce } from "@/lib/hooks/useDebounce";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { SalaryPaymentForm } from "./SalaryPaymentForm";
@@ -25,6 +26,7 @@ export function SalaryPaymentList() {
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [employeeFilter, setEmployeeFilter] = useState<number | undefined>();
   const [searchTerm, setSearchTerm] = useState("");
+  const debouncedSearch = useDebounce(searchTerm, 300);
   const [page, setPage] = useState(1);
   const [dateRange, setDateRange] = useState<DateRange>({
     startDate: "",
@@ -35,14 +37,14 @@ export function SalaryPaymentList() {
   // Reset page when filters change
   useEffect(() => {
     setPage(1);
-  }, [employeeFilter, dateRange, searchTerm]);
+  }, [employeeFilter, dateRange, debouncedSearch]);
 
   const { data: employeesData } = useGetEmployeesQuery();
   const { data, isLoading, refetch } = useGetSalaryPaymentsQuery({
     employeeId: employeeFilter,
     startDate: dateRange.startDate || undefined,
     endDate: dateRange.endDate || undefined,
-    search: searchTerm || undefined,
+    search: debouncedSearch || undefined,
     page,
     limit: 20,
   });

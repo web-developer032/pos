@@ -7,6 +7,7 @@ import {
   Employee,
 } from "@/lib/api/financeApi";
 import { useCurrency } from "@/lib/hooks/useCurrency";
+import { useDebounce } from "@/lib/hooks/useDebounce";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { EmployeeForm } from "./EmployeeForm";
@@ -19,10 +20,11 @@ export function EmployeeList() {
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [searchTerm, setSearchTerm] = useState("");
+  const debouncedSearch = useDebounce(searchTerm, 300);
 
   const { data, isLoading, refetch } = useGetEmployeesQuery({
     status: statusFilter || undefined,
-    search: searchTerm || undefined,
+    search: debouncedSearch || undefined,
   });
   const [deleteEmployee] = useDeleteEmployeeMutation();
   const { format: formatCurrency } = useCurrency();
