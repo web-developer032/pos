@@ -20,6 +20,7 @@ import { Select } from "@/components/ui/Select";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { Form } from "@/components/ui/Form";
+import { Input } from "@/components/ui/Input";
 import { useCurrency } from "@/lib/hooks/useCurrency";
 import { useDebounce } from "@/lib/hooks/useDebounce";
 import {
@@ -76,6 +77,7 @@ export function PurchaseOrderForm({
     null
   );
   const [productSearch, setProductSearch] = useState("");
+  const [itemSearch, setItemSearch] = useState("");
 
   // Refs
   const productInputRefs = useRef<{ [key: number]: HTMLInputElement | null }>(
@@ -300,6 +302,23 @@ export function PurchaseOrderForm({
     return Array.from(optionsMap.values());
   }, [productsData?.products, watchedItems, formatCurrency]);
 
+  // Filter items based on search
+  const filteredFieldsWithIndex = useMemo(() => {
+    if (!itemSearch.trim()) {
+      return fields.map((field, index) => ({ field, index }));
+    }
+    const searchLower = itemSearch.toLowerCase();
+    return fields
+      .map((field, index) => ({ field, index }))
+      .filter(({ index }) => {
+        const item = watchedItems[index];
+        const productName = item?.product_name?.toLowerCase() || "";
+        const cachedProduct = productsCache.current.get(item?.product_id || 0);
+        const cachedName = cachedProduct?.name?.toLowerCase() || "";
+        return productName.includes(searchLower) || cachedName.includes(searchLower);
+      });
+  }, [fields, watchedItems, itemSearch]);
+
   // Handlers
   const handleAddItem = useCallback(() => {
     prepend({
@@ -454,55 +473,109 @@ export function PurchaseOrderForm({
 
         {/* Items Section */}
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <h3 className="text-sm font-semibold text-gray-700">
-              Items <span className="text-gray-400">({fields.length})</span>
+              Items{" "}
+              <span className="text-gray-400">
+                ({filteredFieldsWithIndex.length}
+                {itemSearch && ` of ${fields.length}`})
+              </span>
             </h3>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={handleAddItem}
-            >
-              + Add Item
-            </Button>
+            <div className="flex items-center gap-2">
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Search added items..."
+                  value={itemSearch}
+                  onChange={(e) => setItemSearch(e.target.value)}
+                  className="h-8 w-48 rounded-md border border-gray-300 pl-8 pr-3 text-sm placeholder-gray-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                />
+                <svg
+                  className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                  />
+                </svg>
+                {itemSearch && (
+                  <button
+                    type="button"
+                    onClick={() => setItemSearch("")}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleAddItem}
+              >
+                + Add Item
+              </Button>
+            </div>
           </div>
 
           <div
             ref={itemsContainerRef}
             className="form-scrollbar max-h-[450px] space-y-3 overflow-y-auto pr-1"
           >
-            {fields.map((field, index) => (
-              <PurchaseOrderItem
-                key={field.id}
-                ref={(el) => {
-                  productInputRefs.current[index] = el;
-                }}
-                index={index}
-                itemNumber={index + 1}
-                canRemove={fields.length > 1}
-                productId={watchedItems[index]?.product_id || 0}
-                productName={watchedItems[index]?.product_name || ""}
-                quantity={watchedItems[index]?.quantity || 0}
-                unitCost={watchedItems[index]?.unit_cost || 0}
-                retailPrice={watchedItems[index]?.retail_price || 0}
-                discountFactor={discountFactor}
-                taxFactor={taxFactor}
-                productOptions={productOptions}
-                errors={errors.items?.[index]}
-                register={register}
-                onProductChange={(productId) =>
-                  handleProductChange(index, productId)
-                }
-                onProductSearch={setProductSearch}
-                onBarcodeKeyDown={(e) => handleBarcodeKeyDown(index, e)}
-                onRemove={() => remove(index)}
-                onAddProduct={() => {
-                  setProductModalIndex(index);
-                  setShowProductModal(true);
-                }}
-              />
-            ))}
+            {filteredFieldsWithIndex.length === 0 && itemSearch ? (
+              <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-6 text-center">
+                <p className="text-sm text-gray-500">
+                  No items found matching &ldquo;{itemSearch}&rdquo;
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setItemSearch("")}
+                  className="mt-2 text-sm text-indigo-600 hover:text-indigo-800"
+                >
+                  Clear search
+                </button>
+              </div>
+            ) : (
+              filteredFieldsWithIndex.map(({ field, index }) => (
+                <PurchaseOrderItem
+                  key={field.id}
+                  ref={(el) => {
+                    productInputRefs.current[index] = el;
+                  }}
+                  index={index}
+                  itemNumber={index + 1}
+                  canRemove={fields.length > 1}
+                  productId={watchedItems[index]?.product_id || 0}
+                  productName={watchedItems[index]?.product_name || ""}
+                  quantity={watchedItems[index]?.quantity || 0}
+                  unitCost={watchedItems[index]?.unit_cost || 0}
+                  retailPrice={watchedItems[index]?.retail_price || 0}
+                  discountFactor={discountFactor}
+                  taxFactor={taxFactor}
+                  productOptions={productOptions}
+                  errors={errors.items?.[index]}
+                  register={register}
+                  onProductChange={(productId) =>
+                    handleProductChange(index, productId)
+                  }
+                  onProductSearch={setProductSearch}
+                  onBarcodeKeyDown={(e) => handleBarcodeKeyDown(index, e)}
+                  onRemove={() => remove(index)}
+                  onAddProduct={() => {
+                    setProductModalIndex(index);
+                    setShowProductModal(true);
+                  }}
+                />
+              ))
+            )}
           </div>
 
           {errors.items?.message && (
