@@ -183,78 +183,89 @@ export default function BarcodeGeneratorPage() {
           <style>
             /* TLP 2844-Z Label Printer Settings - 3 labels per row */
             @page {
-              size: 100mm 30mm; /* Approximate label roll width x label height */
+              size: 105mm 30mm; /* Label roll width x label height */
               margin: 0;
-            }
-            @media print {
-              html, body {
-                width: 100mm;
-                margin: 0;
-                padding: 0;
-              }
             }
             * {
               margin: 0;
               padding: 0;
               box-sizing: border-box;
             }
-            body {
-              font-family: Arial, Helvetica, sans-serif;
-              padding: 0;
+            html, body {
+              width: 105mm;
               margin: 0;
+              padding: 0;
+              font-family: Arial, Helvetica, sans-serif;
             }
             .grid {
-              display: grid;
-              grid-template-columns: repeat(3, 1fr); /* 3 labels per row for TLP 2844-Z */
-              gap: 0;
+              display: flex;
+              flex-wrap: wrap;
+              width: 105mm;
             }
             .barcode-card {
-              border: none;
-              border-right: 1px dashed #ccc;
-              padding: 1.5mm;
+              width: 35mm; /* Fixed width: 105mm / 3 = 35mm per label */
+              height: 28mm; /* Fixed height */
+              padding: 1mm;
               text-align: center;
+              overflow: hidden; /* Prevent content overflow */
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              justify-content: center;
               break-inside: avoid;
               page-break-inside: avoid;
-              height: auto;
-              min-height: 25mm;
-            }
-            .barcode-card:nth-child(3n) {
-              border-right: none;
             }
             .store-name {
-              font-size: 7px;
+              font-size: 6pt;
               font-weight: bold;
-              margin-bottom: 0.3mm;
-              line-height: 1.1;
-            }
-            .product-info {
-              font-size: 6px;
-              font-weight: 500;
-              margin-bottom: 0.3mm;
+              margin-bottom: 0.5mm;
+              line-height: 1;
+              max-width: 33mm;
               overflow: hidden;
               text-overflow: ellipsis;
               white-space: nowrap;
-              line-height: 1.1;
+            }
+            .product-info {
+              font-size: 5pt;
+              font-weight: 500;
+              margin-bottom: 0.5mm;
+              max-width: 33mm;
+              overflow: hidden;
+              text-overflow: ellipsis;
+              white-space: nowrap;
+              line-height: 1;
             }
             .barcode-card img {
-              max-width: 100%;
-              height: 12mm;
+              width: 32mm;
+              height: 10mm;
               object-fit: contain;
               margin: 0.5mm 0;
             }
             .barcode-number {
               font-family: 'Courier New', monospace;
-              font-size: 7px;
+              font-size: 6pt;
               font-weight: bold;
-              letter-spacing: 0.5px;
+              letter-spacing: 0.3px;
+              line-height: 1;
             }
             .dates-row {
-              font-size: 5px;
+              font-size: 5pt;
               color: #333;
-              margin-top: 0.3mm;
+              margin-top: 0.5mm;
               display: flex;
               justify-content: space-between;
-              padding: 0 0.5mm;
+              width: 32mm;
+              line-height: 1;
+            }
+            @media print {
+              html, body {
+                width: 105mm;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+              }
+              .grid {
+                width: 105mm;
+              }
             }
           </style>
         </head>
@@ -547,10 +558,10 @@ function BarcodeCard({
               if (JsBarcode && canvasRef.current) {
                 JsBarcode(canvasRef.current, barcode, {
                   format: "CODE128",
-                  width: 1.5,
-                  height: 35,
+                  width: 1.2, // Narrower bars for better fit
+                  height: 30, // Shorter height
                   displayValue: false,
-                  margin: 2,
+                  margin: 0, // No margin - we handle padding in CSS
                 });
               }
             } catch (error) {
