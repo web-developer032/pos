@@ -112,7 +112,7 @@ export function CustomerCreditDetail({
           <h3 className="mb-3 font-semibold text-gray-900">
             Unpaid/Partial Sales ({unpaid_sales.length})
           </h3>
-          <div className="max-h-48 overflow-y-auto rounded-lg border border-gray-200">
+          <div className="form-scrollbar max-h-48 overflow-y-scroll rounded-lg border border-gray-200">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="sticky top-0 bg-gray-50">
                 <tr>
@@ -175,7 +175,7 @@ export function CustomerCreditDetail({
       {recent_payments.length > 0 && (
         <div>
           <h3 className="mb-3 font-semibold text-gray-900">Recent Payments</h3>
-          <div className="max-h-48 overflow-y-auto rounded-lg border border-gray-200">
+          <div className="form-scrollbar max-h-48 overflow-y-scroll rounded-lg border border-gray-200">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="sticky top-0 bg-gray-50">
                 <tr>
