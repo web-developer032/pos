@@ -95,299 +95,289 @@ export default function SaleDetailPage() {
           <p className="mt-2 text-gray-600">Sale Number: {sale.sale_number}</p>
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-3">
+        <div className="grid gap-6 lg:grid-cols-2">
           {/* Sale Information */}
-          <div className="lg:col-span-2">
-            <div className="rounded-lg bg-white shadow">
-              <div className="border-b border-gray-200 px-6 py-4">
-                <h2 className="text-lg font-semibold">Sale Information</h2>
-              </div>
-              <div className="px-6 py-4">
-                <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <div>
-                    <dt className="text-sm font-medium text-gray-500">
-                      Sale Number
-                    </dt>
-                    <dd className="mt-1 text-sm font-semibold">
-                      {sale.sale_number}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-sm font-medium text-gray-500">Date</dt>
-                    <dd className="mt-1 text-sm">
-                      {formatDateTime(sale.created_at)}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-sm font-medium text-gray-500">
-                      Customer
-                    </dt>
-                    <dd className="mt-1 text-sm">
-                      {sale.customer_name || "Walk-in Customer"}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-sm font-medium text-gray-500">
-                      Cashier
-                    </dt>
-                    <dd className="mt-1 text-sm">{sale.user_name || "N/A"}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-sm font-medium text-gray-500">
-                      Payment Method
-                    </dt>
-                    <dd className="mt-1 text-sm capitalize">
-                      {sale.payment_method}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-sm font-medium text-gray-500">
-                      Payment Status
-                    </dt>
-                    <dd className="mt-1 text-sm capitalize">
-                      <span
-                        className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${
-                          sale.payment_status === "paid"
-                            ? "bg-green-100 text-green-800"
-                            : "bg-yellow-100 text-yellow-800"
-                        }`}
-                      >
-                        {sale.payment_status}
-                      </span>
-                    </dd>
-                  </div>
-                </dl>
-              </div>
+          <div className="rounded-lg bg-white shadow">
+            <div className="border-b border-gray-200 px-6 py-4">
+              <h2 className="text-lg font-semibold">Sale Information</h2>
             </div>
-
-            {/* Sale Items */}
-            <div className="mt-6 rounded-lg bg-white shadow">
-              <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
-                <h2 className="text-lg font-semibold">Items</h2>
-                <span className="text-sm text-gray-500">
-                  Total:{" "}
-                  <span className="font-semibold text-gray-700">
-                    {items.length}
-                  </span>{" "}
-                  items
-                </span>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-gray-500">
-                        #
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                        Product
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                        Barcode
-                      </th>
-                      <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">
-                        Quantity
-                      </th>
-                      <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">
-                        Unit Price
-                      </th>
-                      <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">
-                        Discount
-                      </th>
-                      <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">
-                        Subtotal
-                      </th>
-                      <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">
-                        Profit
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200 bg-white">
-                    {items.map((item, index) => {
-                      const costPrice = item.cost_price || 0;
-                      const profitPerUnit = item.unit_price - costPrice;
-
-                      // Get return status for this item
-                      const itemStatus = returnsData?.sale_items_status?.find(
-                        (status) => status.id === item.id
-                      );
-                      const returnedQty = itemStatus?.returned_quantity || 0;
-                      const isFullyReturned = returnedQty >= item.quantity;
-                      const isPartiallyReturned =
-                        returnedQty > 0 && !isFullyReturned;
-
-                      return (
-                        <tr
-                          key={item.id}
-                          className={
-                            isFullyReturned ? "bg-gray-50 opacity-75" : ""
-                          }
-                        >
-                          <td className="whitespace-nowrap px-4 py-4 text-center text-sm text-gray-500">
-                            {index + 1}
-                          </td>
-                          <td className="whitespace-nowrap px-6 py-4 text-sm font-medium">
-                            <div className="flex items-center gap-2">
-                              {item.product_name}
-                              {isFullyReturned && (
-                                <span className="rounded bg-red-100 px-2 py-0.5 text-xs text-red-800">
-                                  Returned
-                                </span>
-                              )}
-                              {isPartiallyReturned && (
-                                <span className="rounded bg-orange-100 px-2 py-0.5 text-xs text-orange-800">
-                                  Partial Return
-                                </span>
-                              )}
-                            </div>
-                          </td>
-                          <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-500">
-                            {item.barcode || "N/A"}
-                          </td>
-                          <td className="whitespace-nowrap px-6 py-4 text-right text-sm">
-                            <div>
-                              {item.quantity}
-                              {returnedQty > 0 && (
-                                <span className="ml-1 text-xs text-red-600">
-                                  (-{returnedQty})
-                                </span>
-                              )}
-                            </div>
-                          </td>
-                          <td className="whitespace-nowrap px-6 py-4 text-right text-sm">
-                            {formatCurrency(item.unit_price)}
-                          </td>
-                          <td className="whitespace-nowrap px-6 py-4 text-right text-sm text-red-600">
-                            {item.discount > 0
-                              ? formatCurrency(item.discount)
-                              : "-"}
-                          </td>
-                          <td className="whitespace-nowrap px-6 py-4 text-right text-sm font-semibold">
-                            {formatCurrency(item.subtotal)}
-                          </td>
-                          <td className="whitespace-nowrap px-6 py-4 text-right text-sm font-semibold">
-                            <div className="flex flex-col items-end">
-                              {(() => {
-                                const originalProfit =
-                                  profitPerUnit * item.quantity;
-                                const returnedProfit =
-                                  profitPerUnit * returnedQty;
-                                const netProfit =
-                                  originalProfit - returnedProfit;
-                                return (
-                                  <>
-                                    <span
-                                      className={
-                                        netProfit >= 0
-                                          ? "text-green-600"
-                                          : "text-red-600"
-                                      }
-                                    >
-                                      {formatCurrency(netProfit)}
-                                    </span>
-                                    {returnedQty > 0 && (
-                                      <span className="text-xs text-gray-500">
-                                        (was {formatCurrency(originalProfit)})
-                                      </span>
-                                    )}
-                                  </>
-                                );
-                              })()}
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+            <div className="px-6 py-4">
+              <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                  <dt className="text-sm font-medium text-gray-500">
+                    Sale Number
+                  </dt>
+                  <dd className="mt-1 text-sm font-semibold">
+                    {sale.sale_number}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-sm font-medium text-gray-500">Date</dt>
+                  <dd className="mt-1 text-sm">
+                    {formatDateTime(sale.created_at)}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-sm font-medium text-gray-500">
+                    Customer
+                  </dt>
+                  <dd className="mt-1 text-sm">
+                    {sale.customer_name || "Walk-in Customer"}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-sm font-medium text-gray-500">Cashier</dt>
+                  <dd className="mt-1 text-sm">{sale.user_name || "N/A"}</dd>
+                </div>
+                <div>
+                  <dt className="text-sm font-medium text-gray-500">
+                    Payment Method
+                  </dt>
+                  <dd className="mt-1 text-sm capitalize">
+                    {sale.payment_method}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-sm font-medium text-gray-500">
+                    Payment Status
+                  </dt>
+                  <dd className="mt-1 text-sm capitalize">
+                    <span
+                      className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${
+                        sale.payment_status === "paid"
+                          ? "bg-green-100 text-green-800"
+                          : "bg-yellow-100 text-yellow-800"
+                      }`}
+                    >
+                      {sale.payment_status}
+                    </span>
+                  </dd>
+                </div>
+              </dl>
             </div>
           </div>
 
           {/* Summary */}
-          <div className="lg:col-span-1">
-            <div className="rounded-lg bg-white shadow">
-              <div className="border-b border-gray-200 px-6 py-4">
-                <h2 className="text-lg font-semibold">Summary</h2>
-              </div>
-              <div className="px-6 py-4">
-                <dl className="space-y-3">
+          <div className="rounded-lg bg-white shadow">
+            <div className="border-b border-gray-200 px-6 py-4">
+              <h2 className="text-lg font-semibold">Summary</h2>
+            </div>
+            <div className="px-6 py-4">
+              <dl className="space-y-3">
+                <div className="flex justify-between">
+                  <dt className="text-sm text-gray-600">Subtotal</dt>
+                  <dd className="text-sm font-medium">
+                    {formatCurrency(sale.total_amount)}
+                  </dd>
+                </div>
+                {sale.discount_amount > 0 && (
                   <div className="flex justify-between">
-                    <dt className="text-sm text-gray-600">Subtotal</dt>
-                    <dd className="text-sm font-medium">
-                      {formatCurrency(sale.total_amount)}
+                    <dt className="text-sm text-gray-600">Discount</dt>
+                    <dd className="text-sm font-medium text-red-600">
+                      -{formatCurrency(sale.discount_amount)}
                     </dd>
                   </div>
-                  {sale.discount_amount > 0 && (
-                    <div className="flex justify-between">
-                      <dt className="text-sm text-gray-600">Discount</dt>
-                      <dd className="text-sm font-medium text-red-600">
-                        -{formatCurrency(sale.discount_amount)}
-                      </dd>
+                )}
+                {sale.tax_amount > 0 && (
+                  <div className="flex justify-between">
+                    <dt className="text-sm text-gray-600">Tax</dt>
+                    <dd className="text-sm font-medium">
+                      {formatCurrency(sale.tax_amount)}
+                    </dd>
+                  </div>
+                )}
+                <div className="border-t border-gray-200 pt-3">
+                  <div className="flex justify-between">
+                    <dt className="text-base font-semibold">Total</dt>
+                    <dd className="text-base font-bold text-indigo-600">
+                      {formatCurrency(sale.final_amount)}
+                    </dd>
+                  </div>
+                </div>
+                <div className="border-t border-gray-200 pt-3">
+                  <div className="flex justify-between">
+                    <dt className="text-base font-semibold text-green-600">
+                      Net Profit
+                    </dt>
+                    <dd className="text-base font-bold text-green-600">
+                      {formatCurrency(
+                        (() => {
+                          const originalProfit = items.reduce((sum, item) => {
+                            const costPrice = item.cost_price || 0;
+                            const profitPerUnit = item.unit_price - costPrice;
+                            return sum + profitPerUnit * item.quantity;
+                          }, 0);
+
+                          const returnedProfit =
+                            returnsData?.return_items?.reduce(
+                              (sum, returnItem) => {
+                                const saleItem = items.find(
+                                  (si) => si.id === returnItem.sale_item_id
+                                );
+                                if (!saleItem) return sum;
+                                const costPrice = saleItem.cost_price || 0;
+                                const profitPerUnit =
+                                  returnItem.unit_price - costPrice;
+                                return (
+                                  sum + profitPerUnit * returnItem.quantity
+                                );
+                              },
+                              0
+                            ) || 0;
+
+                          return originalProfit - returnedProfit;
+                        })()
+                      )}
+                    </dd>
+                  </div>
+                  {returnsData && returnsData.returns.length > 0 && (
+                    <div className="mt-2 text-xs text-gray-500">
+                      After {returnsData.returns.length} return
+                      {returnsData.returns.length > 1 ? "s" : ""}
                     </div>
                   )}
-                  {sale.tax_amount > 0 && (
-                    <div className="flex justify-between">
-                      <dt className="text-sm text-gray-600">Tax</dt>
-                      <dd className="text-sm font-medium">
-                        {formatCurrency(sale.tax_amount)}
-                      </dd>
-                    </div>
-                  )}
-                  <div className="border-t border-gray-200 pt-3">
-                    <div className="flex justify-between">
-                      <dt className="text-base font-semibold">Total</dt>
-                      <dd className="text-base font-bold text-indigo-600">
-                        {formatCurrency(sale.final_amount)}
-                      </dd>
-                    </div>
-                  </div>
-                  <div className="border-t border-gray-200 pt-3">
-                    <div className="flex justify-between">
-                      <dt className="text-base font-semibold text-green-600">
-                        Net Profit
-                      </dt>
-                      <dd className="text-base font-bold text-green-600">
-                        {formatCurrency(
-                          (() => {
-                            const originalProfit = items.reduce((sum, item) => {
-                              const costPrice = item.cost_price || 0;
-                              const profitPerUnit = item.unit_price - costPrice;
-                              return sum + profitPerUnit * item.quantity;
-                            }, 0);
-
-                            const returnedProfit =
-                              returnsData?.return_items?.reduce(
-                                (sum, returnItem) => {
-                                  const saleItem = items.find(
-                                    (si) => si.id === returnItem.sale_item_id
-                                  );
-                                  if (!saleItem) return sum;
-                                  const costPrice = saleItem.cost_price || 0;
-                                  const profitPerUnit =
-                                    returnItem.unit_price - costPrice;
-                                  return (
-                                    sum + profitPerUnit * returnItem.quantity
-                                  );
-                                },
-                                0
-                              ) || 0;
-
-                            return originalProfit - returnedProfit;
-                          })()
-                        )}
-                      </dd>
-                    </div>
-                    {returnsData && returnsData.returns.length > 0 && (
-                      <div className="mt-2 text-xs text-gray-500">
-                        After {returnsData.returns.length} return
-                        {returnsData.returns.length > 1 ? "s" : ""}
-                      </div>
-                    )}
-                  </div>
-                </dl>
-              </div>
+                </div>
+              </dl>
             </div>
+          </div>
+        </div>
+
+        {/* Sale Items */}
+        <div className="mt-6 rounded-lg bg-white shadow">
+          <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+            <h2 className="text-lg font-semibold">Items</h2>
+            <span className="text-sm text-gray-500">
+              Total:{" "}
+              <span className="font-semibold text-gray-700">
+                {items.length}
+              </span>{" "}
+              items
+            </span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-gray-500">
+                    #
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                    Product
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                    Barcode
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">
+                    Quantity
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">
+                    Unit Price
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">
+                    Discount
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">
+                    Subtotal
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">
+                    Profit
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200 bg-white">
+                {items.map((item, index) => {
+                  const costPrice = item.cost_price || 0;
+                  const profitPerUnit = item.unit_price - costPrice;
+
+                  // Get return status for this item
+                  const itemStatus = returnsData?.sale_items_status?.find(
+                    (status) => status.id === item.id
+                  );
+                  const returnedQty = itemStatus?.returned_quantity || 0;
+                  const isFullyReturned = returnedQty >= item.quantity;
+                  const isPartiallyReturned =
+                    returnedQty > 0 && !isFullyReturned;
+
+                  return (
+                    <tr
+                      key={item.id}
+                      className={isFullyReturned ? "bg-gray-50 opacity-75" : ""}
+                    >
+                      <td className="whitespace-nowrap px-4 py-4 text-center text-sm text-gray-500">
+                        {index + 1}
+                      </td>
+                      <td className="whitespace-nowrap px-6 py-4 text-sm font-medium">
+                        <div className="flex items-center gap-2">
+                          {item.product_name}
+                          {isFullyReturned && (
+                            <span className="rounded bg-red-100 px-2 py-0.5 text-xs text-red-800">
+                              Returned
+                            </span>
+                          )}
+                          {isPartiallyReturned && (
+                            <span className="rounded bg-orange-100 px-2 py-0.5 text-xs text-orange-800">
+                              Partial Return
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-500">
+                        {item.barcode || "N/A"}
+                      </td>
+                      <td className="whitespace-nowrap px-6 py-4 text-right text-sm">
+                        <div>
+                          {item.quantity}
+                          {returnedQty > 0 && (
+                            <span className="ml-1 text-xs text-red-600">
+                              (-{returnedQty})
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="whitespace-nowrap px-6 py-4 text-right text-sm">
+                        {formatCurrency(item.unit_price)}
+                      </td>
+                      <td className="whitespace-nowrap px-6 py-4 text-right text-sm text-red-600">
+                        {item.discount > 0
+                          ? formatCurrency(item.discount)
+                          : "-"}
+                      </td>
+                      <td className="whitespace-nowrap px-6 py-4 text-right text-sm font-semibold">
+                        {formatCurrency(item.subtotal)}
+                      </td>
+                      <td className="whitespace-nowrap px-6 py-4 text-right text-sm font-semibold">
+                        <div className="flex flex-col items-end">
+                          {(() => {
+                            const originalProfit =
+                              profitPerUnit * item.quantity;
+                            const returnedProfit = profitPerUnit * returnedQty;
+                            const netProfit = originalProfit - returnedProfit;
+                            return (
+                              <>
+                                <span
+                                  className={
+                                    netProfit >= 0
+                                      ? "text-green-600"
+                                      : "text-red-600"
+                                  }
+                                >
+                                  {formatCurrency(netProfit)}
+                                </span>
+                                {returnedQty > 0 && (
+                                  <span className="text-xs text-gray-500">
+                                    (was {formatCurrency(originalProfit)})
+                                  </span>
+                                )}
+                              </>
+                            );
+                          })()}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         </div>
 

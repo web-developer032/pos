@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useGetCustomerCreditQuery } from "@/lib/api/customersApi";
 import { useCurrency } from "@/lib/hooks/useCurrency";
 import { formatDateTime } from "@/lib/utils/dateTime";
@@ -111,6 +112,9 @@ export function CustomerCreditDetail({
                   <th className="px-3 py-2 text-right text-xs font-medium uppercase text-gray-500">
                     Due
                   </th>
+                  <th className="px-3 py-2 text-center text-xs font-medium uppercase text-gray-500">
+                    Action
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 bg-white">
@@ -130,6 +134,15 @@ export function CustomerCreditDetail({
                     </td>
                     <td className="px-3 py-2 text-right text-sm font-medium text-amber-600">
                       {formatCurrency(sale.amount_due)}
+                    </td>
+                    <td className="px-3 py-2 text-center text-sm">
+                      <Link
+                        href={`/sales/${sale.id}`}
+                        target="_blank"
+                        className="text-indigo-600 hover:text-indigo-900 hover:underline"
+                      >
+                        View
+                      </Link>
                     </td>
                   </tr>
                 ))}
