@@ -36,6 +36,8 @@ export function CustomerPaymentForm({
   const { format: formatCurrency } = useCurrency();
   const [createPayment, { isLoading }] = useCreateCustomerPaymentMutation();
 
+  const isAddingCredit = currentBalance === 0;
+
   const {
     register,
     handleSubmit,
@@ -45,7 +47,7 @@ export function CustomerPaymentForm({
   } = useForm<PaymentFormData>({
     resolver: zodResolver(paymentSchema),
     defaultValues: {
-      amount: currentBalance,
+      amount: currentBalance || undefined,
       payment_method: "cash",
       reference_number: "",
       notes: "",
@@ -62,13 +64,6 @@ export function CustomerPaymentForm({
   ];
 
   const onSubmit = async (data: PaymentFormData) => {
-    if (data.amount > currentBalance) {
-      toast.error(
-        `Amount cannot exceed balance of ${formatCurrency(currentBalance)}`
-      );
-      return;
-    }
-
     try {
       const result = await createPayment({
         customerId,
@@ -93,53 +88,81 @@ export function CustomerPaymentForm({
   return (
     <Form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
       {/* Current Balance Display */}
-      <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
-        <p className="text-sm font-medium text-amber-700">
-          Outstanding Balance
-        </p>
-        <p className="text-2xl font-bold text-amber-800">
-          {formatCurrency(currentBalance)}
-        </p>
-      </div>
+      {currentBalance > 0 ? (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+          <p className="text-sm font-medium text-amber-700">
+            Outstanding Balance
+          </p>
+          <p className="text-2xl font-bold text-amber-800">
+            {formatCurrency(currentBalance)}
+          </p>
+        </div>
+      ) : (
+        <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+          <p className="text-sm font-medium text-blue-700">Adding Credit</p>
+          <p className="text-sm text-blue-600">
+            Amount will be stored as credit for future purchases
+          </p>
+        </div>
+      )}
 
       {/* Amount Input */}
       <div>
         <Input
-          label="Payment Amount"
+          label={isAddingCredit ? "Credit Amount" : "Payment Amount"}
           type="number"
           step="0.01"
           min="0.01"
-          max={currentBalance}
           {...register("amount", { valueAsNumber: true })}
           error={errors.amount?.message}
         />
-        <div className="mt-2 flex gap-2">
-          {quickAmounts.map((qa) => (
-            <button
-              key={qa.label}
-              type="button"
-              onClick={() => setValue("amount", qa.value)}
-              className={`rounded px-3 py-1 text-xs transition-colors ${
-                amountValue === qa.value
-                  ? "bg-indigo-600 text-white"
-                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-              }`}
-            >
-              {qa.label} ({formatCurrency(qa.value)})
-            </button>
-          ))}
-        </div>
+        {currentBalance > 0 && (
+          <div className="mt-2 flex gap-2">
+            {quickAmounts.map((qa) => (
+              <button
+                key={qa.label}
+                type="button"
+                onClick={() => setValue("amount", qa.value)}
+                className={`rounded px-3 py-1 text-xs transition-colors ${
+                  amountValue === qa.value
+                    ? "bg-indigo-600 text-white"
+                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                }`}
+              >
+                {qa.label} ({formatCurrency(qa.value)})
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* Remaining after payment */}
-      {amountValue > 0 && amountValue < currentBalance && (
-        <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
-          <p className="text-sm text-gray-600">
-            Remaining after payment:{" "}
-            <span className="font-semibold text-gray-900">
-              {formatCurrency(currentBalance - amountValue)}
-            </span>
-          </p>
+      {/* Balance after payment */}
+      {amountValue > 0 && !isAddingCredit && amountValue !== currentBalance && (
+        <div
+          className={`rounded-lg border p-3 ${
+            amountValue > currentBalance
+              ? "border-blue-200 bg-blue-50"
+              : "border-gray-200 bg-gray-50"
+          }`}
+        >
+          {amountValue > currentBalance ? (
+            <p className="text-sm text-blue-700">
+              Credit balance after payment:{" "}
+              <span className="font-semibold">
+                {formatCurrency(amountValue - currentBalance)}
+              </span>
+              <span className="ml-1 text-xs text-blue-600">
+                (can be used for future purchases)
+              </span>
+            </p>
+          ) : (
+            <p className="text-sm text-gray-600">
+              Remaining after payment:{" "}
+              <span className="font-semibold text-gray-900">
+                {formatCurrency(currentBalance - amountValue)}
+              </span>
+            </p>
+          )}
         </div>
       )}
 
@@ -187,7 +210,9 @@ export function CustomerPaymentForm({
         <Button type="submit" disabled={isLoading}>
           {isLoading
             ? "Recording..."
-            : `Record Payment of ${formatCurrency(amountValue || 0)}`}
+            : isAddingCredit
+              ? `Add Credit of ${formatCurrency(amountValue || 0)}`
+              : `Record Payment of ${formatCurrency(amountValue || 0)}`}
         </Button>
       </div>
     </Form>

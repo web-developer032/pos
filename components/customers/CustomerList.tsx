@@ -53,16 +53,35 @@ export function CustomerList() {
   const [deleteAllCustomers] = useDeleteAllCustomersMutation();
   const [importCustomers] = useImportCustomersMutation();
 
-  // Calculate total receivables
+  // Calculate total receivables (only positive balances - money owed TO the business)
   const totalReceivables = useMemo(() => {
     return (
-      data?.customers.reduce((sum, c) => sum + (c.credit_balance || 0), 0) || 0
+      data?.customers.reduce((sum, c) => {
+        const balance = c.credit_balance || 0;
+        return balance > 0 ? sum + balance : sum;
+      }, 0) || 0
+    );
+  }, [data?.customers]);
+
+  // Calculate total credits owed BY the business to customers (negative balances)
+  const totalCreditsOwed = useMemo(() => {
+    return (
+      data?.customers.reduce((sum, c) => {
+        const balance = c.credit_balance || 0;
+        return balance < 0 ? sum + Math.abs(balance) : sum;
+      }, 0) || 0
     );
   }, [data?.customers]);
 
   const customersWithCredit = useMemo(() => {
     return (
       data?.customers.filter((c) => (c.credit_balance || 0) > 0).length || 0
+    );
+  }, [data?.customers]);
+
+  const customersWithStoredCredit = useMemo(() => {
+    return (
+      data?.customers.filter((c) => (c.credit_balance || 0) < 0).length || 0
     );
   }, [data?.customers]);
 
@@ -170,20 +189,36 @@ export function CustomerList() {
   return (
     <div>
       {/* Summary Cards */}
-      {totalReceivables > 0 && (
+      {(totalReceivables > 0 || totalCreditsOwed > 0) && (
         <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
-            <p className="text-sm font-medium text-amber-600">
-              Total Receivables
-            </p>
-            <p className="mt-1 text-2xl font-bold text-amber-700">
-              {formatCurrency(totalReceivables)}
-            </p>
-            <p className="mt-1 text-xs text-amber-600">
-              From {customersWithCredit} customer
-              {customersWithCredit !== 1 ? "s" : ""}
-            </p>
-          </div>
+          {totalReceivables > 0 && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+              <p className="text-sm font-medium text-amber-600">
+                Total Receivables
+              </p>
+              <p className="mt-1 text-2xl font-bold text-amber-700">
+                {formatCurrency(totalReceivables)}
+              </p>
+              <p className="mt-1 text-xs text-amber-600">
+                From {customersWithCredit} customer
+                {customersWithCredit !== 1 ? "s" : ""}
+              </p>
+            </div>
+          )}
+          {totalCreditsOwed > 0 && (
+            <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+              <p className="text-sm font-medium text-blue-600">
+                Customer Credits
+              </p>
+              <p className="mt-1 text-2xl font-bold text-blue-700">
+                {formatCurrency(totalCreditsOwed)}
+              </p>
+              <p className="mt-1 text-xs text-blue-600">
+                Owed to {customersWithStoredCredit} customer
+                {customersWithStoredCredit !== 1 ? "s" : ""}
+              </p>
+            </div>
+          )}
         </div>
       )}
 
@@ -263,7 +298,11 @@ export function CustomerList() {
               <tr
                 key={customer.id}
                 className={
-                  (customer.credit_balance || 0) > 0 ? "bg-amber-50" : ""
+                  (customer.credit_balance || 0) > 0
+                    ? "bg-amber-50"
+                    : (customer.credit_balance || 0) < 0
+                      ? "bg-blue-50"
+                      : ""
                 }
               >
                 <td className="whitespace-nowrap px-3 py-4 text-center text-sm text-gray-500 sm:px-4">
@@ -286,6 +325,14 @@ export function CustomerList() {
                     >
                       {formatCurrency(customer.credit_balance || 0)}
                     </button>
+                  ) : (customer.credit_balance || 0) < 0 ? (
+                    <button
+                      onClick={() => setViewingCreditCustomer(customer)}
+                      className="font-semibold text-blue-600 hover:text-blue-800 hover:underline"
+                      title="Customer has credit"
+                    >
+                      -{formatCurrency(Math.abs(customer.credit_balance || 0))}
+                    </button>
                   ) : (
                     <span className="text-gray-400">—</span>
                   )}
@@ -295,12 +342,16 @@ export function CustomerList() {
                 </td>
                 <td className="whitespace-nowrap px-3 py-4 text-right text-sm font-medium sm:px-6">
                   <div className="flex flex-col gap-1 sm:flex-row sm:justify-end sm:gap-2">
-                    {(customer.credit_balance || 0) > 0 && (
+                    {(customer.credit_balance || 0) !== 0 && (
                       <button
                         onClick={() => setViewingCreditCustomer(customer)}
-                        className="text-amber-600 hover:text-amber-800"
+                        className={
+                          (customer.credit_balance || 0) > 0
+                            ? "text-amber-600 hover:text-amber-800"
+                            : "text-blue-600 hover:text-blue-800"
+                        }
                       >
-                        Credit
+                        {(customer.credit_balance || 0) > 0 ? "Owes" : "Credit"}
                       </button>
                     )}
                     <button

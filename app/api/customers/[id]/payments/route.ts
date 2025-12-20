@@ -103,16 +103,6 @@ async function postHandler(req: AuthRequest, context?: RouteContext) {
       credit_balance: number;
     };
 
-    // Validate payment amount doesn't exceed balance
-    if (validated.amount > customer.credit_balance) {
-      return NextResponse.json(
-        {
-          error: `Payment amount (${validated.amount}) exceeds outstanding balance (${customer.credit_balance})`,
-        },
-        { status: 400 }
-      );
-    }
-
     const timestamp = getCurrentTimestamp();
 
     // Create payment record
@@ -140,11 +130,18 @@ async function postHandler(req: AuthRequest, context?: RouteContext) {
       args: [newBalance, timestamp, customerId],
     });
 
+    const message =
+      newBalance < 0
+        ? `Payment of ${validated.amount} recorded. Customer has credit of ${Math.abs(newBalance)}`
+        : newBalance === 0
+          ? `Payment of ${validated.amount} recorded. Balance cleared!`
+          : `Payment of ${validated.amount} recorded. Remaining balance: ${newBalance}`;
+
     return NextResponse.json(
       {
         payment: paymentResult.rows[0],
         new_balance: newBalance,
-        message: `Payment of ${validated.amount} recorded. New balance: ${newBalance}`,
+        message,
       },
       { status: 201 }
     );

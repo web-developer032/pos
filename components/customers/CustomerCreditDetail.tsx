@@ -50,12 +50,33 @@ export function CustomerCreditDetail({
     <div className="space-y-6">
       {/* Summary Cards */}
       <div className="grid grid-cols-2 gap-4">
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
-          <p className="text-sm font-medium text-amber-600">Current Balance</p>
-          <p className="text-2xl font-bold text-amber-700">
-            {formatCurrency(customer.credit_balance)}
-          </p>
-        </div>
+        {customer.credit_balance > 0 ? (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+            <p className="text-sm font-medium text-amber-600">Balance Owed</p>
+            <p className="text-2xl font-bold text-amber-700">
+              {formatCurrency(customer.credit_balance)}
+            </p>
+          </div>
+        ) : customer.credit_balance < 0 ? (
+          <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+            <p className="text-sm font-medium text-blue-600">
+              Credit Available
+            </p>
+            <p className="text-2xl font-bold text-blue-700">
+              {formatCurrency(Math.abs(customer.credit_balance))}
+            </p>
+            <p className="mt-1 text-xs text-blue-600">
+              Can be used for future purchases
+            </p>
+          </div>
+        ) : (
+          <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+            <p className="text-sm font-medium text-gray-600">Balance</p>
+            <p className="text-2xl font-bold text-gray-700">
+              {formatCurrency(0)}
+            </p>
+          </div>
+        )}
         <div className="rounded-lg border border-green-200 bg-green-50 p-4">
           <p className="text-sm font-medium text-green-600">Total Payments</p>
           <p className="text-2xl font-bold text-green-700">
@@ -64,28 +85,26 @@ export function CustomerCreditDetail({
         </div>
       </div>
 
-      {/* Record Payment Button / Form */}
-      {customer.credit_balance > 0 && (
-        <div>
-          {showPaymentForm ? (
-            <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
-              <h3 className="mb-4 font-semibold text-gray-900">
-                Record Payment
-              </h3>
-              <CustomerPaymentForm
-                customerId={customerId}
-                currentBalance={customer.credit_balance}
-                onSuccess={handlePaymentSuccess}
-                onCancel={() => setShowPaymentForm(false)}
-              />
-            </div>
-          ) : (
-            <Button onClick={() => setShowPaymentForm(true)} className="w-full">
-              Record Payment
-            </Button>
-          )}
-        </div>
-      )}
+      {/* Record Payment / Add Credit Button / Form */}
+      <div>
+        {showPaymentForm ? (
+          <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+            <h3 className="mb-4 font-semibold text-gray-900">
+              {customer.credit_balance > 0 ? "Record Payment" : "Add Credit"}
+            </h3>
+            <CustomerPaymentForm
+              customerId={customerId}
+              currentBalance={Math.max(0, customer.credit_balance)}
+              onSuccess={handlePaymentSuccess}
+              onCancel={() => setShowPaymentForm(false)}
+            />
+          </div>
+        ) : (
+          <Button onClick={() => setShowPaymentForm(true)} className="w-full">
+            {customer.credit_balance > 0 ? "Record Payment" : "Add Credit"}
+          </Button>
+        )}
+      </div>
 
       {/* Unpaid Sales */}
       {unpaid_sales.length > 0 && (
