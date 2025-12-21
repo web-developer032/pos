@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import client from "@/lib/db";
 
+// Disable caching for this route - summary must always be fresh
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 interface PaymentMethodRow {
   payment_method: string;
   total_amount: number;
@@ -82,7 +86,9 @@ export async function GET() {
       args: [openedAt],
     });
 
-    const returnedProfit = (returnedProfitResult.rows[0] as unknown as { returned_profit: number }).returned_profit || 0;
+    const returnedProfit =
+      (returnedProfitResult.rows[0] as unknown as { returned_profit: number })
+        .returned_profit || 0;
 
     // Get total sales summary
     const totalSalesResult = await client.execute({
@@ -145,7 +151,8 @@ export async function GET() {
 
     // Calculate gross profit from all sales
     const grossProfit = salesByMethodResult.rows.reduce(
-      (sum, row) => sum + ((row as unknown as { gross_profit: number }).gross_profit || 0),
+      (sum, row) =>
+        sum + ((row as unknown as { gross_profit: number }).gross_profit || 0),
       0
     );
 

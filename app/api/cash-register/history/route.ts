@@ -6,6 +6,10 @@ import {
   SESSION_SELECT_SQL,
 } from "@/lib/utils/cashRegisterHelpers";
 
+// Disable caching for this route
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 // GET /api/cash-register/history - Get past sessions
 export async function GET(request: NextRequest) {
   try {

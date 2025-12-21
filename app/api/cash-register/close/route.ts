@@ -8,6 +8,9 @@ import {
   SESSION_SELECT_SQL,
 } from "@/lib/utils/cashRegisterHelpers";
 
+// Disable caching for this route
+export const dynamic = "force-dynamic";
+
 const closeSessionSchema = z.object({
   closing_balance: z.number().min(0, "Closing balance must be non-negative"),
   notes: z.string().optional(),
