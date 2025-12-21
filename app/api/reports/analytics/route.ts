@@ -49,23 +49,23 @@ async function getHandler(req: NextRequest) {
 
     const revenueResult = await client.execute({ sql: revenueSql, args });
 
-    // Then, get profit grouped by date (needs JOIN with sale_items for cost calculation)
-    const profitSql = `
+    // Get refunds grouped by date (to subtract from revenue)
+    const refundsSql = `
+      SELECT 
+        ${dateGrouping} as date,
+        COALESCE(SUM(refund_amount), 0) as total_refunds
+      FROM returns
+      WHERE 1=1 ${dateFilter}
+      GROUP BY ${dateGrouping}
+    `;
+
+    const refundsResult = await client.execute({ sql: refundsSql, args });
+
+    // Get gross profit grouped by date (from sale items)
+    const grossProfitSql = `
       SELECT 
         ${dateGrouping.replace("created_at", "s.created_at")} as date,
-        COALESCE(
-          SUM((si.unit_price - si.cost_price) * si.quantity)
-          -
-          COALESCE(
-            (SELECT SUM((ri.unit_price - si2.cost_price) * ri.quantity)
-             FROM return_items ri
-             JOIN returns r ON ri.return_id = r.id
-             JOIN sale_items si2 ON ri.sale_item_id = si2.id
-             WHERE r.sale_id = s.id),
-            0
-          ),
-          0
-        ) as total_profit
+        COALESCE(SUM((si.unit_price - si.cost_price) * si.quantity), 0) as gross_profit
       FROM sales s
       LEFT JOIN sale_items si ON s.id = si.sale_id
       WHERE 1=1 ${dateFilter.replace(/created_at/g, "s.created_at")}
@@ -73,7 +73,27 @@ async function getHandler(req: NextRequest) {
       ORDER BY date ASC
     `;
 
-    const profitResult = await client.execute({ sql: profitSql, args });
+    const grossProfitResult = await client.execute({
+      sql: grossProfitSql,
+      args,
+    });
+
+    // Get returned profit grouped by date (from return items)
+    const returnedProfitSql = `
+      SELECT 
+        ${dateGrouping.replace("created_at", "r.created_at")} as date,
+        COALESCE(SUM((ri.unit_price - si.cost_price) * ri.quantity), 0) as returned_profit
+      FROM returns r
+      JOIN return_items ri ON r.id = ri.return_id
+      JOIN sale_items si ON ri.sale_item_id = si.id
+      WHERE 1=1 ${dateFilter.replace(/created_at/g, "r.created_at")}
+      GROUP BY ${dateGrouping.replace("created_at", "r.created_at")}
+    `;
+
+    const returnedProfitResult = await client.execute({
+      sql: returnedProfitSql,
+      args,
+    });
 
     // Merge revenue and profit data by date
     const revenueMap = new Map(
@@ -87,16 +107,32 @@ async function getHandler(req: NextRequest) {
       ])
     );
 
-    const profitMap = new Map(
-      profitResult.rows.map((row: any) => [row.date, row.total_profit || 0])
+    const refundsMap = new Map(
+      refundsResult.rows.map((row: any) => [row.date, row.total_refunds || 0])
     );
 
-    // Combine data
+    const grossProfitMap = new Map(
+      grossProfitResult.rows.map((row: any) => [
+        row.date,
+        row.gross_profit || 0,
+      ])
+    );
+
+    const returnedProfitMap = new Map(
+      returnedProfitResult.rows.map((row: any) => [
+        row.date,
+        row.returned_profit || 0,
+      ])
+    );
+
+    // Combine data (subtract refunds from revenue, subtract returned profit from gross profit)
     const data = Array.from(revenueMap.keys()).map((date) => ({
       date,
       total_sales: revenueMap.get(date)!.total_sales,
-      total_revenue: revenueMap.get(date)!.total_revenue,
-      total_profit: profitMap.get(date) || 0,
+      total_revenue:
+        revenueMap.get(date)!.total_revenue - (refundsMap.get(date) || 0),
+      total_profit:
+        (grossProfitMap.get(date) || 0) - (returnedProfitMap.get(date) || 0),
       average_order_value: revenueMap.get(date)!.average_order_value,
     }));
 
@@ -115,28 +151,46 @@ async function getHandler(req: NextRequest) {
       args,
     });
 
-    const profitSummarySql = `
-      SELECT 
-        COALESCE(
-          SUM((si.unit_price - si.cost_price) * si.quantity)
-          -
-          COALESCE(
-            (SELECT SUM((ri.unit_price - si2.cost_price) * ri.quantity)
-             FROM return_items ri
-             JOIN returns r ON ri.return_id = r.id
-             JOIN sale_items si2 ON ri.sale_item_id = si2.id
-             WHERE r.sale_id = s.id),
-            0
-          ),
-          0
-        ) as total_profit
+    // Get total refunds for the period
+    const summaryRefundsSql = `
+      SELECT COALESCE(SUM(refund_amount), 0) as total_refunds
+      FROM returns
+      WHERE 1=1 ${dateFilter}
+    `;
+
+    const summaryRefundsResult = await client.execute({
+      sql: summaryRefundsSql,
+      args,
+    });
+
+    const summaryRefunds =
+      (summaryRefundsResult.rows[0] as unknown as { total_refunds: number })
+        .total_refunds || 0;
+
+    // Get gross profit for period
+    const grossProfitSummarySql = `
+      SELECT COALESCE(SUM((si.unit_price - si.cost_price) * si.quantity), 0) as gross_profit
       FROM sales s
       LEFT JOIN sale_items si ON s.id = si.sale_id
       WHERE 1=1 ${dateFilter.replace(/created_at/g, "s.created_at")}
     `;
 
-    const summaryProfitResult = await client.execute({
-      sql: profitSummarySql,
+    const grossProfitSummaryResult = await client.execute({
+      sql: grossProfitSummarySql,
+      args,
+    });
+
+    // Get returned profit for period
+    const returnedProfitSummarySql = `
+      SELECT COALESCE(SUM((ri.unit_price - si.cost_price) * ri.quantity), 0) as returned_profit
+      FROM returns r
+      JOIN return_items ri ON r.id = ri.return_id
+      JOIN sale_items si ON ri.sale_item_id = si.id
+      WHERE 1=1 ${dateFilter.replace(/created_at/g, "r.created_at")}
+    `;
+
+    const returnedProfitSummaryResult = await client.execute({
+      sql: returnedProfitSummarySql,
       args,
     });
 
@@ -146,22 +200,32 @@ async function getHandler(req: NextRequest) {
       average_order_value: number;
     };
 
-    const summaryProfit = summaryProfitResult.rows[0] as unknown as {
-      total_profit: number;
-    };
+    const summaryGrossProfit =
+      (
+        grossProfitSummaryResult.rows[0] as unknown as {
+          gross_profit: number;
+        }
+      ).gross_profit || 0;
+
+    const summaryReturnedProfit =
+      (
+        returnedProfitSummaryResult.rows[0] as unknown as {
+          returned_profit: number;
+        }
+      ).returned_profit || 0;
+
+    const totalProfit = summaryGrossProfit - summaryReturnedProfit;
+
+    // Calculate net revenue (gross revenue minus refunds)
+    const netRevenue = (summaryRevenue.total_revenue || 0) - summaryRefunds;
 
     const summary = {
       totalSales: summaryRevenue.total_sales || 0,
-      totalRevenue: summaryRevenue.total_revenue || 0,
-      totalProfit: summaryProfit.total_profit || 0,
+      totalRevenue: netRevenue,
+      totalProfit: totalProfit,
       averageOrderValue: summaryRevenue.average_order_value || 0,
       profitMargin:
-        summaryRevenue.total_revenue > 0
-          ? (
-              (summaryProfit.total_profit / summaryRevenue.total_revenue) *
-              100
-            ).toFixed(2)
-          : "0.00",
+        netRevenue > 0 ? ((totalProfit / netRevenue) * 100).toFixed(2) : "0.00",
     };
 
     return NextResponse.json({

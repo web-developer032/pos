@@ -56,19 +56,33 @@ export async function GET() {
 
     const openedAt = session.opened_at;
 
-    // Get sales by payment method with profit
+    // Get sales by payment method with gross profit
     const salesByMethodResult = await client.execute({
       sql: `
         SELECT payment_method, COUNT(*) as transaction_count,
                COALESCE(SUM(final_amount), 0) as total_amount,
                COALESCE(SUM((SELECT SUM((si.unit_price - si.cost_price) * si.quantity) 
-                             FROM sale_items si WHERE si.sale_id = sales.id)), 0) as total_profit
+                             FROM sale_items si WHERE si.sale_id = sales.id)), 0) as gross_profit
         FROM sales
         WHERE created_at >= ?
         GROUP BY payment_method
       `,
       args: [openedAt],
     });
+
+    // Get returned profit for the session
+    const returnedProfitResult = await client.execute({
+      sql: `
+        SELECT COALESCE(SUM((ri.unit_price - si.cost_price) * ri.quantity), 0) as returned_profit
+        FROM returns r
+        JOIN return_items ri ON r.id = ri.return_id
+        JOIN sale_items si ON ri.sale_item_id = si.id
+        WHERE r.created_at >= ?
+      `,
+      args: [openedAt],
+    });
+
+    const returnedProfit = (returnedProfitResult.rows[0] as unknown as { returned_profit: number }).returned_profit || 0;
 
     // Get total sales summary
     const totalSalesResult = await client.execute({
@@ -129,6 +143,15 @@ export async function GET() {
     const expectedCashBalance =
       session.opening_balance + cashSales - cashRefunds - cashExpenses;
 
+    // Calculate gross profit from all sales
+    const grossProfit = salesByMethodResult.rows.reduce(
+      (sum, row) => sum + ((row as unknown as { gross_profit: number }).gross_profit || 0),
+      0
+    );
+
+    // Net profit = gross profit - returned profit
+    const netProfit = grossProfit - returnedProfit;
+
     return NextResponse.json({
       session: {
         id: session.id,
@@ -137,7 +160,12 @@ export async function GET() {
       },
       sales: {
         by_method: salesByMethodResult.rows,
-        total: totalSalesResult.rows[0],
+        total: {
+          ...totalSalesResult.rows[0],
+          gross_profit: grossProfit,
+          returned_profit: returnedProfit,
+          net_profit: netProfit,
+        },
       },
       returns: {
         by_method: returnsByMethodResult.rows,

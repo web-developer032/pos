@@ -6,25 +6,18 @@ import { format, parseISO, isValid } from "date-fns";
  */
 
 /**
- * Get the current timestamp in local time
- * Returns format: YYYY-MM-DD HH:MM:SS (for SQLite DATETIME)
+ * Get the current timestamp in UTC (ISO 8601 format)
+ * Returns format: YYYY-MM-DDTHH:MM:SS.sssZ (UTC/ISO format for consistent storage)
  */
 export function getCurrentTimestamp(): string {
-  const now = new Date();
-  // Format in local time for consistent display
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, "0");
-  const day = String(now.getDate()).padStart(2, "0");
-  const hours = String(now.getHours()).padStart(2, "0");
-  const minutes = String(now.getMinutes()).padStart(2, "0");
-  const seconds = String(now.getSeconds()).padStart(2, "0");
-  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+  return new Date().toISOString();
 }
 
 /**
  * Parse a database timestamp string to a Date object
- * Timestamps are stored in local time
- * @param timestamp - Database timestamp string (YYYY-MM-DD HH:MM:SS in local time)
+ * New timestamps are stored in UTC (ISO format with Z suffix)
+ * Old timestamps without timezone are treated as UTC for consistency
+ * @param timestamp - Database timestamp string (ISO format or legacy YYYY-MM-DD HH:MM:SS)
  */
 export function parseDatabaseTimestamp(timestamp: string | Date): Date {
   if (timestamp instanceof Date) {
@@ -40,9 +33,9 @@ export function parseDatabaseTimestamp(timestamp: string | Date): Date {
     return parseISO(timestamp);
   }
 
-  // Database stores in local time format: "YYYY-MM-DD HH:MM:SS"
-  // Parse as local time (no Z suffix)
-  const isoString = timestamp.replace(" ", "T");
+  // Legacy format: "YYYY-MM-DD HH:MM:SS" without timezone
+  // Treat as UTC for consistency (append Z)
+  const isoString = timestamp.replace(" ", "T") + "Z";
   const date = new Date(isoString);
 
   if (!isValid(date)) {
@@ -128,35 +121,37 @@ export function formatTimeOnly(
 }
 
 /**
- * Format date for database storage (YYYY-MM-DD)
+ * Format date for database storage (YYYY-MM-DD in UTC)
  */
 export function formatDateForDatabase(date: Date): string {
-  return format(date, "yyyy-MM-dd");
+  return date.toISOString().split("T")[0];
 }
 
 /**
- * Format datetime for database storage (YYYY-MM-DD HH:MM:SS)
+ * Format datetime for database storage (ISO 8601 UTC format)
  */
 export function formatDateTimeForDatabase(date: Date): string {
-  return format(date, "yyyy-MM-dd HH:mm:ss");
+  return date.toISOString();
 }
 
 /**
  * Get start of day in local timezone (for date range queries)
+ * Returns UTC timestamp for the start of the local day
  */
 export function getStartOfDay(date: Date = new Date()): string {
   const start = new Date(date);
   start.setHours(0, 0, 0, 0);
-  return formatDateTimeForDatabase(start);
+  return start.toISOString();
 }
 
 /**
  * Get end of day in local timezone (for date range queries)
+ * Returns UTC timestamp for the end of the local day
  */
 export function getEndOfDay(date: Date = new Date()): string {
   const end = new Date(date);
   end.setHours(23, 59, 59, 999);
-  return formatDateTimeForDatabase(end);
+  return end.toISOString();
 }
 
 /**
