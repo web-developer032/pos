@@ -535,22 +535,25 @@ export default function SaleDetailPage() {
 
         {/* Hidden receipt for printing */}
         <div className="hidden">
-          <Receipt
-            ref={receiptRef}
-            sale={sale}
-            items={items
+          {(() => {
+            // Calculate total refunds from returns
+            const totalRefunds =
+              returnsData?.returns?.reduce(
+                (sum, r) => sum + (r.refund_amount || 0),
+                0
+              ) || 0;
+
+            // Filter and adjust items for returns
+            const adjustedItems = items
               .map((item) => {
-                // Get return status for this item
                 const itemStatus = returnsData?.sale_items_status?.find(
                   (status) => status.id === item.id
                 );
                 const returnedQty = itemStatus?.returned_quantity || 0;
                 const effectiveQty = item.quantity - returnedQty;
 
-                // Skip fully returned items
                 if (effectiveQty <= 0) return null;
 
-                // Return item with adjusted quantity and subtotal
                 return {
                   ...item,
                   quantity: effectiveQty,
@@ -559,8 +562,32 @@ export default function SaleDetailPage() {
               })
               .filter(
                 (item): item is NonNullable<typeof item> => item !== null
-              )}
-          />
+              );
+
+            // Calculate adjusted subtotal from effective items
+            const adjustedSubtotal = adjustedItems.reduce(
+              (sum, item) => sum + item.quantity * item.unit_price,
+              0
+            );
+
+            // Adjusted total = original final amount - refunds
+            const adjustedTotal = sale.final_amount - totalRefunds;
+
+            // Create adjusted sale object for receipt
+            const adjustedSale = {
+              ...sale,
+              total_amount: adjustedSubtotal,
+              final_amount: adjustedTotal,
+            };
+
+            return (
+              <Receipt
+                ref={receiptRef}
+                sale={adjustedSale}
+                items={adjustedItems}
+              />
+            );
+          })()}
         </div>
       </DashboardLayout>
     </ProtectedRoute>
