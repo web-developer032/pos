@@ -26,7 +26,24 @@ async function getHandler(req: NextRequest, context?: RouteContext) {
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
     }
 
-    return NextResponse.json({ product: result.rows[0] });
+    const product = result.rows[0];
+
+    // Fetch additional barcodes for this product
+    const barcodesResult = await client.execute({
+      sql: `SELECT barcode FROM product_barcodes WHERE product_id = ?`,
+      args: [product.id],
+    });
+
+    const additional_barcodes = barcodesResult.rows.map(
+      (row) => row.barcode as string
+    );
+
+    return NextResponse.json({
+      product: {
+        ...product,
+        additional_barcodes,
+      },
+    });
   } catch (error) {
     console.error("Error fetching product by barcode:", error);
     return NextResponse.json(
