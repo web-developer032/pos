@@ -75,7 +75,7 @@ export const suppliersApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
     getSuppliers: builder.query<
       { suppliers: Supplier[]; pagination: PaginationInfo },
-      { page?: number; limit?: number } | void
+      { page?: number; limit?: number; search?: string } | void
     >({
       query: (params) => {
         const searchParams = new URLSearchParams();
@@ -84,6 +84,9 @@ export const suppliersApi = apiSlice.injectEndpoints({
         }
         if (params?.limit) {
           searchParams.append("limit", params.limit.toString());
+        }
+        if (params?.search) {
+          searchParams.append("search", params.search);
         }
         const query = searchParams.toString();
         return `/suppliers${query ? `?${query}` : ""}`;

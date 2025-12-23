@@ -16,11 +16,9 @@ import {
   ProductUnit,
 } from "@/lib/api/productsApi";
 import { ProductForm } from "@/components/products/ProductForm";
-import { Select } from "@/components/ui/Select";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { Form } from "@/components/ui/Form";
-import { Input } from "@/components/ui/Input";
 import { useCurrency } from "@/lib/hooks/useCurrency";
 import { useDebounce } from "@/lib/hooks/useDebounce";
 import {
@@ -78,22 +76,32 @@ export function PurchaseOrderForm({
   );
   const [productSearch, setProductSearch] = useState("");
   const [itemSearch, setItemSearch] = useState("");
+  const [supplierSearch, setSupplierSearch] = useState("");
+  const [isSupplierDropdownOpen, setIsSupplierDropdownOpen] = useState(false);
 
   // Refs
   const productInputRefs = useRef<{ [key: number]: HTMLInputElement | null }>(
     {}
   );
   const productsCache = useRef<Map<number, Product>>(new Map());
+  const supplierDropdownRef = useRef<HTMLDivElement>(null);
+  const suppliersCache = useRef<Map<number, { id: number; name: string }>>(
+    new Map()
+  );
 
   // Hooks
   const { format: formatCurrency } = useCurrency();
   const debouncedProductSearch = useDebounce(productSearch, 200);
+  const debouncedSupplierSearch = useDebounce(supplierSearch, 200);
   const { barcodeToScan, handleBarcodeKeyDown, clearBarcodeState } =
     useFormBarcodeScanner();
 
-  // API Queries
+  // API Queries - fetch suppliers with search
   const { data: suppliersData, refetch: refetchSuppliers } =
-    useGetSuppliersQuery();
+    useGetSuppliersQuery({
+      limit: 100,
+      search: debouncedSupplierSearch || undefined,
+    });
   const { data: productsData, refetch: refetchProducts } = useGetProductsQuery({
     search: debouncedProductSearch || undefined,
     limit: 1000,
@@ -182,6 +190,33 @@ export function PurchaseOrderForm({
       });
     }
   }, [productsData]);
+
+  // Cache suppliers from API
+  useEffect(() => {
+    if (suppliersData?.suppliers) {
+      suppliersData.suppliers.forEach((supplier) => {
+        suppliersCache.current.set(supplier.id, {
+          id: supplier.id,
+          name: supplier.name,
+        });
+      });
+    }
+  }, [suppliersData]);
+
+  // Close supplier dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        supplierDropdownRef.current &&
+        !supplierDropdownRef.current.contains(event.target as Node)
+      ) {
+        setIsSupplierDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   // Load existing data when editing
   useEffect(() => {
@@ -315,7 +350,9 @@ export function PurchaseOrderForm({
         const productName = item?.product_name?.toLowerCase() || "";
         const cachedProduct = productsCache.current.get(item?.product_id || 0);
         const cachedName = cachedProduct?.name?.toLowerCase() || "";
-        return productName.includes(searchLower) || cachedName.includes(searchLower);
+        return (
+          productName.includes(searchLower) || cachedName.includes(searchLower)
+        );
       });
   }, [fields, watchedItems, itemSearch]);
 
@@ -422,18 +459,6 @@ export function PurchaseOrderForm({
     }
   };
 
-  // Supplier options
-  const supplierOptions = useMemo(
-    () => [
-      { value: 0, label: "Select Supplier" },
-      ...(suppliersData?.suppliers.map((s) => ({
-        value: s.id,
-        label: s.name,
-      })) || []),
-    ],
-    [suppliersData?.suppliers]
-  );
-
   return (
     <>
       <Form
@@ -446,28 +471,115 @@ export function PurchaseOrderForm({
           <Controller
             name="supplier_id"
             control={control}
-            render={({ field }) => (
-              <div>
-                <Select
-                  label="Supplier"
-                  options={supplierOptions}
-                  value={field.value?.toString() || "0"}
-                  onChange={(e) =>
-                    field.onChange(
-                      e.target.value === "0" ? 0 : Number(e.target.value)
-                    )
-                  }
-                  error={errors.supplier_id?.message}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowSupplierModal(true)}
-                  className="mt-1 text-xs text-indigo-600 hover:text-indigo-800"
-                >
-                  + Add New Supplier
-                </button>
-              </div>
-            )}
+            render={({ field }) => {
+              const selectedSupplier = suppliersCache.current.get(field.value);
+              const selectedName = selectedSupplier?.name || "";
+
+              return (
+                <div ref={supplierDropdownRef} className="relative">
+                  <label className="mb-1 block text-sm font-medium text-gray-700">
+                    Supplier
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="Search suppliers..."
+                      value={
+                        isSupplierDropdownOpen ? supplierSearch : selectedName
+                      }
+                      onChange={(e) => {
+                        setSupplierSearch(e.target.value);
+                        if (!isSupplierDropdownOpen) {
+                          setIsSupplierDropdownOpen(true);
+                        }
+                      }}
+                      onFocus={() => {
+                        setIsSupplierDropdownOpen(true);
+                        setSupplierSearch("");
+                      }}
+                      className={`w-full rounded-md border px-3 py-2 pr-10 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 ${
+                        errors.supplier_id
+                          ? "border-red-500"
+                          : "border-gray-300"
+                      }`}
+                    />
+                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                      <svg
+                        className="h-4 w-4 text-gray-400"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                        />
+                      </svg>
+                    </div>
+                  </div>
+
+                  {/* Dropdown */}
+                  {isSupplierDropdownOpen && (
+                    <div className="absolute z-20 mt-1 max-h-60 w-full overflow-auto rounded-md border border-gray-200 bg-white shadow-lg">
+                      {suppliersData?.suppliers &&
+                      suppliersData.suppliers.length > 0 ? (
+                        suppliersData.suppliers.map((supplier) => (
+                          <button
+                            key={supplier.id}
+                            type="button"
+                            onClick={() => {
+                              field.onChange(supplier.id);
+                              suppliersCache.current.set(supplier.id, {
+                                id: supplier.id,
+                                name: supplier.name,
+                              });
+                              setIsSupplierDropdownOpen(false);
+                              setSupplierSearch("");
+                            }}
+                            className={`w-full px-3 py-2 text-left text-sm hover:bg-indigo-50 ${
+                              field.value === supplier.id
+                                ? "bg-indigo-100 text-indigo-700"
+                                : "text-gray-700"
+                            }`}
+                          >
+                            <div className="font-medium">{supplier.name}</div>
+                            {supplier.phone && (
+                              <div className="text-xs text-gray-500">
+                                {supplier.phone}
+                              </div>
+                            )}
+                          </button>
+                        ))
+                      ) : (
+                        <div className="px-3 py-4 text-center text-sm text-gray-500">
+                          {supplierSearch
+                            ? "No suppliers found"
+                            : "Type to search suppliers"}
+                        </div>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowSupplierModal(true);
+                          setIsSupplierDropdownOpen(false);
+                        }}
+                        className="w-full border-t border-gray-200 px-3 py-2 text-left text-sm text-indigo-600 hover:bg-indigo-50"
+                      >
+                        + Add New Supplier
+                      </button>
+                    </div>
+                  )}
+
+                  {errors.supplier_id && (
+                    <p className="mt-1 text-sm text-red-600">
+                      {errors.supplier_id.message}
+                    </p>
+                  )}
+                </div>
+              );
+            }}
           />
         </div>
 
@@ -509,8 +621,18 @@ export function PurchaseOrderForm({
                     onClick={() => setItemSearch("")}
                     className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                   >
-                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    <svg
+                      className="h-4 w-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M6 18L18 6M6 6l12 12"
+                      />
                     </svg>
                   </button>
                 )}

@@ -17,17 +17,27 @@ async function getHandler(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "25");
+    const search = searchParams.get("search") || "";
     const offset = (page - 1) * limit;
 
+    // Build search condition
+    const searchCondition = search
+      ? "WHERE name LIKE ? OR contact_person LIKE ? OR phone LIKE ?"
+      : "";
+    const searchArgs = search
+      ? [`%${search}%`, `%${search}%`, `%${search}%`]
+      : [];
+
     // Get total count
-    const countResult = await client.execute(
-      "SELECT COUNT(*) as total FROM suppliers"
-    );
+    const countResult = await client.execute({
+      sql: `SELECT COUNT(*) as total FROM suppliers ${searchCondition}`,
+      args: searchArgs,
+    });
     const total = (countResult.rows[0] as unknown as { total: number }).total;
 
     const result = await client.execute({
-      sql: "SELECT * FROM suppliers ORDER BY name LIMIT ? OFFSET ?",
-      args: [limit, offset],
+      sql: `SELECT * FROM suppliers ${searchCondition} ORDER BY name LIMIT ? OFFSET ?`,
+      args: [...searchArgs, limit, offset],
     });
 
     // Calculate ledger summary for each supplier

@@ -10,11 +10,13 @@ import {
   CreateSupplierRequest,
 } from "@/lib/api/suppliersApi";
 import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
 import { Pagination } from "@/components/ui/Pagination";
 import { SupplierForm } from "./SupplierForm";
 import { ImportExport } from "@/components/common/ImportExport";
 import { useCurrency } from "@/lib/hooks/useCurrency";
+import { useDebounce } from "@/lib/hooks/useDebounce";
 import toast from "react-hot-toast";
 
 type SortColumn = "total_purchases" | "total_paid" | "balance" | null;
@@ -23,9 +25,15 @@ type SortDirection = "asc" | "desc";
 export function SupplierList() {
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(25);
+  const [search, setSearch] = useState("");
+  const debouncedSearch = useDebounce(search, 300);
   const [sortColumn, setSortColumn] = useState<SortColumn>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
-  const { data, isLoading, refetch } = useGetSuppliersQuery({ page, limit });
+  const { data, isLoading, refetch } = useGetSuppliersQuery({
+    page,
+    limit,
+    search: debouncedSearch || undefined,
+  });
   const [deleteSupplier] = useDeleteSupplierMutation();
   const [deleteAllSuppliers] = useDeleteAllSuppliersMutation();
   const [importSuppliers] = useImportSuppliersMutation();
@@ -214,7 +222,19 @@ export function SupplierList() {
       </div>
 
       <div className="overflow-x-auto rounded-lg bg-white shadow">
-        <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3 sm:px-6">
+        <div className="flex flex-col gap-3 border-b border-gray-200 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+          <div className="flex-1 sm:max-w-xs">
+            <Input
+              type="text"
+              placeholder="Search suppliers..."
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
+              className="w-full"
+            />
+          </div>
           <span className="text-sm text-gray-500">
             Showing{" "}
             <span className="font-semibold text-gray-700">
