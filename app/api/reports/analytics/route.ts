@@ -19,11 +19,11 @@ async function getHandler(req: NextRequest) {
 
     if (startDate) {
       dateFilter += " AND created_at >= ?";
-      args.push(`${startDate} 00:00:00`);
+      args.push(`${startDate}T00:00:00.000Z`);
     }
     if (endDate) {
       dateFilter += " AND created_at <= ?";
-      args.push(`${endDate} 23:59:59`);
+      args.push(`${endDate}T23:59:59.999Z`);
     }
 
     // Determine date grouping

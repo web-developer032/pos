@@ -28,11 +28,11 @@ async function getHandler(req: NextRequest) {
 
     if (startDate) {
       sql += " AND c.created_at >= ?";
-      args.push(`${startDate} 00:00:00`);
+      args.push(`${startDate}T00:00:00.000Z`);
     }
     if (endDate) {
       sql += " AND c.created_at <= ?";
-      args.push(`${endDate} 23:59:59`);
+      args.push(`${endDate}T23:59:59.999Z`);
     }
 
     sql += " ORDER BY c.created_at DESC";

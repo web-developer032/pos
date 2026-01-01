@@ -31,11 +31,11 @@ async function getHandler(req: NextRequest) {
 
     if (startDate) {
       sql += " AND oi.created_at >= ?";
-      args.push(`${startDate} 00:00:00`);
+      args.push(`${startDate}T00:00:00.000Z`);
     }
     if (endDate) {
       sql += " AND oi.created_at <= ?";
-      args.push(`${endDate} 23:59:59`);
+      args.push(`${endDate}T23:59:59.999Z`);
     }
     if (category) {
       sql += " AND oi.category = ?";
@@ -59,11 +59,11 @@ async function getHandler(req: NextRequest) {
 
     if (startDate) {
       summarySql += " AND created_at >= ?";
-      summaryArgs.push(`${startDate} 00:00:00`);
+      summaryArgs.push(`${startDate}T00:00:00.000Z`);
     }
     if (endDate) {
       summarySql += " AND created_at <= ?";
-      summaryArgs.push(`${endDate} 23:59:59`);
+      summaryArgs.push(`${endDate}T23:59:59.999Z`);
     }
 
     summarySql += " GROUP BY category ORDER BY category_total DESC";
@@ -83,11 +83,11 @@ async function getHandler(req: NextRequest) {
 
     if (startDate) {
       totalSql += " AND created_at >= ?";
-      totalArgs.push(`${startDate} 00:00:00`);
+      totalArgs.push(`${startDate}T00:00:00.000Z`);
     }
     if (endDate) {
       totalSql += " AND created_at <= ?";
-      totalArgs.push(`${endDate} 23:59:59`);
+      totalArgs.push(`${endDate}T23:59:59.999Z`);
     }
 
     const totalResult = await client.execute({

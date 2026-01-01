@@ -76,16 +76,14 @@ async function getHandler(req: NextRequest) {
     const args: (string | number)[] = [];
 
     if (startDate) {
-      // Use datetime comparison to include the full start day
-      // Format: "YYYY-MM-DD" -> "YYYY-MM-DD 00:00:00"
+      // Use ISO 8601 datetime comparison to include the full start day (UTC)
       sql += " AND s.created_at >= ?";
-      args.push(`${startDate} 00:00:00`);
+      args.push(`${startDate}T00:00:00.000Z`);
     }
     if (endDate) {
-      // Use datetime comparison to include the full end day
-      // Format: "YYYY-MM-DD" -> "YYYY-MM-DD 23:59:59"
+      // Use ISO 8601 datetime comparison to include the full end day (UTC)
       sql += " AND s.created_at <= ?";
-      args.push(`${endDate} 23:59:59`);
+      args.push(`${endDate}T23:59:59.999Z`);
     }
     if (search) {
       // Search by sale_number, customer_name, or customer_phone
@@ -104,11 +102,11 @@ async function getHandler(req: NextRequest) {
     const countArgs: (string | number)[] = [];
     if (startDate) {
       countSql += " AND s.created_at >= ?";
-      countArgs.push(`${startDate} 00:00:00`);
+      countArgs.push(`${startDate}T00:00:00.000Z`);
     }
     if (endDate) {
       countSql += " AND s.created_at <= ?";
-      countArgs.push(`${endDate} 23:59:59`);
+      countArgs.push(`${endDate}T23:59:59.999Z`);
     }
     if (search) {
       countSql +=
