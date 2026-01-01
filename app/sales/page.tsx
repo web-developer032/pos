@@ -9,8 +9,10 @@ import {
   useDeleteAllSalesMutation,
 } from "@/lib/api/salesApi";
 import { useCurrency } from "@/lib/hooks/useCurrency";
+import { useDebounce } from "@/lib/hooks/useDebounce";
 import { Pagination } from "@/components/ui/Pagination";
 import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
 import { formatDateTime } from "@/lib/utils/dateTime";
 import {
   DateRangeSelector,
@@ -24,6 +26,8 @@ import toast from "react-hot-toast";
 export default function SalesPage() {
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(25);
+  const [search, setSearch] = useState("");
+  const debouncedSearch = useDebounce(search, 300);
   const [dateRange, setDateRange] = useState<DateRange>({
     startDate: "",
     endDate: "",
@@ -35,6 +39,7 @@ export default function SalesPage() {
     limit,
     startDate: dateRange.startDate,
     endDate: dateRange.endDate,
+    search: debouncedSearch || undefined,
   });
 
   const [deleteSale] = useDeleteSaleMutation();
@@ -94,6 +99,11 @@ export default function SalesPage() {
     setPage(1); // Reset to first page when date range changes
   };
 
+  const handleSearchChange = (value: string) => {
+    setSearch(value);
+    setPage(1); // Reset to first page when search changes
+  };
+
   return (
     <ProtectedRoute>
       <DashboardLayout>
@@ -119,7 +129,10 @@ export default function SalesPage() {
 
         {/* Date Range Filter */}
         <div className="mb-6">
-          <DateRangeSelector value={dateRange} onChange={handleDateRangeChange} />
+          <DateRangeSelector
+            value={dateRange}
+            onChange={handleDateRangeChange}
+          />
         </div>
 
         {/* Period Summary Cards */}
@@ -135,17 +148,27 @@ export default function SalesPage() {
         {/* Sales Table */}
         <div className="overflow-x-auto rounded-lg bg-white shadow">
           <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3 sm:px-6">
-            <span className="text-sm text-gray-500">
-              Showing{" "}
-              <span className="font-semibold text-gray-700">
-                {data?.sales.length || 0}
-              </span>{" "}
-              of{" "}
-              <span className="font-semibold text-gray-700">
-                {data?.pagination?.total || 0}
-              </span>{" "}
-              sales
-            </span>
+            <div className="w-full sm:w-72">
+              <Input
+                placeholder="Search by sale #, customer name, or phone..."
+                value={search}
+                onChange={(e) => handleSearchChange(e.target.value)}
+              />
+            </div>
+
+            <div>
+              <span className="text-sm text-gray-500">
+                Showing{" "}
+                <span className="font-semibold text-gray-700">
+                  {data?.sales.length || 0}
+                </span>{" "}
+                of{" "}
+                <span className="font-semibold text-gray-700">
+                  {data?.pagination?.total || 0}
+                </span>{" "}
+                sales
+              </span>
+            </div>
           </div>
 
           {isLoading ? (
@@ -215,7 +238,9 @@ export default function SalesPage() {
                           View
                         </Link>
                         <button
-                          onClick={() => handleDelete(sale.id, sale.sale_number)}
+                          onClick={() =>
+                            handleDelete(sale.id, sale.sale_number)
+                          }
                           disabled={deletingId === sale.id}
                           className="text-red-600 hover:text-red-900 disabled:opacity-50"
                           title="Delete sale"

@@ -72,6 +72,7 @@ export const salesApi = apiSlice.injectEndpoints({
         endDate?: string;
         page?: number;
         limit?: number;
+        search?: string;
       } | void
     >({
       query: (params) => {
@@ -87,6 +88,9 @@ export const salesApi = apiSlice.injectEndpoints({
         }
         if (params?.limit) {
           searchParams.append("limit", params.limit.toString());
+        }
+        if (params?.search) {
+          searchParams.append("search", params.search);
         }
         const query = searchParams.toString();
         return `/sales${query ? `?${query}` : ""}`;

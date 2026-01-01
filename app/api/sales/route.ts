@@ -32,6 +32,7 @@ async function getHandler(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const startDate = searchParams.get("start_date");
     const endDate = searchParams.get("end_date");
+    const search = searchParams.get("search");
     const { page, limit, offset } = getPaginationParams(req);
 
     // Optimized query: Calculate net profit (after returns) using subquery
@@ -74,18 +75,34 @@ async function getHandler(req: NextRequest) {
       sql += " AND s.created_at <= ?";
       args.push(`${endDate} 23:59:59`);
     }
+    if (search) {
+      // Search by sale_number, customer_name, or customer_phone
+      sql += " AND (s.sale_number LIKE ? OR c.name LIKE ? OR c.phone LIKE ?)";
+      const searchTerm = `%${search}%`;
+      args.push(searchTerm, searchTerm, searchTerm);
+    }
 
     // Get total count
-    const countSql = `
+    let countSql = `
       SELECT COUNT(*) as total
       FROM sales s
+      LEFT JOIN customers c ON s.customer_id = c.id
       WHERE 1=1
-      ${startDate ? "AND s.created_at >= ?" : ""}
-      ${endDate ? "AND s.created_at <= ?" : ""}
     `;
     const countArgs: (string | number)[] = [];
-    if (startDate) countArgs.push(`${startDate} 00:00:00`);
-    if (endDate) countArgs.push(`${endDate} 23:59:59`);
+    if (startDate) {
+      countSql += " AND s.created_at >= ?";
+      countArgs.push(`${startDate} 00:00:00`);
+    }
+    if (endDate) {
+      countSql += " AND s.created_at <= ?";
+      countArgs.push(`${endDate} 23:59:59`);
+    }
+    if (search) {
+      countSql += " AND (s.sale_number LIKE ? OR c.name LIKE ? OR c.phone LIKE ?)";
+      const searchTerm = `%${search}%`;
+      countArgs.push(searchTerm, searchTerm, searchTerm);
+    }
 
     const countResult = await client.execute({
       sql: countSql,
