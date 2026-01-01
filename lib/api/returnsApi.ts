@@ -25,6 +25,7 @@ export interface ReturnItem {
   refund_amount: number;
   product_name?: string;
   barcode?: string;
+  cost_price?: number;
 }
 
 export interface CreateReturnRequest {
