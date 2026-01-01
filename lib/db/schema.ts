@@ -283,7 +283,7 @@ export async function initializeDatabase() {
     CREATE TABLE IF NOT EXISTS return_items (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       return_id INTEGER NOT NULL,
-      sale_item_id INTEGER NOT NULL,
+      sale_item_id INTEGER,
       product_id INTEGER NOT NULL,
       quantity REAL NOT NULL,
       unit_price REAL NOT NULL,
@@ -560,5 +560,60 @@ export async function initializeDatabase() {
     await client.execute(
       `ALTER TABLE purchase_orders ADD COLUMN tax_value REAL DEFAULT 0`
     );
+  }
+
+  // Migration: Make sale_item_id nullable in return_items for generic returns
+  // SQLite doesn't support ALTER COLUMN, so we need to recreate the table
+  const returnItemsInfo = await client.execute(
+    `PRAGMA table_info(return_items)`
+  );
+  const saleItemIdColumn = returnItemsInfo.rows.find(
+    (row) => (row as Record<string, unknown>).name === "sale_item_id"
+  ) as Record<string, unknown> | undefined;
+
+  // Check if sale_item_id is NOT NULL (notnull = 1)
+  if (saleItemIdColumn && saleItemIdColumn.notnull === 1) {
+    console.log(
+      "[DB] Migrating return_items table to make sale_item_id nullable..."
+    );
+
+    // Create new table with nullable sale_item_id
+    await client.execute(`
+      CREATE TABLE IF NOT EXISTS return_items_new (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        return_id INTEGER NOT NULL,
+        sale_item_id INTEGER,
+        product_id INTEGER NOT NULL,
+        quantity REAL NOT NULL,
+        unit_price REAL NOT NULL,
+        refund_amount REAL NOT NULL,
+        FOREIGN KEY (return_id) REFERENCES returns(id) ON DELETE CASCADE,
+        FOREIGN KEY (sale_item_id) REFERENCES sale_items(id),
+        FOREIGN KEY (product_id) REFERENCES products(id)
+      )
+    `);
+
+    // Copy data from old table
+    await client.execute(`
+      INSERT INTO return_items_new (id, return_id, sale_item_id, product_id, quantity, unit_price, refund_amount)
+      SELECT id, return_id, sale_item_id, product_id, quantity, unit_price, refund_amount
+      FROM return_items
+    `);
+
+    // Drop old table
+    await client.execute(`DROP TABLE return_items`);
+
+    // Rename new table
+    await client.execute(`ALTER TABLE return_items_new RENAME TO return_items`);
+
+    // Recreate indexes
+    await client.execute(
+      `CREATE INDEX IF NOT EXISTS idx_return_items_return ON return_items(return_id)`
+    );
+    await client.execute(
+      `CREATE INDEX IF NOT EXISTS idx_return_items_sale_item ON return_items(sale_item_id)`
+    );
+
+    console.log("[DB] return_items migration completed successfully");
   }
 }

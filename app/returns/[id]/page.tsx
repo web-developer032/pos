@@ -232,13 +232,28 @@ export default function ReturnDetailPage() {
                   </div>
                   <div className="border-t border-gray-200 pt-3">
                     <div className="flex justify-between">
-                      <dt className="text-base font-semibold">
-                        Total Refund Amount
-                      </dt>
+                      <dt className="text-base font-semibold">Return Value</dt>
                       <dd className="text-base font-bold text-red-600">
-                        {formatCurrency(returnRecord.refund_amount)}
+                        {formatCurrency(
+                          returnRecord.total_amount || returnRecord.refund_amount
+                        )}
                       </dd>
                     </div>
+                    {returnRecord.refund_amount > 0 &&
+                      returnRecord.refund_amount !== returnRecord.total_amount && (
+                        <div className="mt-2 flex justify-between text-sm">
+                          <dt className="text-gray-600">Amount Refunded</dt>
+                          <dd className="font-medium text-red-600">
+                            {formatCurrency(returnRecord.refund_amount)}
+                          </dd>
+                        </div>
+                      )}
+                    {returnRecord.refund_amount === 0 &&
+                      returnRecord.total_amount > 0 && (
+                        <div className="mt-2 text-xs text-gray-500">
+                          Applied as offset to new purchase
+                        </div>
+                      )}
                   </div>
                   <div className="mt-4 rounded-lg bg-red-50 p-3">
                     <p className="text-xs text-red-800">
@@ -247,7 +262,7 @@ export default function ReturnDetailPage() {
                         .replace("_", " ")
                         .split(" ")
                         .map(
-                          (word) =>
+                          (word: string) =>
                             word.charAt(0).toUpperCase() + word.slice(1)
                         )
                         .join(" ")}

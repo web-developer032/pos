@@ -15,9 +15,16 @@ import { Button } from "@/components/ui/Button";
 interface CartProps {
   onCheckout?: () => void;
   onHoldCart?: () => void;
+  isReturnMode?: boolean;
+  onToggleReturnMode?: () => void;
 }
 
-export function Cart({ onCheckout, onHoldCart }: CartProps) {
+export function Cart({
+  onCheckout,
+  onHoldCart,
+  isReturnMode,
+  onToggleReturnMode,
+}: CartProps) {
   const dispatch = useAppDispatch();
   const { items } = useAppSelector((state) => state.cart);
   const { format: formatCurrency } = useCurrency();
@@ -62,10 +69,11 @@ export function Cart({ onCheckout, onHoldCart }: CartProps) {
     }
   };
 
-  const cartTotal = items.reduce(
-    (sum, item) => sum + item.price * item.quantity,
-    0
-  );
+  // Calculate cart total: regular items add, return items subtract
+  const cartTotal = items.reduce((sum, item) => {
+    const itemTotal = item.price * item.quantity;
+    return item.isReturn ? sum - itemTotal : sum + itemTotal;
+  }, 0);
 
   return (
     <div className="flex flex-col rounded-xl bg-white shadow-lg">
@@ -130,8 +138,58 @@ export function Cart({ onCheckout, onHoldCart }: CartProps) {
               </svg>
             </button>
           )}
+          {onToggleReturnMode && (
+            <button
+              onClick={onToggleReturnMode}
+              className={`rounded-lg p-2 transition-colors ${
+                isReturnMode
+                  ? "bg-amber-100 text-amber-600 hover:bg-amber-200"
+                  : "text-gray-400 hover:bg-amber-50 hover:text-amber-600"
+              }`}
+              title={isReturnMode ? "Exit Return Mode" : "Enter Return Mode"}
+            >
+              <svg
+                className="h-5 w-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"
+                />
+              </svg>
+            </button>
+          )}
         </div>
       </div>
+
+      {/* Return Mode Indicator */}
+      {isReturnMode && (
+        <div className="border-b border-amber-200 bg-amber-50 px-4 py-2">
+          <div className="flex items-center gap-2 text-sm font-medium text-amber-700">
+            <svg
+              className="h-4 w-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"
+              />
+            </svg>
+            Return Mode Active
+            <span className="text-xs font-normal text-amber-600">
+              - Scanned items will be returned
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* Cart Items */}
       <div className="flex-1 overflow-y-auto px-3 py-2" style={{ maxHeight: "450px" }}>
@@ -157,21 +215,56 @@ export function Cart({ onCheckout, onHoldCart }: CartProps) {
           <div className="space-y-2">
             {items.map((item, index) => (
               <div
-                key={item.product_id}
-                className="group rounded-lg border border-gray-100 bg-gray-50/50 p-3 transition-all hover:border-indigo-200 hover:bg-indigo-50/30"
+                key={
+                  item.isReturn
+                    ? `return-${item.returnFromSaleItemId}`
+                    : item.product_id
+                }
+                className={`group rounded-lg border p-3 transition-all ${
+                  item.isReturn
+                    ? "border-amber-200 bg-amber-50/50 hover:border-amber-300 hover:bg-amber-50"
+                    : "border-gray-100 bg-gray-50/50 hover:border-indigo-200 hover:bg-indigo-50/30"
+                }`}
               >
                 {/* Product Name - Full width, wraps */}
                 <div className="mb-2 flex items-start justify-between gap-2">
                   <div className="flex items-start gap-2">
-                    <span className="mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded bg-gray-200 text-xs font-medium text-gray-600">
-                      {index + 1}
+                    <span
+                      className={`mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded text-xs font-medium ${
+                        item.isReturn
+                          ? "bg-amber-200 text-amber-700"
+                          : "bg-gray-200 text-gray-600"
+                      }`}
+                    >
+                      {item.isReturn ? "↩" : index + 1}
                     </span>
-                    <h3 className="text-sm font-semibold leading-tight text-gray-900">
-                      {item.name}
-                    </h3>
+                    <div>
+                      <h3
+                        className={`text-sm font-semibold leading-tight ${
+                          item.isReturn ? "text-amber-800" : "text-gray-900"
+                        }`}
+                      >
+                        {item.name}
+                      </h3>
+                      {item.isReturn && (
+                        <span className="text-xs text-amber-600">Return</span>
+                      )}
+                    </div>
                   </div>
                   <button
-                    onClick={() => dispatch(removeItem(item.product_id))}
+                    onClick={() =>
+                      dispatch(
+                        removeItem(
+                          item.isReturn
+                            ? {
+                                product_id: item.product_id,
+                                isReturn: true,
+                                returnFromSaleItemId: item.returnFromSaleItemId,
+                              }
+                            : item.product_id
+                        )
+                      )
+                    }
                     className="flex-shrink-0 rounded p-1 text-gray-400 opacity-0 transition-all hover:bg-red-100 hover:text-red-600 group-hover:opacity-100"
                     title="Remove item"
                   >
@@ -294,7 +387,12 @@ export function Cart({ onCheckout, onHoldCart }: CartProps) {
 
                   {/* Subtotal */}
                   <div className="min-w-[80px] text-right">
-                    <span className="text-sm font-bold text-gray-900">
+                    <span
+                      className={`text-sm font-bold ${
+                        item.isReturn ? "text-amber-700" : "text-gray-900"
+                      }`}
+                    >
+                      {item.isReturn ? "-" : ""}
                       {formatCurrency(item.price * item.quantity)}
                     </span>
                   </div>

@@ -14,10 +14,19 @@ import { useGetSettingsQuery } from "@/lib/api/settingsApi";
 import { parseDatabaseTimestamp, formatTimeOnly } from "@/lib/utils/dateTime";
 import { format } from "date-fns";
 
+interface ReturnItemDisplay {
+  product_id: number;
+  name: string;
+  quantity: number;
+  unit_price: number;
+}
+
 interface ReceiptProps {
   sale: Sale;
   items: SaleItem[];
+  returnItems?: ReturnItemDisplay[]; // Items being returned
   amountPaid?: number; // For partial/credit payments
+  changeAmount?: number; // Change to return to customer
 }
 
 export interface ReceiptRef {
@@ -25,7 +34,7 @@ export interface ReceiptRef {
 }
 
 export const Receipt = forwardRef<ReceiptRef, ReceiptProps>(
-  ({ sale, items, amountPaid }, ref) => {
+  ({ sale, items, returnItems, amountPaid, changeAmount }, ref) => {
     const receiptRef = useRef<HTMLDivElement>(null);
     const { format: formatCurrency } = useCurrency();
     const { data: settingsData } = useGetSettingsQuery();
@@ -157,6 +166,35 @@ export const Receipt = forwardRef<ReceiptRef, ReceiptProps>(
                   </td>
                 </tr>
               ))}
+              {/* Return Items */}
+              {returnItems && returnItems.length > 0 && (
+                <>
+                  <tr className="border-b border-gray-300">
+                    <td
+                      colSpan={5}
+                      className="py-1 text-center text-xs font-semibold"
+                    >
+                      --- RETURNS ---
+                    </td>
+                  </tr>
+                  {returnItems.map((item, index) => (
+                    <tr
+                      key={`return-${item.product_id}-${index}`}
+                      className="border-b border-gray-200"
+                    >
+                      <td className="py-1">R{index + 1}</td>
+                      <td className="py-1">{item.name}</td>
+                      <td className="py-1 text-right">{item.quantity}</td>
+                      <td className="py-1 text-right">
+                        {formatCurrency(item.unit_price)}
+                      </td>
+                      <td className="py-1 text-right font-semibold">
+                        -{formatCurrency(item.quantity * item.unit_price)}
+                      </td>
+                    </tr>
+                  ))}
+                </>
+              )}
             </tbody>
           </table>
         </div>
@@ -191,6 +229,12 @@ export const Receipt = forwardRef<ReceiptRef, ReceiptProps>(
                 <span>{sale.payment_method?.toUpperCase()}-PAID:</span>
                 <span>{formatCurrency(amountPaid)}</span>
               </div>
+              {changeAmount !== undefined && changeAmount > 0 && (
+                <div className="flex justify-between font-semibold text-green-600">
+                  <span>CHANGE:</span>
+                  <span>{formatCurrency(changeAmount)}</span>
+                </div>
+              )}
               {amountPaid < sale.final_amount && (
                 <div className="flex justify-between font-semibold text-amber-600">
                   <span>CREDIT (OWED):</span>

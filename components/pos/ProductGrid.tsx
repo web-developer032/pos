@@ -13,7 +13,7 @@ import { useCurrency } from "@/lib/hooks/useCurrency";
 import { useDebounce } from "@/lib/hooks/useDebounce";
 import { useThrottledCallback } from "@/lib/hooks/useThrottledCallback";
 import { useBarcodeScanner } from "@/lib/hooks/useBarcodeScanner";
-import { addItem } from "@/lib/slices/cartSlice";
+import { addItem, addReturnItem } from "@/lib/slices/cartSlice";
 import { formatPriceForInput, roundPrice } from "@/lib/utils/formHelpers";
 import {
   calculateEffectiveStock,
@@ -27,7 +27,11 @@ import { Button } from "@/components/ui/Button";
 import { Form } from "@/components/ui/Form";
 import toast from "react-hot-toast";
 
-export function ProductGrid() {
+interface ProductGridProps {
+  isReturnMode?: boolean;
+}
+
+export function ProductGrid({ isReturnMode }: ProductGridProps = {}) {
   const [search, setSearch] = useState("");
   const [categoryId, setCategoryId] = useState<number | undefined>();
   const [editingProduct, setEditingProduct] = useState<{
@@ -125,17 +129,32 @@ export function ProductGrid() {
 
       processedBarcodesRef.current.add(barcodeToScan);
 
-      // Add to cart
-      dispatch(
-        addItem({
-          product_id: product.id,
-          name: product.name,
-          price: roundPrice(product.selling_price),
-          quantity: 1,
-          stock_quantity: product.stock_quantity,
-        })
-      );
-      toast.success(`${product.name} added to cart`);
+      // Add to cart (as return if in return mode)
+      if (isReturnMode) {
+        dispatch(
+          addReturnItem({
+            product_id: product.id,
+            name: product.name,
+            price: roundPrice(product.selling_price),
+            quantity: 1,
+            stock_quantity: product.stock_quantity,
+            isReturn: true,
+            costPrice: product.cost_price,
+          })
+        );
+        toast.success(`${product.name} added as return`);
+      } else {
+        dispatch(
+          addItem({
+            product_id: product.id,
+            name: product.name,
+            price: roundPrice(product.selling_price),
+            quantity: 1,
+            stock_quantity: product.stock_quantity,
+          })
+        );
+        toast.success(`${product.name} added to cart`);
+      }
 
       // Clear barcode and search
       setBarcodeToScan("");
@@ -148,6 +167,7 @@ export function ProductGrid() {
     }
   }, [
     barcodeToScan,
+    isReturnMode,
     barcodeProductData,
     barcodeError,
     isBarcodeFetching,
@@ -158,16 +178,31 @@ export function ProductGrid() {
     const finalPrice = product.selling_price;
     const finalQuantity = quantity || 1;
 
-    dispatch(
-      addItem({
-        product_id: product.id,
-        name: product.name,
-        price: roundPrice(finalPrice),
-        quantity: finalQuantity,
-        stock_quantity: product.stock_quantity,
-      })
-    );
-    toast.success("Added to cart");
+    if (isReturnMode) {
+      dispatch(
+        addReturnItem({
+          product_id: product.id,
+          name: product.name,
+          price: roundPrice(finalPrice),
+          quantity: finalQuantity,
+          stock_quantity: product.stock_quantity,
+          isReturn: true,
+          costPrice: product.cost_price,
+        })
+      );
+      toast.success("Added as return");
+    } else {
+      dispatch(
+        addItem({
+          product_id: product.id,
+          name: product.name,
+          price: roundPrice(finalPrice),
+          quantity: finalQuantity,
+          stock_quantity: product.stock_quantity,
+        })
+      );
+      toast.success("Added to cart");
+    }
   };
 
   const handleProductClick = (product: Product) => {

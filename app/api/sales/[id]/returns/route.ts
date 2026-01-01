@@ -42,9 +42,11 @@ async function getHandler(req: Request, context?: RouteContext) {
     if (returnIds.length > 0) {
       const placeholders = returnIds.map(() => "?").join(",");
       const itemsResult = await client.execute({
-        sql: `SELECT ri.*, p.name as product_name, p.barcode
+        sql: `SELECT ri.*, p.name as product_name, p.barcode, p.cost_price as product_cost_price,
+                     COALESCE(si.cost_price, p.cost_price) as cost_price
               FROM return_items ri
               JOIN products p ON ri.product_id = p.id
+              LEFT JOIN sale_items si ON ri.sale_item_id = si.id
               WHERE ri.return_id IN (${placeholders})`,
         args: returnIds,
       });

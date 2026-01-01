@@ -40,6 +40,14 @@ export interface CreateSaleRequest {
     unit_price: number;
     discount?: number;
   }[];
+  return_items?: {
+    sale_id?: number;
+    sale_item_id?: number;
+    product_id: number;
+    quantity: number;
+    unit_price: number;
+    cost_price?: number;
+  }[];
   discount_amount?: number;
   tax_amount?: number;
   payment_method: "cash" | "card" | "digital";

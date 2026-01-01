@@ -164,14 +164,26 @@ export default function SaleDetailPage() {
             </div>
             <div className="px-6 py-4">
               {(() => {
-                // Calculate total refunds from returns
-                const totalRefunds =
-                  returnsData?.returns?.reduce(
-                    (sum, r) => sum + (r.refund_amount || 0),
-                    0
-                  ) || 0;
+                // Separate inline returns (refund_amount = 0, already deducted from sale) from regular returns
+                const inlineReturns =
+                  returnsData?.returns?.filter((r) => r.refund_amount === 0) ||
+                  [];
+                const regularReturns =
+                  returnsData?.returns?.filter((r) => r.refund_amount > 0) || [];
 
-                // Calculate adjusted subtotal based on effective items
+                // Total value from inline returns (for display purposes)
+                const inlineReturnsTotal = inlineReturns.reduce(
+                  (sum, r) => sum + (r.total_amount || 0),
+                  0
+                );
+
+                // Total refunds from regular returns (need to subtract from final_amount)
+                const regularRefundsTotal = regularReturns.reduce(
+                  (sum, r) => sum + (r.refund_amount || 0),
+                  0
+                );
+
+                // Calculate adjusted subtotal based on effective items (only for regular returns)
                 const adjustedSubtotal = items.reduce((sum, item) => {
                   const itemStatus = returnsData?.sale_items_status?.find(
                     (status) => status.id === item.id
@@ -181,15 +193,18 @@ export default function SaleDetailPage() {
                   return sum + effectiveQty * item.unit_price;
                 }, 0);
 
-                const adjustedTotal = sale.final_amount - totalRefunds;
-                const hasReturns = totalRefunds > 0;
+                // Only subtract regular returns (inline returns already in final_amount)
+                const adjustedTotal = sale.final_amount - regularRefundsTotal;
+                const hasRegularReturns = regularRefundsTotal > 0;
+                const hasInlineReturns = inlineReturnsTotal > 0;
+                const hasAnyReturns = hasRegularReturns || hasInlineReturns;
 
                 return (
                   <dl className="space-y-3">
                     <div className="flex justify-between">
                       <dt className="text-sm text-gray-600">Subtotal</dt>
                       <dd className="text-sm font-medium">
-                        {hasReturns ? (
+                        {hasRegularReturns ? (
                           <span>
                             {formatCurrency(adjustedSubtotal)}
                             <span className="ml-2 text-xs text-gray-400 line-through">
@@ -217,11 +232,21 @@ export default function SaleDetailPage() {
                         </dd>
                       </div>
                     )}
-                    {hasReturns && (
+                    {hasInlineReturns && (
+                      <div className="flex justify-between">
+                        <dt className="text-sm text-gray-600">
+                          Returns (offset)
+                        </dt>
+                        <dd className="text-sm font-medium text-amber-600">
+                          -{formatCurrency(inlineReturnsTotal)}
+                        </dd>
+                      </div>
+                    )}
+                    {hasRegularReturns && (
                       <div className="flex justify-between">
                         <dt className="text-sm text-gray-600">Refunds</dt>
                         <dd className="text-sm font-medium text-red-600">
-                          -{formatCurrency(totalRefunds)}
+                          -{formatCurrency(regularRefundsTotal)}
                         </dd>
                       </div>
                     )}
@@ -229,7 +254,7 @@ export default function SaleDetailPage() {
                       <div className="flex justify-between">
                         <dt className="text-base font-semibold">Total</dt>
                         <dd className="text-base font-bold text-indigo-600">
-                          {hasReturns ? (
+                          {hasRegularReturns ? (
                             <span>
                               {formatCurrency(adjustedTotal)}
                               <span className="ml-2 text-xs text-gray-400 line-through">
@@ -243,46 +268,53 @@ export default function SaleDetailPage() {
                       </div>
                     </div>
                     <div className="border-t border-gray-200 pt-3">
-                      <div className="flex justify-between">
-                        <dt className="text-base font-semibold text-green-600">
-                          Net Profit
-                        </dt>
-                        <dd className="text-base font-bold text-green-600">
-                          {formatCurrency(
-                            (() => {
-                              const originalProfit = items.reduce(
-                                (sum, item) => {
-                                  const costPrice = item.cost_price || 0;
-                                  const profitPerUnit =
-                                    item.unit_price - costPrice;
-                                  return sum + profitPerUnit * item.quantity;
-                                },
-                                0
+                      {(() => {
+                        const originalProfit = items.reduce((sum, item) => {
+                          const costPrice = item.cost_price || 0;
+                          const profitPerUnit = item.unit_price - costPrice;
+                          return sum + profitPerUnit * item.quantity;
+                        }, 0);
+
+                        const returnedProfit =
+                          returnsData?.return_items?.reduce(
+                            (sum, returnItem) => {
+                              const saleItem = returnItem.sale_item_id
+                                ? items.find(
+                                    (si) => si.id === returnItem.sale_item_id
+                                  )
+                                : null;
+                              const costPrice =
+                                returnItem.cost_price ||
+                                saleItem?.cost_price ||
+                                0;
+                              const profitPerUnit =
+                                returnItem.unit_price - costPrice;
+                              return (
+                                sum + profitPerUnit * returnItem.quantity
                               );
+                            },
+                            0
+                          ) || 0;
 
-                              const returnedProfit =
-                                returnsData?.return_items?.reduce(
-                                  (sum, returnItem) => {
-                                    const saleItem = items.find(
-                                      (si) => si.id === returnItem.sale_item_id
-                                    );
-                                    if (!saleItem) return sum;
-                                    const costPrice = saleItem.cost_price || 0;
-                                    const profitPerUnit =
-                                      returnItem.unit_price - costPrice;
-                                    return (
-                                      sum + profitPerUnit * returnItem.quantity
-                                    );
-                                  },
-                                  0
-                                ) || 0;
+                        const netProfit = originalProfit - returnedProfit;
+                        const isLoss = netProfit < 0;
 
-                              return originalProfit - returnedProfit;
-                            })()
-                          )}
-                        </dd>
-                      </div>
-                      {hasReturns && (
+                        return (
+                          <div className="flex justify-between">
+                            <dt
+                              className={`text-base font-semibold ${isLoss ? "text-red-600" : "text-green-600"}`}
+                            >
+                              {isLoss ? "Net Loss" : "Net Profit"}
+                            </dt>
+                            <dd
+                              className={`text-base font-bold ${isLoss ? "text-red-600" : "text-green-600"}`}
+                            >
+                              {formatCurrency(Math.abs(netProfit))}
+                            </dd>
+                          </div>
+                        );
+                      })()}
+                      {hasAnyReturns && (
                         <div className="mt-2 text-xs text-gray-500">
                           After {returnsData?.returns.length} return
                           {(returnsData?.returns.length || 0) > 1 ? "s" : ""}
@@ -462,7 +494,7 @@ export default function SaleDetailPage() {
                       Date
                     </th>
                     <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">
-                      Refund Amount
+                      Return Value
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                       Method
@@ -493,7 +525,7 @@ export default function SaleDetailPage() {
                         {formatDateTime(returnRecord.created_at)}
                       </td>
                       <td className="whitespace-nowrap px-6 py-4 text-right text-sm font-semibold text-red-600">
-                        {formatCurrency(returnRecord.refund_amount)}
+                        {formatCurrency(returnRecord.total_amount || returnRecord.refund_amount)}
                       </td>
                       <td className="whitespace-nowrap px-6 py-4 text-sm capitalize text-gray-500">
                         {returnRecord.refund_method.replace("_", " ")}
@@ -536,14 +568,14 @@ export default function SaleDetailPage() {
         {/* Hidden receipt for printing */}
         <div className="hidden">
           {(() => {
-            // Calculate total refunds from returns
-            const totalRefunds =
-              returnsData?.returns?.reduce(
-                (sum, r) => sum + (r.refund_amount || 0),
-                0
-              ) || 0;
+            // Only count regular returns (refund_amount > 0) for adjusting final amount
+            // Inline returns (refund_amount = 0) are already deducted from sale.final_amount
+            const regularRefundsTotal =
+              returnsData?.returns
+                ?.filter((r) => r.refund_amount > 0)
+                .reduce((sum, r) => sum + (r.refund_amount || 0), 0) || 0;
 
-            // Filter and adjust items for returns
+            // Filter and adjust items for regular returns only
             const adjustedItems = items
               .map((item) => {
                 const itemStatus = returnsData?.sale_items_status?.find(
@@ -570,8 +602,8 @@ export default function SaleDetailPage() {
               0
             );
 
-            // Adjusted total = original final amount - refunds
-            const adjustedTotal = sale.final_amount - totalRefunds;
+            // Adjusted total = original final amount - regular refunds only
+            const adjustedTotal = sale.final_amount - regularRefundsTotal;
 
             // Create adjusted sale object for receipt
             const adjustedSale = {

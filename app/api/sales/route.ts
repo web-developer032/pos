@@ -21,6 +21,18 @@ const saleSchema = z.object({
       discount: z.number().min(0).optional(),
     })
   ),
+  return_items: z
+    .array(
+      z.object({
+        sale_id: z.number().optional(),
+        sale_item_id: z.number().optional(),
+        product_id: z.number(),
+        quantity: z.number().min(0.001),
+        unit_price: z.number().min(0),
+        cost_price: z.number().min(0).optional(),
+      })
+    )
+    .optional(),
   discount_amount: z.number().min(0).optional(),
   tax_amount: z.number().min(0).optional(),
   payment_method: z.enum(["cash", "card", "digital"]),
@@ -99,7 +111,8 @@ async function getHandler(req: NextRequest) {
       countArgs.push(`${endDate} 23:59:59`);
     }
     if (search) {
-      countSql += " AND (s.sale_number LIKE ? OR c.name LIKE ? OR c.phone LIKE ?)";
+      countSql +=
+        " AND (s.sale_number LIKE ? OR c.name LIKE ? OR c.phone LIKE ?)";
       const searchTerm = `%${search}%`;
       countArgs.push(searchTerm, searchTerm, searchTerm);
     }
@@ -141,7 +154,7 @@ async function postHandler(req: AuthRequest) {
     // Generate sale number
     const saleNumber = `SALE-${Date.now()}`;
 
-    // Calculate totals
+    // Calculate totals for regular items
     let totalAmount = 0;
     for (const item of validated.items) {
       const subtotal = roundPrice(
@@ -152,9 +165,23 @@ async function postHandler(req: AuthRequest) {
     }
     totalAmount = roundPrice(totalAmount);
 
+    // Calculate returns total (these will be deducted)
+    let returnsTotal = 0;
+    if (validated.return_items && validated.return_items.length > 0) {
+      for (const returnItem of validated.return_items) {
+        returnsTotal += roundPrice(
+          returnItem.quantity * roundPrice(returnItem.unit_price)
+        );
+      }
+    }
+    returnsTotal = roundPrice(returnsTotal);
+
+    // Net total after returns
+    const netTotalAmount = roundPrice(totalAmount - returnsTotal);
+
     const discountAmount = roundPrice(validated.discount_amount || 0);
     const taxAmount = roundPrice(validated.tax_amount || 0);
-    const finalAmount = roundPrice(totalAmount - discountAmount + taxAmount);
+    const finalAmount = roundPrice(netTotalAmount - discountAmount + taxAmount);
 
     // Handle partial/credit payments
     const amountPaid =
@@ -194,7 +221,7 @@ async function postHandler(req: AuthRequest) {
         saleNumber,
         validated.customer_id || null,
         user.userId,
-        totalAmount,
+        netTotalAmount, // Use net amount (after returns)
         discountAmount,
         taxAmount,
         finalAmount,
@@ -264,6 +291,90 @@ async function postHandler(req: AuthRequest) {
         sql: "UPDATE customers SET credit_balance = credit_balance + ?, updated_at = ? WHERE id = ?",
         args: [creditAmount, timestamp, validated.customer_id],
       });
+    }
+
+    // Process inline returns if any
+    if (validated.return_items && validated.return_items.length > 0) {
+      // Create a return record linked to the current sale
+      const returnNumber = `RET-${Date.now()}`;
+
+      const returnResult = await client.execute({
+        sql: `INSERT INTO returns (return_number, sale_id, user_id, total_amount, refund_amount, 
+              refund_method, reason, created_at) 
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`,
+        args: [
+          returnNumber,
+          saleId, // Link to the current sale being created
+          user.userId,
+          returnsTotal,
+          0, // Refund amount is 0 since it's applied to the new sale
+          "store_credit", // Applied as credit to new purchase
+          "Inline return with new purchase",
+          timestamp,
+        ],
+      });
+
+      const returnId = (returnResult.rows[0] as unknown as { id: number }).id;
+
+      // Create return items and restore inventory
+      for (const returnItem of validated.return_items) {
+        let costPrice = returnItem.cost_price || 0;
+
+        // If linked to a sale item, get cost_price from original sale_item
+        if (returnItem.sale_item_id) {
+          const originalSaleItemResult = await client.execute({
+            sql: "SELECT cost_price FROM sale_items WHERE id = ?",
+            args: [returnItem.sale_item_id],
+          });
+          if (originalSaleItemResult.rows.length > 0) {
+            costPrice = roundPrice(
+              (
+                originalSaleItemResult.rows[0] as unknown as {
+                  cost_price: number;
+                }
+              ).cost_price || costPrice
+            );
+          }
+        } else if (!costPrice) {
+          // For generic returns without cost_price, get from product
+          const productResult = await client.execute({
+            sql: "SELECT cost_price FROM products WHERE id = ?",
+            args: [returnItem.product_id],
+          });
+          if (productResult.rows.length > 0) {
+            costPrice = roundPrice(
+              (productResult.rows[0] as unknown as { cost_price: number })
+                .cost_price || 0
+            );
+          }
+        }
+
+        const refundAmount = roundPrice(
+          returnItem.quantity * roundPrice(returnItem.unit_price)
+        );
+
+        await client.execute({
+          sql: `INSERT INTO return_items (return_id, sale_item_id, product_id, quantity, 
+                unit_price, refund_amount) VALUES (?, ?, ?, ?, ?, ?)`,
+          args: [
+            returnId,
+            returnItem.sale_item_id || null, // May be null for generic returns
+            returnItem.product_id,
+            returnItem.quantity,
+            roundPrice(returnItem.unit_price),
+            refundAmount,
+          ],
+        });
+
+        // Restore inventory for returned items
+        await updateProductQuantity(
+          returnItem.product_id,
+          returnItem.quantity,
+          "add",
+          returnId,
+          "return"
+        );
+      }
     }
 
     // Get full sale details

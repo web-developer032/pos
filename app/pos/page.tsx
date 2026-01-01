@@ -15,6 +15,7 @@ import {
   setTax,
   holdCart,
   addItem,
+  addReturnItem,
 } from "@/lib/slices/cartSlice";
 import { Modal } from "@/components/ui/Modal";
 import { useGetCustomersQuery } from "@/lib/api/customersApi";
@@ -39,6 +40,7 @@ export default function POSPage() {
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [isHoldCartModalOpen, setIsHoldCartModalOpen] = useState(false);
   const [isOpenDayModalOpen, setIsOpenDayModalOpen] = useState(false);
+  const [isReturnMode, setIsReturnMode] = useState(false);
   const [holdCartName, setHoldCartName] = useState("");
   const [barcodeInput, setBarcodeInput] = useState("");
   const [barcodeToScan, setBarcodeToScan] = useState("");
@@ -47,10 +49,11 @@ export default function POSPage() {
 
   const isDayOpen = sessionData?.isOpen || false;
 
-  // Calculate totals
+  // Calculate totals (returns subtract from subtotal)
   const subtotal = roundPrice(
     items.reduce((sum, item) => {
-      return sum + item.price * item.quantity;
+      const itemTotal = item.price * item.quantity;
+      return item.isReturn ? sum - itemTotal : sum + itemTotal;
     }, 0)
   );
   const finalTotal = roundPrice(subtotal - discount + tax);
@@ -111,17 +114,32 @@ export default function POSPage() {
 
       processedBarcodesRef.current.add(barcodeToScan);
 
-      // Add to cart
-      dispatch(
-        addItem({
-          product_id: product.id,
-          name: product.name,
-          price: roundPrice(product.selling_price),
-          quantity: 1,
-          stock_quantity: product.stock_quantity,
-        })
-      );
-      toast.success(`${product.name} added to cart`);
+      // Add to cart (as return if in return mode)
+      if (isReturnMode) {
+        dispatch(
+          addReturnItem({
+            product_id: product.id,
+            name: product.name,
+            price: roundPrice(product.selling_price),
+            quantity: 1,
+            stock_quantity: product.stock_quantity,
+            isReturn: true,
+            costPrice: product.cost_price,
+          })
+        );
+        toast.success(`${product.name} added as return`);
+      } else {
+        dispatch(
+          addItem({
+            product_id: product.id,
+            name: product.name,
+            price: roundPrice(product.selling_price),
+            quantity: 1,
+            stock_quantity: product.stock_quantity,
+          })
+        );
+        toast.success(`${product.name} added to cart`);
+      }
 
       // Clear state
       setBarcodeToScan("");
@@ -143,6 +161,7 @@ export default function POSPage() {
     barcodeError,
     isBarcodeFetching,
     dispatch,
+    isReturnMode,
   ]);
 
   // Handle barcode input (scanners send Enter after barcode)
@@ -282,7 +301,7 @@ export default function POSPage() {
           </div>
         </div>
 
-        <div className="mb-4 flex gap-4">
+        <div className="mb-4 flex flex-wrap items-end gap-4">
           <div>
             <Select
               direction="column"
@@ -333,12 +352,14 @@ export default function POSPage() {
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:gap-6">
           <div className="lg:col-span-2">
             <HeldCarts />
-            <ProductGrid />
+            <ProductGrid isReturnMode={isReturnMode} />
           </div>
           <div className="lg:sticky lg:top-6 lg:col-span-1 lg:self-start">
             <Cart
               onCheckout={() => setIsPaymentModalOpen(true)}
               onHoldCart={handleHoldCart}
+              isReturnMode={isReturnMode}
+              onToggleReturnMode={() => setIsReturnMode(!isReturnMode)}
             />
           </div>
         </div>

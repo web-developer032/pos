@@ -7,6 +7,10 @@ export interface CartItem {
   price: number;
   quantity: number;
   stock_quantity: number;
+  isReturn?: boolean;
+  returnFromSaleId?: number;
+  returnFromSaleItemId?: number;
+  costPrice?: number;
 }
 
 export interface HeldCart {
@@ -41,7 +45,8 @@ const cartSlice = createSlice({
   reducers: {
     addItem: (state, action: PayloadAction<CartItem>) => {
       const existingItemIndex = state.items.findIndex(
-        (item) => item.product_id === action.payload.product_id
+        (item) =>
+          item.product_id === action.payload.product_id && !item.isReturn
       );
       if (existingItemIndex !== -1) {
         // Item exists: update quantity and move to top
@@ -58,10 +63,82 @@ const cartSlice = createSlice({
         });
       }
     },
-    removeItem: (state, action: PayloadAction<number>) => {
-      state.items = state.items.filter(
-        (item) => item.product_id !== action.payload
-      );
+    addReturnItem: (state, action: PayloadAction<CartItem>) => {
+      // For generic returns (no linked sale), check by product_id
+      // For linked returns, check by returnFromSaleItemId
+      const existingReturnIndex = state.items.findIndex((item) => {
+        if (!item.isReturn) return false;
+        if (action.payload.returnFromSaleItemId) {
+          return (
+            item.returnFromSaleItemId === action.payload.returnFromSaleItemId
+          );
+        }
+        // Generic return - match by product_id and no sale link
+        return (
+          item.product_id === action.payload.product_id &&
+          !item.returnFromSaleItemId
+        );
+      });
+
+      if (existingReturnIndex !== -1) {
+        // Already added this return item, update quantity
+        const existingItem = state.items[existingReturnIndex];
+        existingItem.quantity += action.payload.quantity;
+        // Move to top
+        state.items.splice(existingReturnIndex, 1);
+        state.items.unshift(existingItem);
+      } else {
+        // New return item: add to beginning
+        state.items.unshift({
+          ...action.payload,
+          price: roundPrice(action.payload.price),
+          isReturn: true,
+        });
+      }
+    },
+    removeItem: (
+      state,
+      action: PayloadAction<
+        | number
+        | {
+            product_id: number;
+            isReturn?: boolean;
+            returnFromSaleItemId?: number;
+          }
+      >
+    ) => {
+      if (typeof action.payload === "number") {
+        // Legacy: remove by product_id (only non-return items)
+        state.items = state.items.filter(
+          (item) => item.product_id !== action.payload || item.isReturn
+        );
+      } else {
+        // New: remove by product_id and optionally returnFromSaleItemId
+        const { product_id, isReturn, returnFromSaleItemId } = action.payload;
+        if (isReturn) {
+          if (returnFromSaleItemId !== undefined) {
+            // Remove linked return item by sale_item_id
+            state.items = state.items.filter(
+              (item) => item.returnFromSaleItemId !== returnFromSaleItemId
+            );
+          } else {
+            // Remove generic return item by product_id
+            state.items = state.items.filter(
+              (item) =>
+                !(
+                  item.isReturn &&
+                  item.product_id === product_id &&
+                  !item.returnFromSaleItemId
+                )
+            );
+          }
+        } else {
+          // Remove regular item
+          state.items = state.items.filter(
+            (item) => item.product_id !== product_id || item.isReturn
+          );
+        }
+      }
     },
     updateQuantity: (
       state,
@@ -171,6 +248,7 @@ const cartSlice = createSlice({
 
 export const {
   addItem,
+  addReturnItem,
   removeItem,
   updateQuantity,
   updatePrice,

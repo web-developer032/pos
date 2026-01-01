@@ -40,7 +40,14 @@ export function PaymentModal({
   const [saleData, setSaleData] = useState<{
     sale: Sale;
     items: SaleItem[];
+    returnItemsForReceipt?: {
+      product_id: number;
+      name: string;
+      quantity: number;
+      unit_price: number;
+    }[];
     amountPaid: number;
+    changeAmount?: number;
   } | null>(null);
   const receiptRef = useRef<ReceiptRef>(null);
   const { format: formatCurrency } = useCurrency();
@@ -54,9 +61,18 @@ export function PaymentModal({
       limit: 50,
     });
 
-  const subtotal = roundPrice(
-    items.reduce((sum, item) => sum + item.price * item.quantity, 0)
+  // Separate regular items and return items
+  const regularItems = items.filter((item) => !item.isReturn);
+  const returnItems = items.filter((item) => item.isReturn);
+
+  // Calculate subtotals
+  const regularSubtotal = roundPrice(
+    regularItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
   );
+  const returnsTotal = roundPrice(
+    returnItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
+  );
+  const subtotal = roundPrice(regularSubtotal - returnsTotal);
   const finalTotal = roundPrice(subtotal - discount + tax);
 
   // Amount paying now (default to full amount)
@@ -70,9 +86,26 @@ export function PaymentModal({
   }, [isOpen, finalTotal]);
 
   const amountPayingNum = parseFloat(amountPaying) || 0;
-  const creditAmount = roundPrice(Math.max(0, finalTotal - amountPayingNum));
-  const isPartialPayment = amountPayingNum < finalTotal && amountPayingNum >= 0;
-  const isFullCredit = amountPayingNum === 0;
+
+  // When total is negative (returns > purchases), shop owes customer
+  const isRefundTransaction = finalTotal < 0;
+  const refundToCustomer = isRefundTransaction ? Math.abs(finalTotal) : 0;
+
+  // For positive totals: credit is what customer still owes, change is overpayment
+  // For negative totals: no credit, change/refund is handled separately
+  const creditAmount = isRefundTransaction
+    ? 0
+    : roundPrice(Math.max(0, finalTotal - amountPayingNum));
+  const changeAmount = isRefundTransaction
+    ? 0
+    : roundPrice(Math.max(0, amountPayingNum - finalTotal));
+  const isPartialPayment =
+    !isRefundTransaction &&
+    amountPayingNum < finalTotal &&
+    amountPayingNum >= 0;
+  const isFullCredit =
+    !isRefundTransaction && amountPayingNum === 0 && finalTotal > 0;
+  const isOverpayment = !isRefundTransaction && amountPayingNum > finalTotal;
 
   // Customer options for dropdown
   const customerOptions = useMemo(() => {
@@ -95,42 +128,55 @@ export function PaymentModal({
       return;
     }
 
-    // Validate: credit sales require a customer
-    if (isPartialPayment && !customerId) {
+    // Validate: credit sales require a customer (only for positive totals with partial payment)
+    if (isPartialPayment && !customerId && finalTotal > 0) {
       toast.error("Please select a customer for credit sales");
-      return;
-    }
-
-    // Validate amount
-    if (amountPayingNum < 0) {
-      toast.error("Amount cannot be negative");
-      return;
-    }
-
-    if (amountPayingNum > finalTotal) {
-      toast.error("Amount paying cannot exceed the total");
       return;
     }
 
     try {
       const result = await createSale({
         customer_id: customerId,
-        items: items.map((item) => ({
+        items: regularItems.map((item) => ({
           product_id: item.product_id,
           quantity: item.quantity,
           unit_price: item.price,
         })),
+        return_items: returnItems.map((item) => ({
+          sale_id: item.returnFromSaleId,
+          sale_item_id: item.returnFromSaleItemId,
+          product_id: item.product_id,
+          quantity: item.quantity,
+          unit_price: item.price,
+          cost_price: item.costPrice,
+        })),
         discount_amount: discount,
         tax_amount: tax,
         payment_method: paymentMethod,
-        amount_paid: amountPayingNum,
+        amount_paid: isRefundTransaction
+          ? 0
+          : Math.min(amountPayingNum, finalTotal), // 0 for refunds, capped for regular sales
       }).unwrap();
 
-      // Store sale data for receipt (including amount paid for proper display)
-      setSaleData({ ...result, amountPaid: amountPayingNum });
+      // Store sale data for receipt (including return items for display)
+      setSaleData({
+        ...result,
+        returnItemsForReceipt: returnItems.map((item) => ({
+          product_id: item.product_id,
+          name: item.name,
+          quantity: item.quantity,
+          unit_price: item.price,
+        })),
+        amountPaid: isRefundTransaction ? 0 : amountPayingNum,
+        changeAmount: isRefundTransaction ? refundToCustomer : changeAmount,
+      });
       dispatch(clearCart());
 
-      if (isPartialPayment) {
+      if (isRefundTransaction) {
+        toast.success(
+          `Transaction completed! Pay ${formatCurrency(refundToCustomer)} to customer.`
+        );
+      } else if (isPartialPayment) {
         toast.success(
           `Sale completed! ${formatCurrency(creditAmount)} added to customer's credit.`
         );
@@ -167,21 +213,47 @@ export function PaymentModal({
           {/* Order Summary */}
           <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
             <div className="mb-2 flex justify-between text-sm">
-              <span className="text-gray-600">Subtotal:</span>
-              <span>{formatCurrency(subtotal)}</span>
+              <span className="text-gray-600">
+                Items ({regularItems.length}):
+              </span>
+              <span>{formatCurrency(regularSubtotal)}</span>
             </div>
-            <div className="mb-2 flex justify-between text-sm">
-              <span className="text-gray-600">Discount:</span>
-              <span className="text-red-600">-{formatCurrency(discount)}</span>
-            </div>
-            <div className="mb-2 flex justify-between text-sm">
-              <span className="text-gray-600">Tax:</span>
-              <span>{formatCurrency(tax)}</span>
-            </div>
+            {returnItems.length > 0 && (
+              <div className="mb-2 flex justify-between text-sm">
+                <span className="text-amber-600">
+                  Returns ({returnItems.length}):
+                </span>
+                <span className="text-amber-600">
+                  -{formatCurrency(returnsTotal)}
+                </span>
+              </div>
+            )}
+            {discount > 0 && (
+              <div className="mb-2 flex justify-between text-sm">
+                <span className="text-gray-600">Discount:</span>
+                <span className="text-red-600">
+                  -{formatCurrency(discount)}
+                </span>
+              </div>
+            )}
+            {tax > 0 && (
+              <div className="mb-2 flex justify-between text-sm">
+                <span className="text-gray-600">Tax:</span>
+                <span>{formatCurrency(tax)}</span>
+              </div>
+            )}
             <div className="flex justify-between border-t border-gray-300 pt-2 text-lg font-bold">
-              <span>Total:</span>
-              <span className="text-indigo-600">
-                {formatCurrency(finalTotal)}
+              <span>
+                {isRefundTransaction ? "Refund to Customer:" : "Total:"}
+              </span>
+              <span
+                className={
+                  isRefundTransaction ? "text-green-600" : "text-indigo-600"
+                }
+              >
+                {isRefundTransaction
+                  ? formatCurrency(refundToCustomer)
+                  : formatCurrency(finalTotal)}
               </span>
             </div>
           </div>
@@ -237,35 +309,97 @@ export function PaymentModal({
             }
           />
 
-          {/* Amount Paying Now */}
-          <div>
-            <Input
-              label="Amount Paying Now"
-              type="number"
-              min="0"
-              max={finalTotal}
-              step="0.01"
-              value={amountPaying}
-              onChange={(e) => setAmountPaying(e.target.value)}
-              onFocus={(e) => e.target.select()}
-            />
-            <div className="mt-1 flex gap-2">
-              <button
-                type="button"
-                onClick={() => setAmountPaying(finalTotal.toString())}
-                className="rounded bg-gray-100 px-2 py-1 text-xs text-gray-600 hover:bg-gray-200"
-              >
-                Full Amount
-              </button>
-              <button
-                type="button"
-                onClick={() => setAmountPaying("0")}
-                className="rounded bg-gray-100 px-2 py-1 text-xs text-gray-600 hover:bg-gray-200"
-              >
-                Full Credit
-              </button>
+          {/* Amount Paying Now - Only show for positive totals */}
+          {!isRefundTransaction && (
+            <div>
+              <Input
+                label="Amount Paying Now"
+                type="number"
+                min="0"
+                step="0.01"
+                value={amountPaying}
+                onChange={(e) => setAmountPaying(e.target.value)}
+                onFocus={(e) => e.target.select()}
+              />
+              <div className="mt-1 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setAmountPaying(finalTotal.toString())}
+                  className="rounded bg-gray-100 px-2 py-1 text-xs text-gray-600 hover:bg-gray-200"
+                >
+                  Full Amount
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAmountPaying("0")}
+                  className="rounded bg-gray-100 px-2 py-1 text-xs text-gray-600 hover:bg-gray-200"
+                >
+                  Full Credit
+                </button>
+              </div>
             </div>
-          </div>
+          )}
+
+          {/* Refund Info - Show when returns exceed purchases */}
+          {isRefundTransaction && (
+            <div className="rounded-lg border border-green-300 bg-green-50 p-3">
+              <div className="flex items-center gap-2">
+                <svg
+                  className="h-6 w-6 text-green-500"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"
+                  />
+                </svg>
+                <div>
+                  <p className="text-sm font-medium text-green-700">
+                    Pay to Customer
+                  </p>
+                  <p className="text-2xl font-bold text-green-700">
+                    {formatCurrency(refundToCustomer)}
+                  </p>
+                  <p className="text-xs text-green-600">
+                    Returns exceed new purchases
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Change to Return - For overpayment on positive totals */}
+          {isOverpayment && (
+            <div className="rounded-lg border border-green-300 bg-green-50 p-3">
+              <div className="flex items-center gap-2">
+                <svg
+                  className="h-5 w-5 text-green-500"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"
+                  />
+                </svg>
+                <div>
+                  <p className="text-sm font-medium text-green-700">
+                    Change to Return
+                  </p>
+                  <p className="text-lg font-bold text-green-700">
+                    {formatCurrency(changeAmount)}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Credit Info */}
           {isPartialPayment && (
@@ -315,13 +449,21 @@ export function PaymentModal({
             </Button>
             <Button
               onClick={handlePayment}
-              disabled={isLoading || (isPartialPayment && !customerId)}
+              disabled={
+                isLoading ||
+                (isPartialPayment && !customerId && !isRefundTransaction)
+              }
+              className={
+                isRefundTransaction ? "bg-green-600 hover:bg-green-700" : ""
+              }
             >
               {isLoading
                 ? "Processing..."
-                : isPartialPayment
-                  ? `Pay ${formatCurrency(amountPayingNum)} (${formatCurrency(creditAmount)} on credit)`
-                  : "Complete Payment"}
+                : isRefundTransaction
+                  ? `Complete & Pay ${formatCurrency(refundToCustomer)} to Customer`
+                  : isPartialPayment
+                    ? `Pay ${formatCurrency(amountPayingNum)} (${formatCurrency(creditAmount)} on credit)`
+                    : "Complete Payment"}
             </Button>
           </div>
         </div>
@@ -366,7 +508,9 @@ export function PaymentModal({
             ref={receiptRef}
             sale={saleData.sale}
             items={saleData.items}
+            returnItems={saleData.returnItemsForReceipt}
             amountPaid={saleData.amountPaid}
+            changeAmount={saleData.changeAmount}
           />
         </Modal>
       )}
