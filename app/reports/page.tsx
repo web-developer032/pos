@@ -4,7 +4,6 @@ import { useState } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { useGetSalesAnalyticsQuery } from "@/lib/api/salesApi";
-import { useCurrency } from "@/lib/hooks/useCurrency";
 import {
   DateRangeSelector,
   type DateRange,
@@ -30,7 +29,7 @@ export default function ReportsPage() {
   const [dateRange, setDateRange] = useState<DateRange>({
     startDate: "",
     endDate: "",
-    type: "month",
+    type: "all",
   });
 
   const { data, isLoading } = useGetSalesAnalyticsQuery({

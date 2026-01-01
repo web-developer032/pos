@@ -18,7 +18,7 @@ export default function DashboardPage() {
   const [dateRange, setDateRange] = useState<DateRange>({
     startDate: "",
     endDate: "",
-    type: "week",
+    type: "all",
   });
 
   return (

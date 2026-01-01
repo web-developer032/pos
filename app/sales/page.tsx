@@ -31,7 +31,7 @@ export default function SalesPage() {
   const [dateRange, setDateRange] = useState<DateRange>({
     startDate: "",
     endDate: "",
-    type: "month",
+    type: "all",
   });
 
   const { data, isLoading, refetch } = useGetSalesQuery({
