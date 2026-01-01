@@ -61,6 +61,7 @@ export async function GET() {
     const openedAt = session.opened_at;
 
     // Get sales by payment method with gross profit
+    // Use datetime() to normalize timestamp comparison (handles both old and ISO formats)
     const salesByMethodResult = await client.execute({
       sql: `
         SELECT payment_method, COUNT(*) as transaction_count,
@@ -68,7 +69,7 @@ export async function GET() {
                COALESCE(SUM((SELECT SUM((si.unit_price - si.cost_price) * si.quantity) 
                              FROM sale_items si WHERE si.sale_id = sales.id)), 0) as gross_profit
         FROM sales
-        WHERE created_at >= ?
+        WHERE datetime(created_at) >= datetime(?)
         GROUP BY payment_method
       `,
       args: [openedAt],
@@ -81,7 +82,7 @@ export async function GET() {
         FROM returns r
         JOIN return_items ri ON r.id = ri.return_id
         JOIN sale_items si ON ri.sale_item_id = si.id
-        WHERE r.created_at >= ?
+        WHERE datetime(r.created_at) >= datetime(?)
       `,
       args: [openedAt],
     });
@@ -93,35 +94,35 @@ export async function GET() {
     // Get total sales summary
     const totalSalesResult = await client.execute({
       sql: `SELECT COUNT(*) as transaction_count, COALESCE(SUM(final_amount), 0) as total_amount
-            FROM sales WHERE created_at >= ?`,
+            FROM sales WHERE datetime(created_at) >= datetime(?)`,
       args: [openedAt],
     });
 
     // Get returns by refund method
     const returnsByMethodResult = await client.execute({
       sql: `SELECT refund_method, COUNT(*) as return_count, COALESCE(SUM(refund_amount), 0) as total_refund
-            FROM returns WHERE created_at >= ? GROUP BY refund_method`,
+            FROM returns WHERE datetime(created_at) >= datetime(?) GROUP BY refund_method`,
       args: [openedAt],
     });
 
     // Get total returns summary
     const totalReturnsResult = await client.execute({
       sql: `SELECT COUNT(*) as return_count, COALESCE(SUM(refund_amount), 0) as total_refund
-            FROM returns WHERE created_at >= ?`,
+            FROM returns WHERE datetime(created_at) >= datetime(?)`,
       args: [openedAt],
     });
 
     // Get expenses by payment method
     const expensesByMethodResult = await client.execute({
       sql: `SELECT payment_method, category, COUNT(*) as expense_count, COALESCE(SUM(amount), 0) as total_amount
-            FROM expenses WHERE created_at >= ? GROUP BY payment_method, category`,
+            FROM expenses WHERE datetime(created_at) >= datetime(?) GROUP BY payment_method, category`,
       args: [openedAt],
     });
 
     // Get total expenses summary
     const totalExpensesResult = await client.execute({
       sql: `SELECT COUNT(*) as expense_count, COALESCE(SUM(amount), 0) as total_amount
-            FROM expenses WHERE created_at >= ?`,
+            FROM expenses WHERE datetime(created_at) >= datetime(?)`,
       args: [openedAt],
     });
 

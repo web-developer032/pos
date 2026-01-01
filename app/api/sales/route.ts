@@ -76,13 +76,13 @@ async function getHandler(req: NextRequest) {
     const args: (string | number)[] = [];
 
     if (startDate) {
-      // Use ISO 8601 datetime comparison to include the full start day (UTC)
-      sql += " AND s.created_at >= ?";
+      // Use datetime() to normalize both timestamp formats for comparison
+      sql += " AND datetime(s.created_at) >= datetime(?)";
       args.push(`${startDate}T00:00:00.000Z`);
     }
     if (endDate) {
-      // Use ISO 8601 datetime comparison to include the full end day (UTC)
-      sql += " AND s.created_at <= ?";
+      // Use datetime() to normalize both timestamp formats for comparison
+      sql += " AND datetime(s.created_at) <= datetime(?)";
       args.push(`${endDate}T23:59:59.999Z`);
     }
     if (search) {
@@ -101,11 +101,11 @@ async function getHandler(req: NextRequest) {
     `;
     const countArgs: (string | number)[] = [];
     if (startDate) {
-      countSql += " AND s.created_at >= ?";
+      countSql += " AND datetime(s.created_at) >= datetime(?)";
       countArgs.push(`${startDate}T00:00:00.000Z`);
     }
     if (endDate) {
-      countSql += " AND s.created_at <= ?";
+      countSql += " AND datetime(s.created_at) <= datetime(?)";
       countArgs.push(`${endDate}T23:59:59.999Z`);
     }
     if (search) {

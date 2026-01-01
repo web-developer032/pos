@@ -20,13 +20,13 @@ async function getHandler(req: NextRequest) {
     const args: (string | number)[] = [];
 
     if (startDate) {
-      // Use datetime comparison to include the full start day
-      sql += " AND created_at >= ?";
+      // Use datetime() to normalize timestamp formats for comparison
+      sql += " AND datetime(created_at) >= datetime(?)";
       args.push(`${startDate}T00:00:00.000Z`);
     }
     if (endDate) {
-      // Use datetime comparison to include the full end day
-      sql += " AND created_at <= ?";
+      // Use datetime() to normalize timestamp formats for comparison
+      sql += " AND datetime(created_at) <= datetime(?)";
       args.push(`${endDate}T23:59:59.999Z`);
     }
 

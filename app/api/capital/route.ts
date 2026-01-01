@@ -27,11 +27,11 @@ async function getHandler(req: NextRequest) {
     const args: (string | number)[] = [];
 
     if (startDate) {
-      sql += " AND c.created_at >= ?";
+      sql += " AND datetime(c.created_at) >= datetime(?)";
       args.push(`${startDate}T00:00:00.000Z`);
     }
     if (endDate) {
-      sql += " AND c.created_at <= ?";
+      sql += " AND datetime(c.created_at) <= datetime(?)";
       args.push(`${endDate}T23:59:59.999Z`);
     }
 

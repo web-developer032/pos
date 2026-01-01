@@ -30,11 +30,11 @@ async function getHandler(req: NextRequest) {
     const args: (string | number)[] = [];
 
     if (startDate) {
-      sql += " AND oi.created_at >= ?";
+      sql += " AND datetime(oi.created_at) >= datetime(?)";
       args.push(`${startDate}T00:00:00.000Z`);
     }
     if (endDate) {
-      sql += " AND oi.created_at <= ?";
+      sql += " AND datetime(oi.created_at) <= datetime(?)";
       args.push(`${endDate}T23:59:59.999Z`);
     }
     if (category) {
@@ -58,11 +58,11 @@ async function getHandler(req: NextRequest) {
     const summaryArgs: (string | number)[] = [];
 
     if (startDate) {
-      summarySql += " AND created_at >= ?";
+      summarySql += " AND datetime(created_at) >= datetime(?)";
       summaryArgs.push(`${startDate}T00:00:00.000Z`);
     }
     if (endDate) {
-      summarySql += " AND created_at <= ?";
+      summarySql += " AND datetime(created_at) <= datetime(?)";
       summaryArgs.push(`${endDate}T23:59:59.999Z`);
     }
 
@@ -82,11 +82,11 @@ async function getHandler(req: NextRequest) {
     const totalArgs: (string | number)[] = [];
 
     if (startDate) {
-      totalSql += " AND created_at >= ?";
+      totalSql += " AND datetime(created_at) >= datetime(?)";
       totalArgs.push(`${startDate}T00:00:00.000Z`);
     }
     if (endDate) {
-      totalSql += " AND created_at <= ?";
+      totalSql += " AND datetime(created_at) <= datetime(?)";
       totalArgs.push(`${endDate}T23:59:59.999Z`);
     }
 

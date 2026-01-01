@@ -39,11 +39,11 @@ async function getHandler(req: NextRequest) {
       args.push(period);
     }
     if (startDate) {
-      whereClause += " AND sp.created_at >= ?";
+      whereClause += " AND datetime(sp.created_at) >= datetime(?)";
       args.push(`${startDate}T00:00:00.000Z`);
     }
     if (endDate) {
-      whereClause += " AND sp.created_at <= ?";
+      whereClause += " AND datetime(sp.created_at) <= datetime(?)";
       args.push(`${endDate}T23:59:59.999Z`);
     }
     if (search) {
