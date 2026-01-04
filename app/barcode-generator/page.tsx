@@ -134,13 +134,19 @@ export default function BarcodeGeneratorPage() {
 
   const handlePrint = () => {
     // Create a new window with only barcodes for clean printing
-    const printWindow = window.open("", "_blank");
+    const printWindow = window.open("", "_blank", "width=400,height=600");
     if (!printWindow) {
       toast.error("Please allow popups to print");
       return;
     }
 
     const barcodeCards = document.querySelectorAll(".barcode-card");
+    if (barcodeCards.length === 0) {
+      toast.error("No barcodes to print. Generate some first!");
+      printWindow.close();
+      return;
+    }
+
     let barcodesHTML = "";
 
     barcodeCards.forEach((card) => {
@@ -161,30 +167,36 @@ export default function BarcodeGeneratorPage() {
 
       let canvasDataUrl = "";
       if (canvas) {
-        canvasDataUrl = (canvas as HTMLCanvasElement).toDataURL("image/png");
+        try {
+          canvasDataUrl = (canvas as HTMLCanvasElement).toDataURL("image/png");
+        } catch (e) {
+          console.error("Failed to get canvas data:", e);
+        }
       }
 
       barcodesHTML += `
         <div class="barcode-card">
           ${storeName ? `<div class="store-name">${storeName}</div>` : ""}
           ${productInfo ? `<div class="product-info">${productInfo}</div>` : ""}
-          ${canvasDataUrl ? `<img src="${canvasDataUrl}" alt="${barcodeNumber}" />` : ""}
+          ${canvasDataUrl ? `<img src="${canvasDataUrl}" alt="${barcodeNumber}" />` : `<div style="color:red;">No barcode image</div>`}
           <div class="barcode-number">${barcodeNumber}</div>
           ${mfgText || expText ? `<div class="dates-row"><span>${mfgText}</span><span>${expText}</span></div>` : ""}
         </div>
       `;
     });
 
+    // Label dimensions: 1" x 1.5" = 25.4mm x 38.1mm
+    // Screen preview: 3x scale for visibility (96px x 144px per label)
     printWindow.document.write(`
       <!DOCTYPE html>
       <html>
         <head>
-          <title>Barcodes - TLP 2844-Z</title>
+          <title>Barcodes - TLP 2844-Z (1" x 1.5")</title>
           <style>
-            /* TLP 2844-Z Label Printer Settings - 3 labels per row */
+            /* TLP 2844-Z Label Printer - 1" x 1.5" labels */
             @page {
-              size: 105mm 30mm; /* Label roll width x label height */
-              margin: 0;
+              size: 25.4mm 38.1mm;
+              margin: 0 !important;
             }
             * {
               margin: 0;
@@ -192,99 +204,190 @@ export default function BarcodeGeneratorPage() {
               box-sizing: border-box;
             }
             html, body {
-              width: 105mm;
               margin: 0;
-              padding: 0;
+              padding: 20px;
               font-family: Arial, Helvetica, sans-serif;
+              background: #f0f0f0;
+            }
+            .header {
+              background: #4F46E5;
+              color: white;
+              padding: 15px 20px;
+              margin: -20px -20px 20px -20px;
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+            }
+            .header h1 {
+              font-size: 16px;
+              font-weight: bold;
+            }
+            .print-btn {
+              padding: 10px 25px;
+              background: white;
+              color: #4F46E5;
+              border: none;
+              border-radius: 5px;
+              cursor: pointer;
+              font-size: 14px;
+              font-weight: bold;
+            }
+            .print-btn:hover {
+              background: #E0E7FF;
+            }
+            .info {
+              background: #FEF3C7;
+              border: 1px solid #F59E0B;
+              padding: 10px 15px;
+              margin-bottom: 20px;
+              border-radius: 5px;
+              font-size: 12px;
+              color: #92400E;
             }
             .grid {
               display: flex;
               flex-wrap: wrap;
-              width: 105mm;
+              gap: 10px;
+              justify-content: flex-start;
             }
             .barcode-card {
-              width: 35mm; /* Fixed width: 105mm / 3 = 35mm per label */
-              height: 28mm; /* Fixed height */
-              padding: 1mm;
+              width: 96px;
+              height: 144px;
+              padding: 4px;
               text-align: center;
-              overflow: hidden; /* Prevent content overflow */
+              overflow: hidden;
               display: flex;
               flex-direction: column;
               align-items: center;
               justify-content: center;
-              break-inside: avoid;
-              page-break-inside: avoid;
+              background: white;
+              border: 1px solid #ccc;
+              border-radius: 4px;
+              box-shadow: 0 1px 3px rgba(0,0,0,0.1);
             }
             .store-name {
-              font-size: 6pt;
+              font-size: 8px;
               font-weight: bold;
-              margin-bottom: 0.5mm;
-              line-height: 1;
-              max-width: 33mm;
+              margin-bottom: 2px;
+              line-height: 1.1;
+              max-width: 90px;
               overflow: hidden;
               text-overflow: ellipsis;
               white-space: nowrap;
+              color: #000;
             }
             .product-info {
-              font-size: 5pt;
-              font-weight: 500;
-              margin-bottom: 0.5mm;
-              max-width: 33mm;
+              font-size: 7px;
+              font-weight: 600;
+              margin-bottom: 2px;
+              max-width: 90px;
               overflow: hidden;
               text-overflow: ellipsis;
               white-space: nowrap;
-              line-height: 1;
+              line-height: 1.1;
+              color: #000;
             }
             .barcode-card img {
-              width: 32mm;
-              height: 10mm;
+              width: 88px;
+              height: 55px;
               object-fit: contain;
-              margin: 0.5mm 0;
+              margin: 3px 0;
             }
             .barcode-number {
               font-family: 'Courier New', monospace;
-              font-size: 6pt;
+              font-size: 8px;
               font-weight: bold;
-              letter-spacing: 0.3px;
-              line-height: 1;
+              letter-spacing: 0.5px;
+              line-height: 1.1;
+              color: #000;
             }
             .dates-row {
-              font-size: 5pt;
-              color: #333;
-              margin-top: 0.5mm;
+              font-size: 6px;
+              color: #000;
+              margin-top: 2px;
               display: flex;
               justify-content: space-between;
-              width: 32mm;
-              line-height: 1;
+              width: 88px;
+              line-height: 1.1;
             }
+            
+            /* Print styles - actual label size 1" x 1.5" */
             @media print {
               html, body {
-                width: 105mm;
-                -webkit-print-color-adjust: exact;
-                print-color-adjust: exact;
+                margin: 0 !important;
+                padding: 0 !important;
+                background: white !important;
+                width: 25.4mm;
+              }
+              .header, .info {
+                display: none !important;
               }
               .grid {
-                width: 105mm;
+                display: block;
+                width: 25.4mm;
+                gap: 0;
+              }
+              .barcode-card {
+                width: 25.4mm !important;
+                height: 38.1mm !important;
+                padding: 1mm;
+                border: none !important;
+                border-radius: 0 !important;
+                box-shadow: none !important;
+                page-break-after: always;
+                page-break-inside: avoid;
+                display: flex !important;
+                flex-direction: column !important;
+                align-items: center !important;
+                justify-content: center !important;
+              }
+              .barcode-card:last-child {
+                page-break-after: auto;
+              }
+              .store-name {
+                font-size: 6pt;
+                max-width: 24mm;
+                margin-bottom: 0.5mm;
+              }
+              .product-info {
+                font-size: 5pt;
+                max-width: 24mm;
+                margin-bottom: 0.5mm;
+              }
+              .barcode-card img {
+                width: 24mm !important;
+                height: 18mm !important;
+                object-fit: contain !important;
+                margin: 1mm 0 !important;
+              }
+              .barcode-number {
+                font-size: 6pt;
+                margin-top: 0.5mm;
+              }
+              .dates-row {
+                font-size: 4pt;
+                width: 23mm;
+                margin-top: 0.5mm;
               }
             }
           </style>
         </head>
         <body>
+          <div class="header">
+            <h1>🏷️ Label Preview (${barcodeCards.length} labels)</h1>
+            <button class="print-btn" onclick="window.print()">🖨️ Print Labels</button>
+          </div>
+          <div class="info">
+            <strong>Printer Setup:</strong> Select "Zebra TLP-2844-Z" → Paper size: 1" x 1.5" (25.4mm x 38.1mm) → Margins: None → Scale: 100%
+          </div>
           <div class="grid">
             ${barcodesHTML}
           </div>
-          <script>
-            window.onload = function() {
-              window.print();
-              window.onafterprint = function() {
-                window.close();
-              };
-            };
-          </script>
         </body>
       </html>
     `);
     printWindow.document.close();
+    toast.success("Print preview opened in new window");
   };
 
   const handleCopyAll = () => {
@@ -455,7 +558,7 @@ export default function BarcodeGeneratorPage() {
                 Generated Barcodes ({generatedBarcodes.length})
               </h2>
             </div>
-            <div className="barcode-grid grid grid-cols-3 gap-3">
+            <div className="barcode-grid grid max-w-[120px] grid-cols-1 gap-3">
               {generatedBarcodes.map((item) => (
                 <BarcodeCard
                   key={item.id}
@@ -558,10 +661,10 @@ function BarcodeCard({
               if (JsBarcode && canvasRef.current) {
                 JsBarcode(canvasRef.current, barcode, {
                   format: "CODE128",
-                  width: 1.2, // Narrower bars for better fit
-                  height: 30, // Shorter height
+                  width: 1.5,
+                  height: 50,
                   displayValue: false,
-                  margin: 0, // No margin - we handle padding in CSS
+                  margin: 5,
                 });
               }
             } catch (error) {
