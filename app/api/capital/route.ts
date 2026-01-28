@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth, AuthRequest } from "@/lib/middleware/auth";
-import client from "@/lib/db";
+import { sqlQuery } from "@/lib/db";
 import { z } from "zod";
 import { getCurrentTimestamp } from "@/lib/utils/dateTime";
 import { roundPrice } from "@/lib/utils/apiHelpers";
@@ -27,44 +27,37 @@ async function getHandler(req: NextRequest) {
     const args: (string | number)[] = [];
 
     if (startDate) {
-      sql += " AND datetime(c.created_at) >= datetime(?)";
+      sql += " AND c.created_at >= ?";
       args.push(`${startDate}T00:00:00.000Z`);
     }
     if (endDate) {
-      sql += " AND datetime(c.created_at) <= datetime(?)";
+      sql += " AND c.created_at <= ?";
       args.push(`${endDate}T23:59:59.999Z`);
     }
 
     sql += " ORDER BY c.created_at DESC";
 
-    const result = await client.execute({ sql, args });
+    const rows = await sqlQuery(sql, args);
 
-    // Calculate totals
-    const totalsResult = await client.execute({
-      sql: `
-        SELECT 
-          SUM(CASE WHEN transaction_type = 'investment' THEN amount ELSE 0 END) as total_investments,
-          SUM(CASE WHEN transaction_type = 'withdrawal' THEN amount ELSE 0 END) as total_withdrawals
-        FROM capital
-        WHERE 1=1
-        ${startDate ? "AND created_at >= ?" : ""}
-        ${endDate ? "AND created_at <= ?" : ""}
-      `,
-      args: args,
-    });
-
-    const totals = totalsResult.rows[0] as unknown as {
-      total_investments: number | null;
-      total_withdrawals: number | null;
-    };
+    let totalsSql = `
+      SELECT 
+        COALESCE(SUM(CASE WHEN transaction_type = 'investment' THEN amount ELSE 0 END), 0) as total_investments,
+        COALESCE(SUM(CASE WHEN transaction_type = 'withdrawal' THEN amount ELSE 0 END), 0) as total_withdrawals
+      FROM capital
+      WHERE 1=1
+    `;
+    if (startDate) totalsSql += " AND created_at >= ?";
+    if (endDate) totalsSql += " AND created_at <= ?";
+    const totalsRows = await sqlQuery(totalsSql, args);
+    const totals = totalsRows[0] as Record<string, unknown>;
 
     return NextResponse.json({
-      capital: result.rows,
+      capital: rows,
       summary: {
-        total_investments: totals.total_investments || 0,
-        total_withdrawals: totals.total_withdrawals || 0,
+        total_investments: Number(totals?.total_investments ?? 0),
+        total_withdrawals: Number(totals?.total_withdrawals ?? 0),
         net_capital:
-          (totals.total_investments || 0) - (totals.total_withdrawals || 0),
+          Number(totals?.total_investments ?? 0) - Number(totals?.total_withdrawals ?? 0),
       },
     });
   } catch (error) {
@@ -88,29 +81,28 @@ async function postHandler(req: AuthRequest) {
 
     const timestamp = getCurrentTimestamp();
 
-    const result = await client.execute({
-      sql: `INSERT INTO capital (amount, description, transaction_type, notes, user_id, created_at)
-            VALUES (?, ?, ?, ?, ?, ?) RETURNING *`,
-      args: [
+    const insertRows = await sqlQuery<{ id: number }>(
+      `INSERT INTO capital (amount, description, transaction_type, notes, user_id, created_at)
+            VALUES (?, ?, ?, ?, ?, ?) RETURNING id`,
+      [
         roundPrice(validated.amount),
         validated.description || null,
         validated.transaction_type,
         validated.notes || null,
         user.userId,
         timestamp,
-      ],
-    });
+      ]
+    );
 
-    // Get full record with user name
-    const fullResult = await client.execute({
-      sql: `SELECT c.*, u.username as user_name
+    const fullRows = await sqlQuery(
+      `SELECT c.*, u.username as user_name
             FROM capital c
             JOIN users u ON c.user_id = u.id
             WHERE c.id = ?`,
-      args: [(result.rows[0] as unknown as { id: number }).id],
-    });
+      [insertRows[0].id]
+    );
 
-    return NextResponse.json({ capital: fullResult.rows[0] }, { status: 201 });
+    return NextResponse.json({ capital: fullRows[0] }, { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(

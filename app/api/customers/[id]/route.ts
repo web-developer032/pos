@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth, RouteContext } from "@/lib/middleware/auth";
-import client from "@/lib/db";
+import { prisma } from "@/lib/db";
 import { z } from "zod";
 
 const customerSchema = z.object({
@@ -17,19 +17,22 @@ async function getHandler(req: NextRequest, context?: RouteContext) {
       return NextResponse.json({ error: "Invalid request" }, { status: 400 });
     }
     const params = await context.params;
-    const result = await client.execute({
-      sql: "SELECT * FROM customers WHERE id = ?",
-      args: [params.id],
+    const id = Number(params.id);
+    if (Number.isNaN(id)) {
+      return NextResponse.json({ error: "Invalid id" }, { status: 400 });
+    }
+    const customer = await prisma.customer.findUnique({
+      where: { id },
     });
 
-    if (result.rows.length === 0) {
+    if (!customer) {
       return NextResponse.json(
         { error: "Customer not found" },
         { status: 404 }
       );
     }
 
-    return NextResponse.json({ customer: result.rows[0] });
+    return NextResponse.json({ customer });
   } catch (error) {
     console.error("Error fetching customer:", error);
     return NextResponse.json(
@@ -45,49 +48,40 @@ async function putHandler(req: NextRequest, context?: RouteContext) {
       return NextResponse.json({ error: "Invalid request" }, { status: 400 });
     }
     const params = await context.params;
+    const id = Number(params.id);
+    if (Number.isNaN(id)) {
+      return NextResponse.json({ error: "Invalid id" }, { status: 400 });
+    }
     const body = await req.json();
     const validated = customerSchema.parse(body);
 
-    const updates: string[] = [];
-    const values: (string | number | null)[] = [];
+    const data: {
+      name?: string;
+      email?: string | null;
+      phone?: string | null;
+      address?: string | null;
+      loyaltyPoints?: number;
+    } = {};
+    if (validated.name !== undefined) data.name = validated.name;
+    if (validated.email !== undefined) data.email = validated.email || null;
+    if (validated.phone !== undefined) data.phone = validated.phone ?? null;
+    if (validated.address !== undefined) data.address = validated.address ?? null;
+    if (validated.loyalty_points !== undefined)
+      data.loyaltyPoints = validated.loyalty_points;
 
-    if (validated.name !== undefined) {
-      updates.push("name = ?");
-      values.push(validated.name);
-    }
-    if (validated.email !== undefined) {
-      updates.push("email = ?");
-      values.push(validated.email || null);
-    }
-    if (validated.phone !== undefined) {
-      updates.push("phone = ?");
-      values.push(validated.phone);
-    }
-    if (validated.address !== undefined) {
-      updates.push("address = ?");
-      values.push(validated.address);
-    }
-    if (validated.loyalty_points !== undefined) {
-      updates.push("loyalty_points = ?");
-      values.push(validated.loyalty_points);
-    }
-
-    if (updates.length === 0) {
+    if (Object.keys(data).length === 0) {
       return NextResponse.json(
         { error: "No fields to update" },
         { status: 400 }
       );
     }
 
-    updates.push("updated_at = CURRENT_TIMESTAMP");
-    values.push(params.id);
-
-    const result = await client.execute({
-      sql: `UPDATE customers SET ${updates.join(", ")} WHERE id = ? RETURNING *`,
-      args: values,
+    const customer = await prisma.customer.update({
+      where: { id },
+      data,
     });
 
-    return NextResponse.json({ customer: result.rows[0] });
+    return NextResponse.json({ customer });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
@@ -109,9 +103,12 @@ async function deleteHandler(req: NextRequest, context?: RouteContext) {
       return NextResponse.json({ error: "Invalid request" }, { status: 400 });
     }
     const params = await context.params;
-    await client.execute({
-      sql: "DELETE FROM customers WHERE id = ?",
-      args: [params.id],
+    const id = Number(params.id);
+    if (Number.isNaN(id)) {
+      return NextResponse.json({ error: "Invalid id" }, { status: 400 });
+    }
+    await prisma.customer.delete({
+      where: { id },
     });
 
     return NextResponse.json({ message: "Customer deleted successfully" });

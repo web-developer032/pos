@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAuth, AuthRequest, RouteContext } from "@/lib/middleware/auth";
-import client from "@/lib/db";
+import { sqlQuery, sqlExecute } from "@/lib/db";
 import { z } from "zod";
 import { handleApiError, handleValidationError } from "@/lib/utils/apiHelpers";
 import { getCurrentTimestamp } from "@/lib/utils/dateTime";
@@ -25,41 +25,35 @@ async function getHandler(req: AuthRequest, context?: RouteContext) {
       return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
     }
 
-    // Get employee with payment summary
-    const result = await client.execute({
-      sql: `
-        SELECT e.*,
+    const rows = await sqlQuery(
+      `SELECT e.*,
           (SELECT COALESCE(SUM(CASE WHEN payment_type IN ('salary', 'bonus') THEN amount ELSE -amount END), 0)
            FROM salary_payments sp WHERE sp.employee_id = e.id) as total_paid
         FROM employees e
-        WHERE e.id = ?
-      `,
-      args: [employeeId],
-    });
+        WHERE e.id = ?`,
+      [employeeId]
+    );
 
-    if (result.rows.length === 0) {
+    if (rows.length === 0) {
       return NextResponse.json(
         { error: "Employee not found" },
         { status: 404 }
       );
     }
 
-    // Get recent payments
-    const paymentsResult = await client.execute({
-      sql: `
-        SELECT sp.*, u.username as user_name
+    const paymentsRows = await sqlQuery(
+      `SELECT sp.*, u.username as user_name
         FROM salary_payments sp
         LEFT JOIN users u ON sp.user_id = u.id
         WHERE sp.employee_id = ?
         ORDER BY sp.created_at DESC
-        LIMIT 10
-      `,
-      args: [employeeId],
-    });
+        LIMIT 10`,
+      [employeeId]
+    );
 
     return NextResponse.json({
-      employee: result.rows[0],
-      recent_payments: paymentsResult.rows,
+      employee: rows[0],
+      recent_payments: paymentsRows,
     });
   } catch (error) {
     return handleApiError(error, "fetching employee");
@@ -78,20 +72,18 @@ async function putHandler(req: AuthRequest, context?: RouteContext) {
     const body = await req.json();
     const validated = updateSchema.parse(body);
 
-    // Check if employee exists
-    const existingResult = await client.execute({
-      sql: "SELECT id FROM employees WHERE id = ?",
-      args: [employeeId],
-    });
+    const existingRows = await sqlQuery(
+      "SELECT id FROM employees WHERE id = ?",
+      [employeeId]
+    );
 
-    if (existingResult.rows.length === 0) {
+    if (existingRows.length === 0) {
       return NextResponse.json(
         { error: "Employee not found" },
         { status: 404 }
       );
     }
 
-    // Build update query dynamically
     const updates: string[] = ["updated_at = ?"];
     const args: (string | number | null)[] = [getCurrentTimestamp()];
 
@@ -130,12 +122,12 @@ async function putHandler(req: AuthRequest, context?: RouteContext) {
 
     args.push(employeeId);
 
-    const result = await client.execute({
-      sql: `UPDATE employees SET ${updates.join(", ")} WHERE id = ? RETURNING *`,
-      args,
-    });
+    const updatedRows = await sqlQuery(
+      `UPDATE employees SET ${updates.join(", ")} WHERE id = ? RETURNING *`,
+      args
+    );
 
-    return NextResponse.json({ employee: result.rows[0] });
+    return NextResponse.json({ employee: updatedRows[0] });
   } catch (error) {
     const validationError = handleValidationError(error);
     if (validationError) return validationError;
@@ -152,42 +144,35 @@ async function deleteHandler(req: AuthRequest, context?: RouteContext) {
       return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
     }
 
-    // Check if employee exists
-    const existingResult = await client.execute({
-      sql: "SELECT id FROM employees WHERE id = ?",
-      args: [employeeId],
-    });
+    const existingRows = await sqlQuery(
+      "SELECT id FROM employees WHERE id = ?",
+      [employeeId]
+    );
 
-    if (existingResult.rows.length === 0) {
+    if (existingRows.length === 0) {
       return NextResponse.json(
         { error: "Employee not found" },
         { status: 404 }
       );
     }
 
-    // Check if employee has payments
-    const paymentsResult = await client.execute({
-      sql: "SELECT COUNT(*) as count FROM salary_payments WHERE employee_id = ?",
-      args: [employeeId],
-    });
-    const paymentCount = (paymentsResult.rows[0] as unknown as { count: number }).count;
+    const countRows = await sqlQuery<{ count: number }>(
+      "SELECT COUNT(*)::bigint as count FROM salary_payments WHERE employee_id = ?",
+      [employeeId]
+    );
+    const paymentCount = Number(countRows[0]?.count ?? 0);
 
     if (paymentCount > 0) {
-      // Soft delete by setting status to inactive
-      await client.execute({
-        sql: "UPDATE employees SET status = 'inactive', updated_at = ? WHERE id = ?",
-        args: [getCurrentTimestamp(), employeeId],
-      });
+      await sqlExecute(
+        "UPDATE employees SET status = 'inactive', updated_at = ? WHERE id = ?",
+        [getCurrentTimestamp(), employeeId]
+      );
       return NextResponse.json({
         message: "Employee deactivated (has payment history)",
       });
     }
 
-    // Hard delete if no payments
-    await client.execute({
-      sql: "DELETE FROM employees WHERE id = ?",
-      args: [employeeId],
-    });
+    await sqlExecute("DELETE FROM employees WHERE id = ?", [employeeId]);
 
     return NextResponse.json({ message: "Employee deleted successfully" });
   } catch (error) {

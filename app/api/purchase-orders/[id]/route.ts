@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth, RouteContext, AuthRequest } from "@/lib/middleware/auth";
-import client from "@/lib/db";
+import { sqlQuery, sqlExecute } from "@/lib/db";
 import { z } from "zod";
 import { roundPrice } from "@/lib/utils/apiHelpers";
 import { updateProductQuantity } from "@/lib/utils/productQuantity";
@@ -11,24 +11,24 @@ async function getHandler(req: NextRequest, context?: RouteContext) {
       return NextResponse.json({ error: "Invalid request" }, { status: 400 });
     }
     const params = await context.params;
-    const poResult = await client.execute({
-      sql: `SELECT po.*, s.name as supplier_name, u.username as user_name
+    const poRows = await sqlQuery(
+      `SELECT po.*, s.name as supplier_name, u.username as user_name
             FROM purchase_orders po
             JOIN suppliers s ON po.supplier_id = s.id
             JOIN users u ON po.user_id = u.id
             WHERE po.id = ?`,
-      args: [params.id],
-    });
+      [params.id]
+    );
 
-    if (poResult.rows.length === 0) {
+    if (poRows.length === 0) {
       return NextResponse.json(
         { error: "Purchase order not found" },
         { status: 404 }
       );
     }
 
-    const itemsResult = await client.execute({
-      sql: `SELECT poi.*, 
+    const itemsRows = await sqlQuery(
+      `SELECT poi.*, 
             COALESCE(poi.product_name, p.name, 'Deleted Product') as product_name,
             p.sku as product_sku,
             p.barcode as product_barcode,
@@ -37,29 +37,27 @@ async function getHandler(req: NextRequest, context?: RouteContext) {
             FROM purchase_order_items poi
             LEFT JOIN products p ON poi.product_id = p.id AND p.deleted_at IS NULL
             WHERE poi.po_id = ?`,
-      args: [params.id],
-    });
+      [params.id]
+    );
 
-    // Get payments made against this purchase order
-    const paymentsResult = await client.execute({
-      sql: `SELECT sp.*, u.username as user_name
+    const paymentsRows = await sqlQuery(
+      `SELECT sp.*, u.username as user_name
             FROM supplier_payments sp
             JOIN users u ON sp.user_id = u.id
             WHERE sp.purchase_order_id = ?
             ORDER BY sp.created_at DESC`,
-      args: [params.id],
-    });
+      [params.id]
+    );
 
-    // Calculate total paid
-    const totalPaid = paymentsResult.rows.reduce(
-      (sum, payment) => sum + ((payment as unknown as { amount: number }).amount || 0),
+    const totalPaid = paymentsRows.reduce<number>(
+      (sum, payment) => sum + Number((payment as Record<string, unknown>).amount ?? 0),
       0
     );
 
     return NextResponse.json({
-      purchase_order: poResult.rows[0],
-      items: itemsResult.rows,
-      payments: paymentsResult.rows,
+      purchase_order: poRows[0],
+      items: itemsRows,
+      payments: paymentsRows,
       total_paid: totalPaid,
     });
   } catch (error) {
@@ -104,45 +102,39 @@ async function putHandler(req: AuthRequest, context?: RouteContext) {
       const validated = updateItemsSchema.parse(body);
       const poId = parseInt(params.id);
 
-      // Check if PO exists and is pending
-      const poCheck = await client.execute({
-        sql: "SELECT status FROM purchase_orders WHERE id = ?",
-        args: [poId],
-      });
+      const poCheckRows = await sqlQuery(
+        "SELECT status FROM purchase_orders WHERE id = ?",
+        [poId]
+      );
 
-      if (poCheck.rows.length === 0) {
+      if (poCheckRows.length === 0) {
         return NextResponse.json(
           { error: "Purchase order not found" },
           { status: 404 }
         );
       }
 
-      const poStatus = (poCheck.rows[0] as unknown as { status: string })
-        .status;
+      const poStatus = (poCheckRows[0] as Record<string, unknown>).status as string;
 
-      // Update supplier if provided
       if (validated.supplier_id) {
-        await client.execute({
-          sql: "UPDATE purchase_orders SET supplier_id = ? WHERE id = ?",
-          args: [validated.supplier_id, poId],
-        });
+        await sqlExecute(
+          "UPDATE purchase_orders SET supplier_id = ? WHERE id = ?",
+          [validated.supplier_id, poId]
+        );
       }
 
-      // Update items if provided
       if (validated.items) {
-        // For completed POs, we need to handle differential stock changes
         if (poStatus === "completed") {
-          // Get existing items before making changes
-          const existingItemsResult = await client.execute({
-            sql: "SELECT product_id, quantity, unit_cost, retail_price FROM purchase_order_items WHERE po_id = ?",
-            args: [poId],
-          });
+          const existingItemsRows = await sqlQuery(
+            "SELECT product_id, quantity, unit_cost, retail_price FROM purchase_order_items WHERE po_id = ?",
+            [poId]
+          );
 
           const oldItems = new Map<
             number,
             { quantity: number; unit_cost: number; retail_price: number | null }
           >();
-          for (const row of existingItemsResult.rows) {
+          for (const row of existingItemsRows) {
             const item = row as unknown as {
               product_id: number;
               quantity: number;
@@ -198,20 +190,15 @@ async function putHandler(req: AuthRequest, context?: RouteContext) {
                 "purchase"
               );
 
-              // Update cost price for new items
               if (newItem.unit_cost > 0) {
-                const productResult = await client.execute({
-                  sql: "SELECT cost_price, stock_quantity FROM products WHERE id = ?",
-                  args: [productId],
-                });
-                if (productResult.rows.length > 0) {
-                  const product = productResult.rows[0] as unknown as {
-                    cost_price: number;
-                    stock_quantity: number;
-                  };
-                  const currentStock = product.stock_quantity || 0;
-                  const currentCost = product.cost_price || 0;
-                  // Weighted average cost
+                const productRows = await sqlQuery(
+                  "SELECT cost_price, stock_quantity FROM products WHERE id = ?",
+                  [productId]
+                );
+                if (productRows.length > 0) {
+                  const product = productRows[0] as Record<string, unknown>;
+                  const currentStock = Number(product.stock_quantity ?? 0);
+                  const currentCost = Number(product.cost_price ?? 0);
                   const totalStock = currentStock;
                   const newCostPrice =
                     totalStock > 0
@@ -219,19 +206,18 @@ async function putHandler(req: AuthRequest, context?: RouteContext) {
                           newItem.unit_cost * newItem.quantity) /
                         totalStock
                       : newItem.unit_cost;
-                  await client.execute({
-                    sql: "UPDATE products SET cost_price = ? WHERE id = ?",
-                    args: [roundPrice(newCostPrice), productId],
-                  });
+                  await sqlExecute(
+                    "UPDATE products SET cost_price = ? WHERE id = ?",
+                    [roundPrice(newCostPrice), productId]
+                  );
                 }
               }
 
-              // Update retail price if specified
               if (newItem.retail_price && newItem.retail_price > 0) {
-                await client.execute({
-                  sql: "UPDATE products SET selling_price = ? WHERE id = ?",
-                  args: [roundPrice(newItem.retail_price), productId],
-                });
+                await sqlExecute(
+                  "UPDATE products SET selling_price = ? WHERE id = ?",
+                  [roundPrice(newItem.retail_price), productId]
+                );
               }
             } else {
               // Existing item - check for quantity/price changes
@@ -249,28 +235,23 @@ async function putHandler(req: AuthRequest, context?: RouteContext) {
                     "purchase"
                   );
 
-                  // Recalculate weighted average cost for the increase
-                  const productResult = await client.execute({
-                    sql: "SELECT cost_price, stock_quantity FROM products WHERE id = ?",
-                    args: [productId],
-                  });
-                  if (productResult.rows.length > 0) {
-                    const product = productResult.rows[0] as unknown as {
-                      cost_price: number;
-                      stock_quantity: number;
-                    };
-                    const currentStock = product.stock_quantity || 0;
-                    const currentCost = product.cost_price || 0;
-                    // Apply weighted average for the additional units
+                  const productRows = await sqlQuery(
+                    "SELECT cost_price, stock_quantity FROM products WHERE id = ?",
+                    [productId]
+                  );
+                  if (productRows.length > 0) {
+                    const product = productRows[0] as Record<string, unknown>;
+                    const currentStock = Number(product.stock_quantity ?? 0);
+                    const currentCost = Number(product.cost_price ?? 0);
                     if (currentStock > 0) {
                       const totalValue =
                         currentCost * (currentStock - qtyDiff) +
                         newItem.unit_cost * qtyDiff;
                       const newCostPrice = totalValue / currentStock;
-                      await client.execute({
-                        sql: "UPDATE products SET cost_price = ? WHERE id = ?",
-                        args: [roundPrice(newCostPrice), productId],
-                      });
+                      await sqlExecute(
+                        "UPDATE products SET cost_price = ? WHERE id = ?",
+                        [roundPrice(newCostPrice), productId]
+                      );
                     }
                   }
                 } else {
@@ -286,26 +267,24 @@ async function putHandler(req: AuthRequest, context?: RouteContext) {
                 }
               }
 
-              // Update retail price if changed and specified
               if (
                 newItem.retail_price &&
                 newItem.retail_price > 0 &&
                 newItem.retail_price !== oldItem.retail_price
               ) {
-                await client.execute({
-                  sql: "UPDATE products SET selling_price = ? WHERE id = ?",
-                  args: [roundPrice(newItem.retail_price), productId],
-                });
+                await sqlExecute(
+                  "UPDATE products SET selling_price = ? WHERE id = ?",
+                  [roundPrice(newItem.retail_price), productId]
+                );
               }
             }
           }
         }
 
-        // Delete existing items (for both pending and completed)
-        await client.execute({
-          sql: "DELETE FROM purchase_order_items WHERE po_id = ?",
-          args: [poId],
-        });
+        await sqlExecute(
+          "DELETE FROM purchase_order_items WHERE po_id = ?",
+          [poId]
+        );
 
         // Calculate subtotal
         const subtotal = roundPrice(
@@ -340,31 +319,29 @@ async function putHandler(req: AuthRequest, context?: RouteContext) {
 
         const totalAmount = roundPrice(afterDiscount + taxAmount);
 
-        // Insert new items
         for (const item of validated.items) {
           const roundedUnitCost = roundPrice(item.unit_cost);
           const roundedRetailPrice = item.retail_price
             ? roundPrice(item.retail_price)
             : null;
           const itemSubtotal = roundPrice(item.quantity * roundedUnitCost);
-          await client.execute({
-            sql: `INSERT INTO purchase_order_items (po_id, product_id, product_name, quantity, unit_cost, retail_price, subtotal) 
+          await sqlExecute(
+            `INSERT INTO purchase_order_items (po_id, product_id, product_name, quantity, unit_cost, retail_price, subtotal) 
                   VALUES (?, ?, ?, ?, ?, ?, ?)`,
-            args: [
+            [
               poId,
               item.product_id,
-              item.product_name || null,
+              item.product_name ?? null,
               item.quantity,
               roundedUnitCost,
               roundedRetailPrice,
               itemSubtotal,
-            ],
-          });
+            ]
+          );
         }
 
-        // Update total amount, discount, and tax
-        await client.execute({
-          sql: `UPDATE purchase_orders 
+        await sqlExecute(
+          `UPDATE purchase_orders 
                 SET total_amount = ?, 
                     discount_type = ?, 
                     discount_value = ?,
@@ -372,28 +349,27 @@ async function putHandler(req: AuthRequest, context?: RouteContext) {
                     tax_value = ?,
                     updated_at = CURRENT_TIMESTAMP 
                 WHERE id = ?`,
-          args: [
+          [
             totalAmount,
-            validated.discount_type || null,
-            validated.discount_value || null,
-            validated.tax_type || null,
-            validated.tax_value || null,
+            validated.discount_type ?? null,
+            validated.discount_value ?? null,
+            validated.tax_type ?? null,
+            validated.tax_value ?? null,
             poId,
-          ],
-        });
+          ]
+        );
       }
 
-      // Fetch updated PO
-      const updatedPO = await client.execute({
-        sql: `SELECT po.*, s.name as supplier_name, u.username as user_name
+      const updatedPORows = await sqlQuery(
+        `SELECT po.*, s.name as supplier_name, u.username as user_name
               FROM purchase_orders po
               JOIN suppliers s ON po.supplier_id = s.id
               JOIN users u ON po.user_id = u.id
               WHERE po.id = ?`,
-        args: [poId],
-      });
+        [poId]
+      );
 
-      return NextResponse.json({ purchase_order: updatedPO.rows[0] });
+      return NextResponse.json({ purchase_order: updatedPORows[0] });
     } else {
       // Status update (existing logic)
       const status = body.status;
@@ -402,32 +378,29 @@ async function putHandler(req: AuthRequest, context?: RouteContext) {
         return NextResponse.json({ error: "Invalid status" }, { status: 400 });
       }
 
-      const result = await client.execute({
-        sql: "UPDATE purchase_orders SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? RETURNING *",
-        args: [status, params.id],
-      });
+      const resultRows = await sqlQuery(
+        "UPDATE purchase_orders SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? RETURNING *",
+        [status, params.id]
+      );
 
-      // If completing, update inventory and cost/retail prices
       if (status === "completed") {
-        // Get purchase order discount info
-        const poResult = await client.execute({
-          sql: "SELECT discount_type, discount_value, total_amount FROM purchase_orders WHERE id = ?",
-          args: [params.id],
-        });
+        const poRows = await sqlQuery(
+          "SELECT discount_type, discount_value, total_amount FROM purchase_orders WHERE id = ?",
+          [params.id]
+        );
 
-        const po = poResult.rows[0] as unknown as {
+        const po = poRows[0] as unknown as {
           discount_type: string | null;
           discount_value: number | null;
           total_amount: number;
         };
 
-        const itemsResult = await client.execute({
-          sql: "SELECT product_id, product_name, quantity, unit_cost, retail_price, subtotal FROM purchase_order_items WHERE po_id = ?",
-          args: [params.id],
-        });
+        const itemsRows = await sqlQuery(
+          "SELECT product_id, product_name, quantity, unit_cost, retail_price, subtotal FROM purchase_order_items WHERE po_id = ?",
+          [params.id]
+        );
 
-        // Calculate subtotal (before discount)
-        const items = itemsResult.rows as unknown as {
+        const items = itemsRows as unknown as {
           product_id: number;
           product_name: string | null;
           quantity: number;
@@ -458,75 +431,61 @@ async function putHandler(req: AuthRequest, context?: RouteContext) {
         }
 
         for (const item of items) {
-          // Get current product information
-          const productResult = await client.execute({
-            sql: "SELECT cost_price, stock_quantity FROM products WHERE id = ?",
-            args: [item.product_id],
-          });
+          const productRows = await sqlQuery(
+            "SELECT cost_price, stock_quantity FROM products WHERE id = ?",
+            [item.product_id]
+          );
 
-          if (productResult.rows.length === 0) {
-            continue; // Skip if product doesn't exist
+          if (productRows.length === 0) {
+            continue;
           }
 
-          const product = productResult.rows[0] as unknown as {
-            cost_price: number;
-            stock_quantity: number;
-          };
-
-          const currentStock = product.stock_quantity || 0;
-          const currentCost = product.cost_price || 0;
+          const product = productRows[0] as Record<string, unknown>;
+          const currentStock = Number(product.stock_quantity ?? 0);
+          const currentCost = Number(product.cost_price ?? 0);
           const newQuantity = item.quantity;
-          // Apply discount to the unit cost
           const newCost = item.unit_cost * discountFactor;
 
-          // Calculate new cost price
           let newCostPrice: number;
           if (currentStock > 0) {
-            // Average cost calculation: weighted average
             const totalCurrentValue = currentStock * currentCost;
             const totalNewValue = newQuantity * newCost;
             const totalQuantity = currentStock + newQuantity;
             newCostPrice = (totalCurrentValue + totalNewValue) / totalQuantity;
           } else {
-            // No existing stock, replace cost price
             newCostPrice = newCost;
           }
 
-          // Update stock quantity with relationship logic
           await updateProductQuantity(
             item.product_id,
             item.quantity,
             "add",
-            parseInt(params.id),
+            parseInt(params.id, 10),
             "purchase"
           );
 
-          // Update cost price on the actual product being purchased
-          // Note: For packings/composites, cost price is stored on the product itself, not the base
-          await client.execute({
-            sql: "UPDATE products SET cost_price = ? WHERE id = ?",
-            args: [roundPrice(newCostPrice), item.product_id],
-          });
+          await sqlExecute(
+            "UPDATE products SET cost_price = ? WHERE id = ?",
+            [roundPrice(newCostPrice), item.product_id]
+          );
 
-          // Update selling price if retail_price was specified
           if (item.retail_price !== null && item.retail_price > 0) {
-            await client.execute({
-              sql: "UPDATE products SET selling_price = ? WHERE id = ?",
-              args: [roundPrice(item.retail_price), item.product_id],
-            });
+            await sqlExecute(
+              "UPDATE products SET selling_price = ? WHERE id = ?",
+              [roundPrice(item.retail_price), item.product_id]
+            );
           }
 
-          // Update product name if specified
           if (item.product_name) {
-            await client.execute({
-              sql: "UPDATE products SET name = ? WHERE id = ?",
-              args: [item.product_name, item.product_id],
-            });
+            await sqlExecute(
+              "UPDATE products SET name = ? WHERE id = ?",
+              [item.product_name, item.product_id]
+            );
           }
         }
       }
 
-      return NextResponse.json({ purchase_order: result.rows[0] });
+      return NextResponse.json({ purchase_order: resultRows[0] });
     }
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -551,37 +510,30 @@ async function deleteHandler(req: AuthRequest, context?: RouteContext) {
     const params = await context.params;
     const poId = parseInt(params.id);
 
-    // Check if purchase order exists
-    const poCheck = await client.execute({
-      sql: "SELECT id, status FROM purchase_orders WHERE id = ?",
-      args: [poId],
-    });
+    const poCheckRows = await sqlQuery(
+      "SELECT id, status FROM purchase_orders WHERE id = ?",
+      [poId]
+    );
 
-    if (poCheck.rows.length === 0) {
+    if (poCheckRows.length === 0) {
       return NextResponse.json(
         { error: "Purchase order not found" },
         { status: 404 }
       );
     }
 
-    const poStatus = (poCheck.rows[0] as unknown as { status: string }).status;
+    const poStatus = (poCheckRows[0] as Record<string, unknown>).status as string;
 
-    // If completed, reverse inventory changes
     if (poStatus === "completed") {
-      const itemsResult = await client.execute({
-        sql: "SELECT product_id, quantity FROM purchase_order_items WHERE po_id = ?",
-        args: [poId],
-      });
+      const itemsRows = await sqlQuery<{ product_id: number; quantity: number }>(
+        "SELECT product_id, quantity FROM purchase_order_items WHERE po_id = ?",
+        [poId]
+      );
 
-      // Reverse inventory for each item (subtract quantities that were added)
-      for (const item of itemsResult.rows) {
-        const productId = item.product_id as number;
-        const quantity = item.quantity as number;
-
-        // Subtract stock quantity with relationship logic
+      for (const item of itemsRows) {
         await updateProductQuantity(
-          productId,
-          quantity,
+          item.product_id,
+          item.quantity,
           "subtract",
           poId,
           "purchase"
@@ -589,23 +541,20 @@ async function deleteHandler(req: AuthRequest, context?: RouteContext) {
       }
     }
 
-    // Delete inventory transactions related to this purchase order
-    await client.execute({
-      sql: "DELETE FROM inventory_transactions WHERE reference_id = ? AND transaction_type = 'purchase'",
-      args: [poId],
-    });
+    await sqlExecute(
+      "DELETE FROM inventory_transactions WHERE reference_id = ? AND transaction_type = 'purchase'",
+      [poId]
+    );
 
-    // Delete purchase order items
-    await client.execute({
-      sql: "DELETE FROM purchase_order_items WHERE po_id = ?",
-      args: [poId],
-    });
+    await sqlExecute(
+      "DELETE FROM purchase_order_items WHERE po_id = ?",
+      [poId]
+    );
 
-    // Delete the purchase order
-    await client.execute({
-      sql: "DELETE FROM purchase_orders WHERE id = ?",
-      args: [poId],
-    });
+    await sqlExecute(
+      "DELETE FROM purchase_orders WHERE id = ?",
+      [poId]
+    );
 
     return NextResponse.json({
       message: "Purchase order deleted successfully",

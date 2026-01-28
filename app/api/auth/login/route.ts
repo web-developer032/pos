@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import client from "@/lib/db";
+import { prisma } from "@/lib/db";
 import { verifyPassword, generateToken } from "@/lib/auth/auth";
 import { z } from "zod";
 
@@ -13,31 +13,20 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const validated = loginSchema.parse(body);
 
-    // Find user
-    const result = await client.execute({
-      sql: "SELECT id, username, email, password_hash, role FROM users WHERE username = ?",
-      args: [validated.username],
+    const user = await prisma.user.findUnique({
+      where: { username: validated.username },
     });
 
-    if (result.rows.length === 0) {
+    if (!user) {
       return NextResponse.json(
         { error: "Invalid credentials" },
         { status: 401 }
       );
     }
 
-    const user = result.rows[0] as unknown as {
-      id: number;
-      username: string;
-      email: string;
-      password_hash: string;
-      role: string;
-    };
-
-    // Verify password
     const isValid = await verifyPassword(
       validated.password,
-      user.password_hash
+      user.passwordHash
     );
     if (!isValid) {
       return NextResponse.json(

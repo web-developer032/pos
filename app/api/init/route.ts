@@ -1,11 +1,9 @@
 import { NextResponse } from "next/server";
-import { initializeDatabase } from "@/lib/db/schema";
-import { seedDatabase } from "@/lib/db/seed";
+import { runSeed } from "@/lib/db/runSeed";
 
 export async function GET() {
   try {
-    await initializeDatabase();
-    await seedDatabase();
+    await runSeed();
     return NextResponse.json({ message: "Database initialized successfully" });
   } catch (error) {
     console.error("Error initializing database:", error);

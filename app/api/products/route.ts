@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/middleware/auth";
-import client from "@/lib/db";
+import { sqlQuery, sqlExecute } from "@/lib/db";
 import { z } from "zod";
 import {
   getPaginationParams,
@@ -122,14 +122,12 @@ async function getHandler(req: NextRequest) {
 
     if (productIds.length > 0) {
       const placeholders = productIds.map(() => "?").join(",");
-      const barcodesResult = await client.execute({
-        sql: `SELECT product_id, barcode FROM product_barcodes WHERE product_id IN (${placeholders})`,
-        args: productIds,
-      });
+      const barcodesRows = await sqlQuery<{ product_id: number; barcode: string }>(
+        `SELECT product_id, barcode FROM product_barcodes WHERE product_id IN (${placeholders})`,
+        productIds
+      );
 
-      // Group barcodes by product_id
-      for (const row of barcodesResult.rows) {
-        const r = row as unknown as { product_id: number; barcode: string };
+      for (const r of barcodesRows) {
         if (!additionalBarcodesMap[r.product_id]) {
           additionalBarcodesMap[r.product_id] = [];
         }
@@ -157,19 +155,18 @@ async function postHandler(req: NextRequest) {
     const body = await req.json();
     const validated = productSchema.parse(body);
 
-    // Additional validation: Check if base_product_id exists (for related products)
     if (validated.base_product_id) {
-      const baseProduct = await client.execute({
-        sql: "SELECT id, sku, base_product_id FROM products WHERE id = ? AND deleted_at IS NULL",
-        args: [validated.base_product_id],
-      });
-      if (baseProduct.rows.length === 0) {
+      const baseProductRows = await sqlQuery(
+        "SELECT id, sku, base_product_id FROM products WHERE id = ? AND deleted_at IS NULL",
+        [validated.base_product_id]
+      );
+      if (baseProductRows.length === 0) {
         return NextResponse.json(
           { error: "Base product not found" },
           { status: 400 }
         );
       }
-      const baseProductData = baseProduct.rows[0] as unknown as {
+      const baseProductData = baseProductRows[0] as unknown as {
         id: number;
         sku: string | null;
         base_product_id: number | null;
@@ -190,12 +187,12 @@ async function postHandler(req: NextRequest) {
       validated.min_stock_level = 0;
     }
 
-    const result = await client.execute({
-      sql: `INSERT INTO products (name, barcode, sku, description, category_id, 
+    const insertRows = await sqlQuery<{ id: number }>(
+      `INSERT INTO products (name, barcode, sku, description, category_id, 
             cost_price, selling_price, stock_quantity, min_stock_level, unit, image_url,
             base_product_id, quantity_multiplier, created_at, updated_at) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`,
-      args: [
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
+      [
         validated.name,
         validated.barcode || null,
         validated.sku || null,
@@ -211,32 +208,34 @@ async function postHandler(req: NextRequest) {
         validated.quantity_multiplier || null,
         getCurrentTimestamp(),
         getCurrentTimestamp(),
-      ],
-    });
+      ]
+    );
 
-    const productId = (result.rows[0] as unknown as { id: number }).id;
+    const productId = insertRows[0].id;
 
-    // Insert additional barcodes if provided
     if (
       validated.additional_barcodes &&
       validated.additional_barcodes.length > 0
     ) {
       for (const barcode of validated.additional_barcodes) {
-        if (barcode && barcode.trim()) {
+        if (barcode?.trim()) {
           try {
-            await client.execute({
-              sql: "INSERT INTO product_barcodes (product_id, barcode) VALUES (?, ?)",
-              args: [productId, barcode.trim()],
-            });
+            await sqlExecute(
+              "INSERT INTO product_barcodes (product_id, barcode) VALUES (?, ?)",
+              [productId, barcode.trim()]
+            );
           } catch (error) {
-            // Ignore duplicate barcode errors
             console.warn(`Failed to add barcode ${barcode}:`, error);
           }
         }
       }
     }
 
-    return NextResponse.json({ product: result.rows[0] }, { status: 201 });
+    const productRows = await sqlQuery(
+      "SELECT * FROM products WHERE id = ?",
+      [productId]
+    );
+    return NextResponse.json({ product: productRows[0] }, { status: 201 });
   } catch (error) {
     const validationError = handleValidationError(error);
     if (validationError) return validationError;
@@ -250,9 +249,9 @@ async function deleteHandler(req: NextRequest) {
     const deleteAll = searchParams.get("delete_all") === "true";
 
     if (deleteAll) {
-      // Soft delete all products (set deleted_at timestamp)
-      await client.execute(
-        "UPDATE products SET deleted_at = CURRENT_TIMESTAMP WHERE deleted_at IS NULL"
+      await sqlExecute(
+        "UPDATE products SET deleted_at = CURRENT_TIMESTAMP WHERE deleted_at IS NULL",
+        []
       );
 
       return NextResponse.json({

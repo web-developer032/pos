@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAuth, RouteContext, AuthRequest } from "@/lib/middleware/auth";
-import client from "@/lib/db";
+import { sqlQuery, sqlExecute } from "@/lib/db";
 import { z } from "zod";
 
 const updatePaymentSchema = z.object({
@@ -20,23 +20,23 @@ async function getHandler(req: Request, context?: RouteContext) {
     const supplierId = parseInt(params.id);
     const paymentId = parseInt(params.paymentId);
 
-    const result = await client.execute({
-      sql: `SELECT sp.*, u.username as user_name, po.po_number
+    const rows = await sqlQuery(
+      `SELECT sp.*, u.username as user_name, po.po_number
             FROM supplier_payments sp
             JOIN users u ON sp.user_id = u.id
             LEFT JOIN purchase_orders po ON sp.purchase_order_id = po.id
             WHERE sp.id = ? AND sp.supplier_id = ?`,
-      args: [paymentId, supplierId],
-    });
+      [paymentId, supplierId]
+    );
 
-    if (result.rows.length === 0) {
+    if (rows.length === 0) {
       return NextResponse.json(
         { error: "Payment not found" },
         { status: 404 }
       );
     }
 
-    return NextResponse.json({ payment: result.rows[0] });
+    return NextResponse.json({ payment: rows[0] });
   } catch (error) {
     console.error("Error fetching supplier payment:", error);
     return NextResponse.json(
@@ -57,20 +57,19 @@ async function putHandler(req: AuthRequest, context?: RouteContext) {
     const body = await req.json();
     const validated = updatePaymentSchema.parse(body);
 
-    // Verify payment exists and belongs to supplier
-    const paymentCheck = await client.execute({
-      sql: "SELECT id, supplier_id FROM supplier_payments WHERE id = ?",
-      args: [paymentId],
-    });
+    const paymentRows = await sqlQuery(
+      "SELECT id, supplier_id FROM supplier_payments WHERE id = ?",
+      [paymentId]
+    );
 
-    if (paymentCheck.rows.length === 0) {
+    if (paymentRows.length === 0) {
       return NextResponse.json(
         { error: "Payment not found" },
         { status: 404 }
       );
     }
 
-    const payment = paymentCheck.rows[0] as unknown as { supplier_id: number };
+    const payment = paymentRows[0] as unknown as { supplier_id: number };
     if (payment.supplier_id !== supplierId) {
       return NextResponse.json(
         { error: "Payment does not belong to this supplier" },
@@ -78,21 +77,20 @@ async function putHandler(req: AuthRequest, context?: RouteContext) {
       );
     }
 
-    // If purchase_order_id is provided, verify it exists and belongs to this supplier
     if (validated.purchase_order_id) {
-      const poCheck = await client.execute({
-        sql: "SELECT id, supplier_id FROM purchase_orders WHERE id = ?",
-        args: [validated.purchase_order_id],
-      });
+      const poRows = await sqlQuery(
+        "SELECT id, supplier_id FROM purchase_orders WHERE id = ?",
+        [validated.purchase_order_id]
+      );
 
-      if (poCheck.rows.length === 0) {
+      if (poRows.length === 0) {
         return NextResponse.json(
           { error: "Purchase order not found" },
           { status: 404 }
         );
       }
 
-      const po = poCheck.rows[0] as unknown as { supplier_id: number };
+      const po = poRows[0] as unknown as { supplier_id: number };
       if (po.supplier_id !== supplierId) {
         return NextResponse.json(
           { error: "Purchase order does not belong to this supplier" },
@@ -101,33 +99,31 @@ async function putHandler(req: AuthRequest, context?: RouteContext) {
       }
     }
 
-    // Update payment
-    await client.execute({
-      sql: `UPDATE supplier_payments 
+    await sqlExecute(
+      `UPDATE supplier_payments 
             SET purchase_order_id = ?, amount = ?, payment_method = ?, 
                 reference_number = ?, notes = ?
             WHERE id = ?`,
-      args: [
-        validated.purchase_order_id || null,
+      [
+        validated.purchase_order_id ?? null,
         validated.amount,
         validated.payment_method,
-        validated.reference_number || null,
-        validated.notes || null,
+        validated.reference_number ?? null,
+        validated.notes ?? null,
         paymentId,
-      ],
-    });
+      ]
+    );
 
-    // Get updated payment
-    const result = await client.execute({
-      sql: `SELECT sp.*, u.username as user_name, po.po_number
+    const updatedRows = await sqlQuery(
+      `SELECT sp.*, u.username as user_name, po.po_number
             FROM supplier_payments sp
             JOIN users u ON sp.user_id = u.id
             LEFT JOIN purchase_orders po ON sp.purchase_order_id = po.id
             WHERE sp.id = ?`,
-      args: [paymentId],
-    });
+      [paymentId]
+    );
 
-    return NextResponse.json({ payment: result.rows[0] });
+    return NextResponse.json({ payment: updatedRows[0] });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
@@ -152,20 +148,19 @@ async function deleteHandler(req: Request, context?: RouteContext) {
     const supplierId = parseInt(params.id);
     const paymentId = parseInt(params.paymentId);
 
-    // Verify payment exists and belongs to supplier
-    const paymentCheck = await client.execute({
-      sql: "SELECT id, supplier_id FROM supplier_payments WHERE id = ?",
-      args: [paymentId],
-    });
+    const paymentRows = await sqlQuery(
+      "SELECT id, supplier_id FROM supplier_payments WHERE id = ?",
+      [paymentId]
+    );
 
-    if (paymentCheck.rows.length === 0) {
+    if (paymentRows.length === 0) {
       return NextResponse.json(
         { error: "Payment not found" },
         { status: 404 }
       );
     }
 
-    const payment = paymentCheck.rows[0] as unknown as { supplier_id: number };
+    const payment = paymentRows[0] as unknown as { supplier_id: number };
     if (payment.supplier_id !== supplierId) {
       return NextResponse.json(
         { error: "Payment does not belong to this supplier" },
@@ -173,11 +168,7 @@ async function deleteHandler(req: Request, context?: RouteContext) {
       );
     }
 
-    // Delete payment
-    await client.execute({
-      sql: "DELETE FROM supplier_payments WHERE id = ?",
-      args: [paymentId],
-    });
+    await sqlExecute("DELETE FROM supplier_payments WHERE id = ?", [paymentId]);
 
     return NextResponse.json({ message: "Payment deleted successfully" });
   } catch (error) {

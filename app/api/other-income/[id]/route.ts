@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAuth, AuthRequest, RouteContext } from "@/lib/middleware/auth";
-import client from "@/lib/db";
+import { prisma } from "@/lib/db";
 import { z } from "zod";
 import { handleApiError, handleValidationError } from "@/lib/utils/apiHelpers";
 
@@ -13,33 +13,44 @@ const updateSchema = z.object({
   notes: z.string().optional(),
 });
 
+function toIncomeResponse(o: { id: number; amount: number; category: string; description: string | null; paymentMethod: string; referenceNumber: string | null; notes: string | null; userId: number; createdAt: Date; user?: { username: string } | null }) {
+  const { user, ...rest } = o;
+  return {
+    id: rest.id,
+    amount: rest.amount,
+    category: rest.category,
+    description: rest.description,
+    payment_method: rest.paymentMethod,
+    reference_number: rest.referenceNumber,
+    notes: rest.notes,
+    user_id: rest.userId,
+    created_at: rest.createdAt,
+    user_name: user?.username ?? null,
+  };
+}
+
 async function getHandler(req: AuthRequest, context?: RouteContext) {
   try {
     const { id } = await context!.params;
-    const incomeId = parseInt(id);
+    const incomeId = parseInt(id, 10);
 
     if (isNaN(incomeId)) {
       return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
     }
 
-    const result = await client.execute({
-      sql: `
-        SELECT oi.*, u.username as user_name
-        FROM other_income oi
-        LEFT JOIN users u ON oi.user_id = u.id
-        WHERE oi.id = ?
-      `,
-      args: [incomeId],
+    const income = await prisma.otherIncome.findUnique({
+      where: { id: incomeId },
+      include: { user: { select: { username: true } } },
     });
 
-    if (result.rows.length === 0) {
+    if (!income) {
       return NextResponse.json(
         { error: "Other income record not found" },
         { status: 404 }
       );
     }
 
-    return NextResponse.json({ income: result.rows[0] });
+    return NextResponse.json({ income: toIncomeResponse(income) });
   } catch (error) {
     return handleApiError(error, "fetching other income");
   }
@@ -48,7 +59,7 @@ async function getHandler(req: AuthRequest, context?: RouteContext) {
 async function putHandler(req: AuthRequest, context?: RouteContext) {
   try {
     const { id } = await context!.params;
-    const incomeId = parseInt(id);
+    const incomeId = parseInt(id, 10);
 
     if (isNaN(incomeId)) {
       return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
@@ -57,63 +68,39 @@ async function putHandler(req: AuthRequest, context?: RouteContext) {
     const body = await req.json();
     const validated = updateSchema.parse(body);
 
-    // Check if record exists
-    const existingResult = await client.execute({
-      sql: "SELECT id FROM other_income WHERE id = ?",
-      args: [incomeId],
+    const existing = await prisma.otherIncome.findUnique({
+      where: { id: incomeId },
     });
 
-    if (existingResult.rows.length === 0) {
+    if (!existing) {
       return NextResponse.json(
         { error: "Other income record not found" },
         { status: 404 }
       );
     }
 
-    // Build update query dynamically
-    const updates: string[] = [];
-    const args: (string | number | null)[] = [];
+    const data: { amount?: number; category?: string; description?: string | null; paymentMethod?: string; referenceNumber?: string | null; notes?: string | null } = {};
+    if (validated.amount !== undefined) data.amount = validated.amount;
+    if (validated.category !== undefined) data.category = validated.category;
+    if (validated.description !== undefined) data.description = validated.description ?? null;
+    if (validated.payment_method !== undefined) data.paymentMethod = validated.payment_method;
+    if (validated.reference_number !== undefined) data.referenceNumber = validated.reference_number ?? null;
+    if (validated.notes !== undefined) data.notes = validated.notes ?? null;
 
-    if (validated.amount !== undefined) {
-      updates.push("amount = ?");
-      args.push(validated.amount);
-    }
-    if (validated.category !== undefined) {
-      updates.push("category = ?");
-      args.push(validated.category);
-    }
-    if (validated.description !== undefined) {
-      updates.push("description = ?");
-      args.push(validated.description || null);
-    }
-    if (validated.payment_method !== undefined) {
-      updates.push("payment_method = ?");
-      args.push(validated.payment_method);
-    }
-    if (validated.reference_number !== undefined) {
-      updates.push("reference_number = ?");
-      args.push(validated.reference_number || null);
-    }
-    if (validated.notes !== undefined) {
-      updates.push("notes = ?");
-      args.push(validated.notes || null);
-    }
-
-    if (updates.length === 0) {
+    if (Object.keys(data).length === 0) {
       return NextResponse.json(
         { error: "No fields to update" },
         { status: 400 }
       );
     }
 
-    args.push(incomeId);
-
-    const result = await client.execute({
-      sql: `UPDATE other_income SET ${updates.join(", ")} WHERE id = ? RETURNING *`,
-      args,
+    const income = await prisma.otherIncome.update({
+      where: { id: incomeId },
+      data,
+      include: { user: { select: { username: true } } },
     });
 
-    return NextResponse.json({ income: result.rows[0] });
+    return NextResponse.json({ income: toIncomeResponse(income) });
   } catch (error) {
     const validationError = handleValidationError(error);
     if (validationError) return validationError;
@@ -124,28 +111,25 @@ async function putHandler(req: AuthRequest, context?: RouteContext) {
 async function deleteHandler(req: AuthRequest, context?: RouteContext) {
   try {
     const { id } = await context!.params;
-    const incomeId = parseInt(id);
+    const incomeId = parseInt(id, 10);
 
     if (isNaN(incomeId)) {
       return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
     }
 
-    // Check if record exists
-    const existingResult = await client.execute({
-      sql: "SELECT id FROM other_income WHERE id = ?",
-      args: [incomeId],
+    const existing = await prisma.otherIncome.findUnique({
+      where: { id: incomeId },
     });
 
-    if (existingResult.rows.length === 0) {
+    if (!existing) {
       return NextResponse.json(
         { error: "Other income record not found" },
         { status: 404 }
       );
     }
 
-    await client.execute({
-      sql: "DELETE FROM other_income WHERE id = ?",
-      args: [incomeId],
+    await prisma.otherIncome.delete({
+      where: { id: incomeId },
     });
 
     return NextResponse.json({ message: "Other income deleted successfully" });

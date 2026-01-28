@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/middleware/auth";
-import client from "@/lib/db";
+import { sqlQuery, sqlExecute } from "@/lib/db";
 import { z } from "zod";
 import { roundPrice } from "@/lib/utils/apiHelpers";
 
@@ -73,24 +73,22 @@ async function postHandler(req: NextRequest) {
     let otherCategoryId: number | null = null;
 
     try {
-      // Get or create "Other" category
-      const categoryResult = await client.execute({
-        sql: "SELECT id FROM categories WHERE name = ?",
-        args: ["Other"],
-      });
-      if (categoryResult.rows.length > 0) {
-        otherCategoryId = categoryResult.rows[0].id as number;
+      const categoryRows = await sqlQuery(
+        "SELECT id FROM categories WHERE name = ?",
+        ["Other"]
+      );
+      if (categoryRows.length > 0) {
+        otherCategoryId = (categoryRows[0] as Record<string, unknown>).id as number;
       } else {
-        await client.execute({
-          sql: "INSERT INTO categories (name, description) VALUES (?, ?)",
-          args: ["Other", "Default category for uncategorized items"],
-        });
-        // Get the inserted ID
-        const newCategoryResult = await client.execute({
-          sql: "SELECT id FROM categories WHERE name = ?",
-          args: ["Other"],
-        });
-        otherCategoryId = newCategoryResult.rows[0]?.id as number;
+        await sqlExecute(
+          "INSERT INTO categories (name, description) VALUES (?, ?)",
+          ["Other", "Default category for uncategorized items"]
+        );
+        const newCategoryRows = await sqlQuery(
+          "SELECT id FROM categories WHERE name = ?",
+          ["Other"]
+        );
+        otherCategoryId = (newCategoryRows[0] as Record<string, unknown>)?.id as number;
       }
     } catch (error) {
       console.warn("Error getting/creating Other category:", error);
@@ -99,14 +97,14 @@ async function postHandler(req: NextRequest) {
     // Clean up any existing products with empty string barcodes/skus (convert to NULL)
     // This must run before importing to prevent UNIQUE constraint violations
     try {
-      await client.execute({
-        sql: "UPDATE products SET barcode = NULL WHERE barcode = '' OR barcode IS NULL",
-        args: [],
-      });
-      await client.execute({
-        sql: "UPDATE products SET sku = NULL WHERE sku = '' OR sku IS NULL",
-        args: [],
-      });
+      await sqlExecute(
+        "UPDATE products SET barcode = NULL WHERE barcode = '' OR barcode IS NULL",
+        []
+      );
+      await sqlExecute(
+        "UPDATE products SET sku = NULL WHERE sku = '' OR sku IS NULL",
+        []
+      );
     } catch (cleanupError) {
       console.warn("Cleanup warning (non-fatal):", cleanupError);
     }
@@ -138,24 +136,23 @@ async function postHandler(req: NextRequest) {
         // Use "Other" category if not provided
         let categoryId = product.category_id || null;
 
-        // If category_id is provided, verify it exists, otherwise use "Other"
         if (categoryId) {
-          const categoryCheck = await client.execute({
-            sql: "SELECT id FROM categories WHERE id = ?",
-            args: [categoryId],
-          });
-          if (categoryCheck.rows.length === 0) {
+          const categoryRows = await sqlQuery(
+            "SELECT id FROM categories WHERE id = ?",
+            [categoryId]
+          );
+          if (categoryRows.length === 0) {
             categoryId = otherCategoryId;
           }
         } else {
           categoryId = otherCategoryId;
         }
 
-        await client.execute({
-          sql: `INSERT INTO products (name, barcode, sku, description, category_id, 
+        await sqlExecute(
+          `INSERT INTO products (name, barcode, sku, description, category_id, 
                 cost_price, selling_price, stock_quantity, min_stock_level, unit, image_url) 
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          args: [
+          [
             product.name.trim(),
             barcode,
             sku,
@@ -167,8 +164,8 @@ async function postHandler(req: NextRequest) {
             product.min_stock_level || 0,
             product.unit || "piece",
             imageUrl,
-          ],
-        });
+          ]
+        );
         imported++;
       } catch (error: unknown) {
         const errorMessage =

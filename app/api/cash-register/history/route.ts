@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import client from "@/lib/db";
+import { sqlQuery } from "@/lib/db";
 import {
   serializeSession,
   SessionRow,
@@ -18,21 +18,18 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get("limit") || "25");
     const offset = (page - 1) * limit;
 
-    // Get total count
-    const countResult = await client.execute({
-      sql: `SELECT COUNT(*) as count FROM cash_register_sessions`,
-      args: [],
-    });
-    const total = (countResult.rows[0] as unknown as { count: number }).count;
+    const countRows = await sqlQuery<{ count: number }>(
+      "SELECT COUNT(*)::bigint as count FROM cash_register_sessions",
+      []
+    );
+    const total = Number(countRows[0]?.count ?? 0);
 
-    // Get sessions with user info
-    const result = await client.execute({
-      sql: `${SESSION_SELECT_SQL} ORDER BY crs.opened_at DESC LIMIT ? OFFSET ?`,
-      args: [limit, offset],
-    });
+    const rows = await sqlQuery(
+      `${SESSION_SELECT_SQL} ORDER BY crs.opened_at DESC LIMIT ? OFFSET ?`,
+      [limit, offset]
+    );
 
-    // Serialize all sessions
-    const sessions = result.rows.map((row) =>
+    const sessions = rows.map((row) =>
       serializeSession(row as unknown as SessionRow)
     );
 

@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/middleware/auth";
 import { z } from "zod";
-import client from "@/lib/db";
+import { prisma } from "@/lib/db";
 import {
   getPaginationParams,
-  executePaginatedQuery,
+  buildPaginationResponse,
   handleApiError,
   handleValidationError,
 } from "@/lib/utils/apiHelpers";
@@ -18,18 +18,18 @@ async function getHandler(req: NextRequest) {
   try {
     const { page, limit, offset } = getPaginationParams(req);
 
-    const result = await executePaginatedQuery({
-      baseSql: "SELECT * FROM categories WHERE 1=1",
-      baseArgs: [],
-      orderBy: "name",
-      page,
-      limit,
-      offset,
-    });
+    const [categories, total] = await Promise.all([
+      prisma.category.findMany({
+        orderBy: { name: "asc" },
+        skip: offset,
+        take: limit,
+      }),
+      prisma.category.count(),
+    ]);
 
     return NextResponse.json({
-      categories: result.data,
-      pagination: result.pagination,
+      categories,
+      pagination: buildPaginationResponse(total, page, limit),
     });
   } catch (error) {
     return handleApiError(error, "fetching categories");
@@ -41,12 +41,14 @@ async function postHandler(req: NextRequest) {
     const body = await req.json();
     const validated = categorySchema.parse(body);
 
-    const result = await client.execute({
-      sql: "INSERT INTO categories (name, description) VALUES (?, ?) RETURNING *",
-      args: [validated.name, validated.description || null],
+    const category = await prisma.category.create({
+      data: {
+        name: validated.name,
+        description: validated.description ?? undefined,
+      },
     });
 
-    return NextResponse.json({ category: result.rows[0] }, { status: 201 });
+    return NextResponse.json({ category }, { status: 201 });
   } catch (error) {
     const validationError = handleValidationError(error);
     if (validationError) return validationError;
@@ -60,7 +62,7 @@ async function deleteHandler(req: NextRequest) {
     const deleteAll = searchParams.get("delete_all") === "true";
 
     if (deleteAll) {
-      await client.execute("DELETE FROM categories");
+      await prisma.category.deleteMany();
       return NextResponse.json({
         message: "All categories deleted successfully",
       });

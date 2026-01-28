@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/middleware/auth";
-import client from "@/lib/db";
+import { sqlQuery } from "@/lib/db";
 
 async function getHandler(req: NextRequest) {
   try {
@@ -23,8 +23,8 @@ async function getHandler(req: NextRequest) {
 
     sql += " ORDER BY it.created_at DESC LIMIT 100";
 
-    const result = await client.execute({ sql, args });
-    return NextResponse.json({ transactions: result.rows });
+    const rows = await sqlQuery(sql, args);
+    return NextResponse.json({ transactions: rows });
   } catch (error) {
     console.error("Error fetching transactions:", error);
     return NextResponse.json(

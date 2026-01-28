@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/middleware/auth";
-import client from "@/lib/db";
+import { sqlExecute } from "@/lib/db";
 import { z } from "zod";
 
 const supplierSchema = z.object({
@@ -26,16 +26,16 @@ async function postHandler(req: NextRequest) {
     for (let i = 0; i < validated.suppliers.length; i++) {
       const supplier = validated.suppliers[i];
       try {
-        await client.execute({
-          sql: "INSERT INTO suppliers (name, contact_person, email, phone, address) VALUES (?, ?, ?, ?, ?)",
-          args: [
+        await sqlExecute(
+          "INSERT INTO suppliers (name, contact_person, email, phone, address) VALUES (?, ?, ?, ?, ?)",
+          [
             supplier.name,
             supplier.contact_person || null,
             supplier.email || null,
             supplier.phone || null,
             supplier.address || null,
-          ],
-        });
+          ]
+        );
         imported++;
       } catch (error) {
         const errorMessage =

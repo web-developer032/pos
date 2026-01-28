@@ -1,0 +1,485 @@
+generator client {
+  provider = "prisma-client"
+  output   = "./generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  admin
+  cashier
+  manager
+}
+
+enum ProductUnit {
+  piece
+  gram
+  kilogram
+  liter
+  milliliter
+}
+
+enum PurchaseOrderStatus {
+  pending
+  completed
+  cancelled
+}
+
+enum DiscountType {
+  percentage
+  amount
+}
+
+enum InventoryTransactionType {
+  sale
+  purchase
+  adjustment
+  return
+}
+
+enum RefundMethod {
+  cash
+  card
+  digital
+  store_credit
+}
+
+enum CapitalTransactionType {
+  investment
+  withdrawal
+}
+
+enum PaymentMethodType {
+  cash
+  card
+  bank_transfer
+  check
+  other
+}
+
+enum SalaryType {
+  monthly
+  daily
+}
+
+enum EmployeeStatus {
+  active
+  inactive
+}
+
+enum SalaryPaymentType {
+  salary
+  advance
+  bonus
+  deduction
+}
+
+enum CashRegisterStatus {
+  open
+  closed
+}
+
+model User {
+  id           Int      @id @default(autoincrement())
+  username     String   @unique
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  role         UserRole
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  sales                Sale[]
+  purchaseOrders       PurchaseOrder[]
+  capital              Capital[]
+  expenses             Expense[]
+  otherIncome          OtherIncome[]
+  salaryPayments       SalaryPayment[]
+  supplierPayments    SupplierPayment[]
+  cashRegisterSessions CashRegisterSession[]
+  customerPayments    CustomerPayment[]
+  returns              Return[]
+
+  @@map("users")
+}
+
+model Category {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  products Product[]
+
+  @@map("categories")
+}
+
+model Supplier {
+  id            Int      @id @default(autoincrement())
+  name          String
+  contactPerson String?  @map("contact_person")
+  email         String?
+  phone         String?
+  address       String?
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  purchaseOrders    PurchaseOrder[]
+  supplierPayments  SupplierPayment[]
+
+  @@map("suppliers")
+}
+
+model Product {
+  id                 Int         @id @default(autoincrement())
+  name               String
+  barcode            String?     @unique
+  sku               String?
+  description        String?
+  categoryId         Int?        @map("category_id")
+  costPrice         Float       @default(0) @map("cost_price")
+  sellingPrice      Float       @default(0) @map("selling_price")
+  stockQuantity      Float       @default(0) @map("stock_quantity")
+  minStockLevel      Float       @default(0) @map("min_stock_level")
+  unit               ProductUnit @default(piece)
+  imageUrl          String?     @map("image_url")
+  baseProductId      Int?        @map("base_product_id")
+  quantityMultiplier Float?     @map("quantity_multiplier")
+  deletedAt          DateTime?   @map("deleted_at")
+  createdAt          DateTime    @default(now()) @map("created_at")
+  updatedAt         DateTime    @updatedAt @map("updated_at")
+
+  category         Category?         @relation(fields: [categoryId], references: [id])
+  baseProduct     Product?          @relation("ProductSubProducts", fields: [baseProductId], references: [id])
+  subProducts      Product[]         @relation("ProductSubProducts")
+  saleItems        SaleItem[]
+  purchaseOrderItems PurchaseOrderItem[]
+  inventoryTransactions InventoryTransaction[]
+  productBarcodes  ProductBarcode[]
+  returnItems      ReturnItem[]
+
+  @@map("products")
+}
+
+model Customer {
+  id             Int      @id @default(autoincrement())
+  name           String
+  email          String?
+  phone          String?
+  address        String?
+  loyaltyPoints  Int      @default(0) @map("loyalty_points")
+  creditBalance  Float    @default(0) @map("credit_balance")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  sales            Sale[]
+  customerPayments CustomerPayment[]
+
+  @@map("customers")
+}
+
+model Sale {
+  id             Int      @id @default(autoincrement())
+  saleNumber     String   @unique @map("sale_number")
+  customerId     Int?     @map("customer_id")
+  userId         Int      @map("user_id")
+  totalAmount    Float    @default(0) @map("total_amount")
+  discountAmount Float    @default(0) @map("discount_amount")
+  taxAmount      Float    @default(0) @map("tax_amount")
+  finalAmount    Float    @default(0) @map("final_amount")
+  paymentMethod  String   @map("payment_method")
+  paymentStatus  String   @default("completed") @map("payment_status")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  customer   Customer?   @relation(fields: [customerId], references: [id])
+  user       User       @relation(fields: [userId], references: [id])
+  saleItems  SaleItem[]
+  payments   Payment[]
+  returns    Return[]
+
+  @@map("sales")
+}
+
+model SaleItem {
+  id         Int     @id @default(autoincrement())
+  saleId     Int     @map("sale_id")
+  productId  Int     @map("product_id")
+  quantity   Float
+  unitPrice  Float   @map("unit_price")
+  costPrice  Float   @default(0) @map("cost_price")
+  discount   Float   @default(0)
+  subtotal   Float
+
+  sale       Sale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  product    Product @relation(fields: [productId], references: [id])
+  returnItems ReturnItem[]
+
+  @@map("sale_items")
+}
+
+model Payment {
+  id            Int      @id @default(autoincrement())
+  saleId        Int      @map("sale_id")
+  paymentMethod String   @map("payment_method")
+  amount        Float
+  transactionId String?  @map("transaction_id")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  sale Sale @relation(fields: [saleId], references: [id], onDelete: Cascade)
+
+  @@map("payments")
+}
+
+model PurchaseOrder {
+  id           Int                  @id @default(autoincrement())
+  poNumber     String               @unique @map("po_number")
+  supplierId   Int                  @map("supplier_id")
+  userId       Int                  @map("user_id")
+  totalAmount  Float                @default(0) @map("total_amount")
+  discountType String?              @map("discount_type")
+  discountValue Float               @default(0) @map("discount_value")
+  taxType      String?             @map("tax_type")
+  taxValue     Float               @default(0) @map("tax_value")
+  status       PurchaseOrderStatus @default(pending)
+  createdAt    DateTime             @default(now()) @map("created_at")
+  updatedAt    DateTime             @updatedAt @map("updated_at")
+
+  supplier         Supplier           @relation(fields: [supplierId], references: [id])
+  user             User               @relation(fields: [userId], references: [id])
+  items            PurchaseOrderItem[]
+  supplierPayments SupplierPayment[]
+
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderItem {
+  id          Int     @id @default(autoincrement())
+  poId        Int     @map("po_id")
+  productId   Int     @map("product_id")
+  quantity    Int
+  unitCost    Float   @map("unit_cost")
+  retailPrice Float?  @map("retail_price")
+  productName String? @map("product_name")
+  subtotal    Float
+
+  purchaseOrder PurchaseOrder @relation(fields: [poId], references: [id], onDelete: Cascade)
+  product       Product       @relation(fields: [productId], references: [id])
+
+  @@map("purchase_order_items")
+}
+
+model InventoryTransaction {
+  id               Int                    @id @default(autoincrement())
+  productId        Int                    @map("product_id")
+  transactionType InventoryTransactionType @map("transaction_type")
+  quantity         Int
+  referenceId      Int?                   @map("reference_id")
+  notes           String?
+  createdAt        DateTime               @default(now()) @map("created_at")
+
+  product Product @relation(fields: [productId], references: [id])
+
+  @@map("inventory_transactions")
+}
+
+model Discount {
+  id           Int      @id @default(autoincrement())
+  name         String
+  type         String
+  value        Float
+  applicableTo String   @map("applicable_to")
+  applicableId Int?     @map("applicable_id")
+  startDate    DateTime? @map("start_date")
+  endDate      DateTime? @map("end_date")
+  active       Int      @default(1)
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@map("discounts")
+}
+
+model SupplierPayment {
+  id               Int      @id @default(autoincrement())
+  supplierId        Int      @map("supplier_id")
+  purchaseOrderId   Int?     @map("purchase_order_id")
+  amount            Float
+  paymentMethod     String   @map("payment_method")
+  referenceNumber   String?  @map("reference_number")
+  notes             String?
+  userId            Int      @map("user_id")
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  supplier        Supplier        @relation(fields: [supplierId], references: [id])
+  purchaseOrder   PurchaseOrder?   @relation(fields: [purchaseOrderId], references: [id])
+  user            User             @relation(fields: [userId], references: [id])
+
+  @@map("supplier_payments")
+}
+
+model ProductBarcode {
+  id        Int      @id @default(autoincrement())
+  productId Int      @map("product_id")
+  barcode   String   @unique
+  createdAt DateTime @default(now()) @map("created_at")
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@map("product_barcodes")
+}
+
+model Setting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("settings")
+}
+
+model Return {
+  id           Int          @id @default(autoincrement())
+  returnNumber String       @unique @map("return_number")
+  saleId       Int          @map("sale_id")
+  userId       Int          @map("user_id")
+  totalAmount  Float        @default(0) @map("total_amount")
+  refundAmount Float        @default(0) @map("refund_amount")
+  refundMethod RefundMethod @map("refund_method")
+  reason       String?
+  notes        String?
+  createdAt    DateTime     @default(now()) @map("created_at")
+
+  sale       Sale         @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  user       User         @relation(fields: [userId], references: [id])
+  returnItems ReturnItem[]
+
+  @@map("returns")
+}
+
+model ReturnItem {
+  id          Int     @id @default(autoincrement())
+  returnId    Int     @map("return_id")
+  saleItemId  Int?    @map("sale_item_id")
+  productId   Int     @map("product_id")
+  quantity    Float
+  unitPrice   Float   @map("unit_price")
+  refundAmount Float  @map("refund_amount")
+
+  return_    Return  @relation(fields: [returnId], references: [id], onDelete: Cascade)
+  saleItem    SaleItem? @relation(fields: [saleItemId], references: [id])
+  product     Product @relation(fields: [productId], references: [id])
+
+  @@map("return_items")
+}
+
+model Capital {
+  id               Int                   @id @default(autoincrement())
+  amount           Float
+  description      String?
+  transactionType  CapitalTransactionType @map("transaction_type")
+  notes            String?
+  userId           Int                   @map("user_id")
+  createdAt        DateTime              @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("capital")
+}
+
+model Expense {
+  id              Int     @id @default(autoincrement())
+  amount          Float
+  category        String
+  description     String?
+  paymentMethod   String  @map("payment_method")
+  referenceNumber String? @map("reference_number")
+  notes           String?
+  userId          Int     @map("user_id")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("expenses")
+}
+
+model OtherIncome {
+  id              Int     @id @default(autoincrement())
+  amount          Float
+  category        String
+  description     String?
+  paymentMethod   String  @map("payment_method")
+  referenceNumber String? @map("reference_number")
+  notes           String?
+  userId          Int     @map("user_id")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("other_income")
+}
+
+model Employee {
+  id          Int           @id @default(autoincrement())
+  name        String
+  phone       String?
+  address     String?
+  salaryType  SalaryType    @map("salary_type")
+  baseSalary  Float         @default(0) @map("base_salary")
+  joinDate    DateTime?     @map("join_date") @db.Date
+  status      EmployeeStatus @default(active)
+  notes       String?
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+
+  salaryPayments SalaryPayment[]
+
+  @@map("employees")
+}
+
+model SalaryPayment {
+  id            Int               @id @default(autoincrement())
+  employeeId    Int               @map("employee_id")
+  amount        Float
+  paymentType   SalaryPaymentType @map("payment_type")
+  period        String
+  daysWorked    Int?              @map("days_worked")
+  paymentMethod String            @map("payment_method")
+  notes         String?
+  userId        Int               @map("user_id")
+  createdAt     DateTime         @default(now()) @map("created_at")
+
+  employee Employee @relation(fields: [employeeId], references: [id])
+  user     User     @relation(fields: [userId], references: [id])
+
+  @@map("salary_payments")
+}
+
+model CashRegisterSession {
+  id              Int                @id @default(autoincrement())
+  userId           Int                @map("user_id")
+  openingBalance   Float              @default(0) @map("opening_balance")
+  closingBalance   Float?             @map("closing_balance")
+  expectedBalance  Float?            @map("expected_balance")
+  variance         Float?
+  status           CashRegisterStatus @default(open)
+  openedAt         DateTime          @default(now()) @map("opened_at")
+  closedAt         DateTime?         @map("closed_at")
+  notes            String?
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("cash_register_sessions")
+}
+
+model CustomerPayment {
+  id              Int      @id @default(autoincrement())
+  customerId      Int      @map("customer_id")
+  amount          Float
+  paymentMethod   String   @map("payment_method")
+  referenceNumber String?  @map("reference_number")
+  notes           String?
+  userId          Int      @map("user_id")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  customer Customer @relation(fields: [customerId], references: [id])
+  user     User     @relation(fields: [userId], references: [id])
+
+  @@map("customer_payments")
+}

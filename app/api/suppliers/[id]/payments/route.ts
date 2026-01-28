@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAuth, RouteContext, AuthRequest } from "@/lib/middleware/auth";
-import client from "@/lib/db";
+import { sqlQuery } from "@/lib/db";
 import { z } from "zod";
 import { roundPrice } from "@/lib/utils/apiHelpers";
 import { getCurrentTimestamp } from "@/lib/utils/dateTime";
@@ -28,34 +28,32 @@ async function postHandler(req: AuthRequest, context?: RouteContext) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Verify supplier exists
-    const supplierCheck = await client.execute({
-      sql: "SELECT id FROM suppliers WHERE id = ?",
-      args: [supplierId],
-    });
+    const supplierRows = await sqlQuery(
+      "SELECT id FROM suppliers WHERE id = ?",
+      [supplierId]
+    );
 
-    if (supplierCheck.rows.length === 0) {
+    if (supplierRows.length === 0) {
       return NextResponse.json(
         { error: "Supplier not found" },
         { status: 404 }
       );
     }
 
-    // If purchase_order_id is provided, verify it exists and belongs to this supplier
     if (validated.purchase_order_id) {
-      const poCheck = await client.execute({
-        sql: "SELECT id, supplier_id FROM purchase_orders WHERE id = ?",
-        args: [validated.purchase_order_id],
-      });
+      const poRows = await sqlQuery(
+        "SELECT id, supplier_id FROM purchase_orders WHERE id = ?",
+        [validated.purchase_order_id]
+      );
 
-      if (poCheck.rows.length === 0) {
+      if (poRows.length === 0) {
         return NextResponse.json(
           { error: "Purchase order not found" },
           { status: 404 }
         );
       }
 
-      const po = poCheck.rows[0] as unknown as { supplier_id: number };
+      const po = poRows[0] as unknown as { supplier_id: number };
       if (po.supplier_id !== supplierId) {
         return NextResponse.json(
           { error: "Purchase order does not belong to this supplier" },
@@ -64,24 +62,23 @@ async function postHandler(req: AuthRequest, context?: RouteContext) {
       }
     }
 
-    // Insert payment
-    const result = await client.execute({
-      sql: `INSERT INTO supplier_payments 
+    const rows = await sqlQuery(
+      `INSERT INTO supplier_payments 
             (supplier_id, purchase_order_id, amount, payment_method, reference_number, notes, user_id, created_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`,
-      args: [
+      [
         supplierId,
-        validated.purchase_order_id || null,
+        validated.purchase_order_id ?? null,
         roundPrice(validated.amount),
         validated.payment_method,
-        validated.reference_number || null,
-        validated.notes || null,
+        validated.reference_number ?? null,
+        validated.notes ?? null,
         user.userId,
         getCurrentTimestamp(),
-      ],
-    });
+      ]
+    );
 
-    return NextResponse.json({ payment: result.rows[0] }, { status: 201 });
+    return NextResponse.json({ payment: rows[0] }, { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(

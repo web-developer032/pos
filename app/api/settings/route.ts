@@ -1,14 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/middleware/auth";
-import client from "@/lib/db";
+import { prisma } from "@/lib/db";
 
 async function getHandler(_req: NextRequest) {
   try {
-    const result = await client.execute("SELECT * FROM settings");
+    const rows = await prisma.setting.findMany();
     const settings: { [key: string]: string } = {};
-    result.rows.forEach((row) => {
-      const rowData = row as unknown as { key: string; value: string };
-      settings[rowData.key] = rowData.value;
+    rows.forEach((row) => {
+      settings[row.key] = row.value;
     });
     return NextResponse.json({ settings });
   } catch (error) {
@@ -26,9 +25,10 @@ async function putHandler(req: NextRequest) {
     const settings = body.settings as { [key: string]: string };
 
     for (const [key, value] of Object.entries(settings)) {
-      await client.execute({
-        sql: "INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)",
-        args: [key, value],
+      await prisma.setting.upsert({
+        where: { key },
+        create: { key, value },
+        update: { value },
       });
     }
 

@@ -1,29 +1,38 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: pos-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: pos
+      POSTGRES_PASSWORD: pos
+      POSTGRES_DB: pos
+    volumes:
+      - pos-db-data:/var/lib/postgresql/data
+    networks:
+      - pos-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pos -d pos"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   pos:
     build:
       context: .
       dockerfile: Dockerfile
     container_name: pos-application
     restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
     ports:
       - "3000:3000"
     environment:
       - NODE_ENV=production
       - NEXT_TELEMETRY_DISABLED=1
-      # JWT Secret (change this in production!)
       - JWT_SECRET=${JWT_SECRET:-your-secret-key-change-in-production}
-      # Database configuration (uncomment if using Turso)
-      # - TURSO_DATABASE_URL=${TURSO_DATABASE_URL}
-      # - TURSO_AUTH_TOKEN=${TURSO_AUTH_TOKEN}
-      # Or use local file database (default)
-      - DATABASE_URL=file:///app/data/db/local.db
-    volumes:
-      # Mount local database as read-only source (for cloning)
-      - ./data/db:/app/data/db-source:ro
-      # Container's own database (isolated from local dev)
-      - pos-db-data:/app/data/db
-      # Optional: Mount .env.local if you have one
-      # - ./.env.local:/app/.env.local:ro
+      - DATABASE_URL=postgresql://postgres:1228@postgres:5432/pos
     networks:
       - pos-network
     healthcheck:

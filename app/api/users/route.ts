@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth, AuthRequest } from "@/lib/middleware/auth";
-import client from "@/lib/db";
+import { prisma } from "@/lib/db";
 import { hashPassword } from "@/lib/auth/auth";
 import { z } from "zod";
+import { buildPaginationResponse, getPaginationParams } from "@/lib/utils/apiHelpers";
 
 const userSchema = z.object({
   username: z.string().min(1),
@@ -13,29 +14,27 @@ const userSchema = z.object({
 
 async function getHandler(req: NextRequest) {
   try {
-    const { searchParams } = new URL(req.url);
-    const page = parseInt(searchParams.get("page") || "1");
-    const limit = parseInt(searchParams.get("limit") || "25");
-    const offset = (page - 1) * limit;
+    const { page, limit, offset } = getPaginationParams(req);
 
-    // Get total count
-    const countResult = await client.execute(
-      "SELECT COUNT(*) as total FROM users"
-    );
-    const total = (countResult.rows[0] as unknown as { total: number }).total;
+    const [users, total] = await Promise.all([
+      prisma.user.findMany({
+        select: { id: true, username: true, email: true, role: true, createdAt: true },
+        orderBy: { username: "asc" },
+        skip: offset,
+        take: limit,
+      }),
+      prisma.user.count(),
+    ]);
 
-    const result = await client.execute({
-      sql: "SELECT id, username, email, role, created_at FROM users ORDER BY username LIMIT ? OFFSET ?",
-      args: [limit, offset],
-    });
     return NextResponse.json({
-      users: result.rows,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-      },
+      users: users.map((u) => ({
+        id: u.id,
+        username: u.username,
+        email: u.email,
+        role: u.role,
+        created_at: u.createdAt,
+      })),
+      pagination: buildPaginationResponse(total, page, limit),
     });
   } catch (error) {
     console.error("Error fetching users:", error);
@@ -58,12 +57,27 @@ async function postHandler(req: AuthRequest) {
 
     const passwordHash = await hashPassword(validated.password);
 
-    const result = await client.execute({
-      sql: "INSERT INTO users (username, email, password_hash, role) VALUES (?, ?, ?, ?) RETURNING id, username, email, role",
-      args: [validated.username, validated.email, passwordHash, validated.role],
+    const newUser = await prisma.user.create({
+      data: {
+        username: validated.username,
+        email: validated.email,
+        passwordHash,
+        role: validated.role,
+      },
+      select: { id: true, username: true, email: true, role: true },
     });
 
-    return NextResponse.json({ user: result.rows[0] }, { status: 201 });
+    return NextResponse.json(
+      {
+        user: {
+          id: newUser.id,
+          username: newUser.username,
+          email: newUser.email,
+          role: newUser.role,
+        },
+      },
+      { status: 201 }
+    );
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
@@ -90,7 +104,7 @@ async function deleteHandler(req: AuthRequest) {
     const deleteAll = searchParams.get("delete_all") === "true";
 
     if (deleteAll) {
-      await client.execute("DELETE FROM users WHERE role != 'admin'");
+      await prisma.user.deleteMany({ where: { role: { not: "admin" } } });
       return NextResponse.json({
         message: "All non-admin users deleted successfully",
       });

@@ -3,10 +3,7 @@ const nextConfig = {
   reactStrictMode: true,
   // Enable standalone output for Docker
   output: "standalone",
-  // Enable instrumentation hook for database initialization
-  experimental: {
-    instrumentationHook: true,
-  },
+  // Instrumentation is stable in Next 15+ (no experimental flag needed)
 };
 
 module.exports = nextConfig;

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import client from "@/lib/db";
+import { sqlQuery } from "@/lib/db";
 
 /**
  * Pagination parameters from request
@@ -77,13 +77,12 @@ export async function getTotalCount(
   baseSql: string,
   args: (string | number)[]
 ): Promise<number> {
-  // Replace SELECT clause with COUNT(*)
   const countSql = baseSql.replace(
     /SELECT[\s\S]*?FROM/i,
     "SELECT COUNT(*) as total FROM"
   );
-  const countResult = await client.execute({ sql: countSql, args });
-  return (countResult.rows[0] as unknown as { total: number }).total;
+  const rows = await sqlQuery<{ total: bigint }>(countSql, args);
+  return Number(rows[0]?.total ?? 0);
 }
 
 /**
@@ -141,16 +140,13 @@ export async function executePaginatedQuery<T>(
 ): Promise<PaginatedResult<T>> {
   const { baseSql, baseArgs, orderBy, page, limit, offset } = options;
 
-  // Get total count
   const total = await getTotalCount(baseSql, baseArgs);
-
-  // Execute paginated query
   const sql = `${baseSql} ORDER BY ${orderBy} LIMIT ? OFFSET ?`;
   const args = [...baseArgs, limit, offset];
-  const result = await client.execute({ sql, args });
+  const data = await sqlQuery<T>(sql, args);
 
   return {
-    data: result.rows as T[],
+    data,
     pagination: buildPaginationResponse(total, page, limit),
   };
 }
@@ -161,4 +157,21 @@ export async function executePaginatedQuery<T>(
  */
 export function roundPrice(price: number): number {
   return Math.round(price * 100) / 100;
+}
+
+/**
+ * Recursively convert BigInt to Number for JSON serialization.
+ * JSON.stringify throws on BigInt; PostgreSQL COUNT(*) and some aggregates return BigInt.
+ */
+export function serializeForJson<T>(obj: T): T {
+  if (typeof obj === "bigint") return Number(obj) as T;
+  if (Array.isArray(obj)) return obj.map(serializeForJson) as T;
+  if (obj !== null && typeof obj === "object") {
+    const result = {} as Record<string, unknown>;
+    for (const [k, v] of Object.entries(obj)) {
+      result[k] = serializeForJson(v);
+    }
+    return result as T;
+  }
+  return obj;
 }

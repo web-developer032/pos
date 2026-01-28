@@ -1,4 +1,6 @@
-import client from "@/lib/db";
+import { prisma } from "@/lib/db";
+
+type TransactionType = "sale" | "purchase" | "adjustment" | "return";
 
 /**
  * Update product quantity based on product relationships
@@ -8,51 +10,49 @@ import client from "@/lib/db";
 export async function updateProductQuantity(
   productId: number,
   quantity: number,
-  operation: 'subtract' | 'add',
+  operation: "subtract" | "add",
   referenceId?: number,
-  transactionType: 'sale' | 'purchase' | 'adjustment' | 'return' = 'sale'
+  transactionType: TransactionType = "sale"
 ) {
-  // Get product details
-  const productResult = await client.execute({
-    sql: "SELECT base_product_id, quantity_multiplier FROM products WHERE id = ? AND deleted_at IS NULL",
-    args: [productId],
+  const product = await prisma.product.findFirst({
+    where: { id: productId, deletedAt: null },
+    select: { baseProductId: true, quantityMultiplier: true },
   });
 
-  if (productResult.rows.length === 0) {
+  if (!product) {
     throw new Error(`Product ${productId} not found`);
   }
 
-  const product = productResult.rows[0] as unknown as {
-    base_product_id: number | null;
-    quantity_multiplier: number | null;
-  };
-
-  if (product.base_product_id) {
-    // Related product: Convert to base units and update base product
-    const baseQuantity = quantity * (product.quantity_multiplier || 1);
+  if (product.baseProductId) {
+    const baseQuantity = quantity * (product.quantityMultiplier ?? 1);
     await updateProductQuantity(
-      product.base_product_id,
+      product.baseProductId,
       baseQuantity,
       operation,
       referenceId,
       transactionType
     );
-    // Also record transaction for the related product for audit trail
-    await client.execute({
-      sql: "INSERT INTO inventory_transactions (product_id, transaction_type, quantity, reference_id) VALUES (?, ?, ?, ?)",
-      args: [productId, transactionType, quantity, referenceId || null],
+    await prisma.inventoryTransaction.create({
+      data: {
+        productId,
+        transactionType,
+        quantity: Math.round(quantity),
+        referenceId: referenceId ?? null,
+      },
     });
   } else {
-    // Base product: Direct update
-    const operator = operation === 'subtract' ? '-' : '+';
-    await client.execute({
-      sql: `UPDATE products SET stock_quantity = stock_quantity ${operator} ? WHERE id = ? AND deleted_at IS NULL`,
-      args: [quantity, productId],
+    const delta = operation === "subtract" ? -quantity : quantity;
+    await prisma.product.update({
+      where: { id: productId },
+      data: { stockQuantity: { increment: delta } },
     });
-    await client.execute({
-      sql: "INSERT INTO inventory_transactions (product_id, transaction_type, quantity, reference_id) VALUES (?, ?, ?, ?)",
-      args: [productId, transactionType, quantity, referenceId || null],
+    await prisma.inventoryTransaction.create({
+      data: {
+        productId,
+        transactionType,
+        quantity: Math.round(quantity),
+        referenceId: referenceId ?? null,
+      },
     });
   }
 }
-

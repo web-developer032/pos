@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import client from "@/lib/db";
+import { sqlQuery } from "@/lib/db";
 import {
   serializeSession,
   SessionRow,
@@ -13,17 +13,17 @@ export const revalidate = 0;
 // GET /api/cash-register/current - Get current open session
 export async function GET() {
   try {
-    const result = await client.execute({
-      sql: `${SESSION_SELECT_SQL} WHERE crs.status = 'open' ORDER BY crs.opened_at DESC LIMIT 1`,
-      args: [],
-    });
+    const rows = await sqlQuery<SessionRow>(
+      `${SESSION_SELECT_SQL} WHERE crs.status = 'open' ORDER BY crs.opened_at DESC LIMIT 1`,
+      []
+    );
 
-    if (result.rows.length === 0) {
+    if (rows.length === 0) {
       return NextResponse.json({ session: null, isOpen: false });
     }
 
     return NextResponse.json({
-      session: serializeSession(result.rows[0] as unknown as SessionRow),
+      session: serializeSession(rows[0]),
       isOpen: true,
     });
   } catch (error) {

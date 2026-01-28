@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth, AuthRequest } from "@/lib/middleware/auth";
-import client from "@/lib/db";
+import { prisma, sqlQuery, sqlExecute } from "@/lib/db";
 import { z } from "zod";
 import {
   getPaginationParams,
@@ -9,7 +9,10 @@ import {
   handleValidationError,
   roundPrice,
 } from "@/lib/utils/apiHelpers";
-import { getCurrentTimestamp } from "@/lib/utils/dateTime";
+
+type TransactionClient = Parameters<
+  Parameters<typeof prisma.$transaction>[0]
+>[0];
 
 const poSchema = z.object({
   supplier_id: z.number(),
@@ -89,14 +92,8 @@ async function getHandler(req: NextRequest) {
       summaryArgs.push(status);
     }
 
-    const summaryResult = await client.execute({
-      sql: summarySql,
-      args: summaryArgs,
-    });
+    const summaryRows = await sqlQuery(summarySql, summaryArgs);
 
-    // Get total paid amount - includes both:
-    // 1. Payments linked to specific purchase orders
-    // 2. General payments to suppliers who have purchase orders
     let paidSql = `
       SELECT COALESCE(SUM(sp.amount), 0) as total_paid
       FROM supplier_payments sp
@@ -122,28 +119,21 @@ async function getHandler(req: NextRequest) {
 
     paidSql += `)`;
 
-    const paidResult = await client.execute({
-      sql: paidSql,
-      args: paidArgs,
-    });
+    const paidRows = await sqlQuery(paidSql, paidArgs);
 
-    const summary = summaryResult.rows[0] as unknown as {
-      total_completed: number;
-      total_pending: number;
-      grand_total: number;
-    };
-    const totalPaid =
-      (paidResult.rows[0] as unknown as { total_paid: number }).total_paid || 0;
+    const summary = summaryRows[0] as Record<string, unknown>;
+    const paidRow = paidRows[0] as Record<string, unknown> | undefined;
+    const totalPaid = Number(paidRow?.total_paid ?? 0);
 
     return NextResponse.json({
       purchase_orders: result.data,
       pagination: result.pagination,
       summary: {
-        total_completed: summary.total_completed,
-        total_pending: summary.total_pending,
-        grand_total: summary.grand_total,
+        total_completed: Number(summary?.total_completed ?? 0),
+        total_pending: Number(summary?.total_pending ?? 0),
+        grand_total: Number(summary?.grand_total ?? 0),
         total_paid: totalPaid,
-        outstanding: summary.total_completed - totalPaid,
+        outstanding: Number(summary?.total_completed ?? 0) - totalPaid,
       },
     });
   } catch (error) {
@@ -193,59 +183,59 @@ async function postHandler(req: AuthRequest) {
 
     const totalAmount = roundPrice(afterDiscount + taxAmount);
 
-    // Use transaction to ensure atomicity - if items fail, PO header is rolled back
-    await client.execute("BEGIN TRANSACTION");
-
-    try {
-      const poResult = await client.execute({
-        sql: `INSERT INTO purchase_orders (po_number, supplier_id, user_id, total_amount, discount_type, discount_value, tax_type, tax_value, created_at) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`,
-        args: [
-          poNumber,
-          validated.supplier_id,
-          user.userId,
-          totalAmount,
-          validated.discount_type || null,
-          validated.discount_value || null,
-          validated.tax_type || null,
-          validated.tax_value || null,
-          getCurrentTimestamp(),
-        ],
-      });
-
-      const poId = (poResult.rows[0] as unknown as { id: number }).id;
-
-      for (const item of validated.items) {
-        const roundedUnitCost = roundPrice(item.unit_cost);
-        const roundedRetailPrice = item.retail_price
-          ? roundPrice(item.retail_price)
-          : null;
-        const itemSubtotal = roundPrice(item.quantity * roundedUnitCost);
-        await client.execute({
-          sql: `INSERT INTO purchase_order_items (po_id, product_id, product_name, quantity, unit_cost, retail_price, subtotal) 
-                VALUES (?, ?, ?, ?, ?, ?, ?)`,
-          args: [
-            poId,
-            item.product_id,
-            item.product_name || null,
-            item.quantity,
-            roundedUnitCost,
-            roundedRetailPrice,
-            itemSubtotal,
-          ],
+    const purchase_order = await prisma.$transaction(
+      async (tx: TransactionClient) => {
+        const po = await tx.purchaseOrder.create({
+          data: {
+            poNumber,
+            supplierId: validated.supplier_id,
+            userId: user.userId,
+            totalAmount,
+            discountType: validated.discount_type ?? undefined,
+            discountValue: validated.discount_value ?? undefined,
+            taxType: validated.tax_type ?? undefined,
+            taxValue: validated.tax_value ?? undefined,
+          },
         });
+
+        await tx.purchaseOrderItem.createMany({
+          data: validated.items.map((item) => {
+            const roundedUnitCost = roundPrice(item.unit_cost);
+            const roundedRetailPrice = item.retail_price
+              ? roundPrice(item.retail_price)
+              : null;
+            const itemSubtotal = roundPrice(item.quantity * roundedUnitCost);
+            return {
+              poId: po.id,
+              productId: item.product_id,
+              productName: item.product_name ?? null,
+              quantity: item.quantity,
+              unitCost: roundedUnitCost,
+              retailPrice: roundedRetailPrice,
+              subtotal: itemSubtotal,
+            };
+          }),
+        });
+
+        return po;
       }
+    );
 
-      await client.execute("COMMIT");
+    const poWithId = purchase_order as unknown as { id: number };
+    const fullPo = await prisma.purchaseOrder.findUnique({
+      where: { id: poWithId.id },
+      include: { supplier: true, user: { select: { username: true } } },
+    });
 
-      return NextResponse.json(
-        { purchase_order: poResult.rows[0] },
-        { status: 201 }
-      );
-    } catch (txError) {
-      await client.execute("ROLLBACK");
-      throw txError;
-    }
+    const row = fullPo
+      ? {
+          ...fullPo,
+          supplier_name: fullPo.supplier.name,
+          user_name: fullPo.user.username,
+        }
+      : purchase_order;
+
+    return NextResponse.json({ purchase_order: row }, { status: 201 });
   } catch (error) {
     const validationError = handleValidationError(error);
     if (validationError) return validationError;
@@ -259,7 +249,7 @@ async function deleteHandler(req: NextRequest) {
     const deleteAll = searchParams.get("delete_all") === "true";
 
     if (deleteAll) {
-      await client.execute("DELETE FROM purchase_orders");
+      await sqlExecute("DELETE FROM purchase_orders", []);
       return NextResponse.json({
         message: "All purchase orders deleted successfully",
       });

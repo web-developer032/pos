@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/middleware/auth";
-import client from "@/lib/db";
+import { sqlQuery, sqlExecute } from "@/lib/db";
 import { z } from "zod";
 import { getCurrentTimestamp } from "@/lib/utils/dateTime";
 
@@ -28,49 +28,37 @@ async function getHandler(req: NextRequest) {
       ? [`%${search}%`, `%${search}%`, `%${search}%`]
       : [];
 
-    // Get total count
-    const countResult = await client.execute({
-      sql: `SELECT COUNT(*) as total FROM suppliers ${searchCondition}`,
-      args: searchArgs,
-    });
-    const total = (countResult.rows[0] as unknown as { total: number }).total;
+    const countSql = `SELECT COUNT(*)::bigint as total FROM suppliers ${searchCondition || "WHERE 1=1"}`;
+    const countRows = await sqlQuery<{ total: number }>(countSql, searchArgs);
+    const total = Number(countRows[0]?.total ?? 0);
 
-    const result = await client.execute({
-      sql: `SELECT * FROM suppliers ${searchCondition} ORDER BY name LIMIT ? OFFSET ?`,
-      args: [...searchArgs, limit, offset],
-    });
+    const dataSql = `SELECT * FROM suppliers ${searchCondition || "WHERE 1=1"} ORDER BY name LIMIT ? OFFSET ?`;
+    const resultRows = await sqlQuery(dataSql, [...searchArgs, limit, offset]);
 
-    // Calculate ledger summary for each supplier
     const suppliersWithLedger = await Promise.all(
-      result.rows.map(async (supplier) => {
+      resultRows.map(async (supplier) => {
         const supplierData = supplier as unknown as { id: number };
 
-        // Get total purchases (only completed POs)
-        const purchasesResult = await client.execute({
-          sql: `SELECT COALESCE(SUM(total_amount), 0) as total_purchases
+        const purchasesRows = await sqlQuery<{ total_purchases: number }>(
+          `SELECT COALESCE(SUM(total_amount), 0) as total_purchases
                 FROM purchase_orders
                 WHERE supplier_id = ? AND status = 'completed'`,
-          args: [supplierData.id],
-        });
-        const totalPurchases =
-          (purchasesResult.rows[0] as unknown as { total_purchases: number })
-            .total_purchases || 0;
+          [supplierData.id]
+        );
+        const totalPurchases = Number(purchasesRows[0]?.total_purchases ?? 0);
 
-        // Get total payments
-        const paymentsResult = await client.execute({
-          sql: `SELECT COALESCE(SUM(amount), 0) as total_paid
+        const paymentsRows = await sqlQuery<{ total_paid: number }>(
+          `SELECT COALESCE(SUM(amount), 0) as total_paid
                 FROM supplier_payments
                 WHERE supplier_id = ?`,
-          args: [supplierData.id],
-        });
-        const totalPaid =
-          (paymentsResult.rows[0] as unknown as { total_paid: number })
-            .total_paid || 0;
+          [supplierData.id]
+        );
+        const totalPaid = Number(paymentsRows[0]?.total_paid ?? 0);
 
         const balance = totalPurchases - totalPaid;
 
         return {
-          ...supplier,
+          ...(supplier as Record<string, unknown>),
           total_purchases: totalPurchases,
           total_paid: totalPaid,
           balance: balance,
@@ -101,19 +89,19 @@ async function postHandler(req: NextRequest) {
     const body = await req.json();
     const validated = supplierSchema.parse(body);
 
-    const result = await client.execute({
-      sql: "INSERT INTO suppliers (name, contact_person, email, phone, address, created_at) VALUES (?, ?, ?, ?, ?, ?) RETURNING *",
-      args: [
+    const rows = await sqlQuery(
+      "INSERT INTO suppliers (name, contact_person, email, phone, address, created_at) VALUES (?, ?, ?, ?, ?, ?) RETURNING *",
+      [
         validated.name,
         validated.contact_person || null,
         validated.email || null,
         validated.phone || null,
         validated.address || null,
         getCurrentTimestamp(),
-      ],
-    });
+      ]
+    );
 
-    return NextResponse.json({ supplier: result.rows[0] }, { status: 201 });
+    return NextResponse.json({ supplier: rows[0] }, { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
@@ -135,7 +123,7 @@ async function deleteHandler(req: NextRequest) {
     const deleteAll = searchParams.get("delete_all") === "true";
 
     if (deleteAll) {
-      await client.execute("DELETE FROM suppliers");
+      await sqlExecute("DELETE FROM suppliers", []);
       return NextResponse.json({
         message: "All suppliers deleted successfully",
       });

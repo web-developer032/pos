@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth, AuthRequest } from "@/lib/middleware/auth";
-import client from "@/lib/db";
+import { sqlQuery } from "@/lib/db";
 import { z } from "zod";
 import { handleApiError, handleValidationError } from "@/lib/utils/apiHelpers";
 import { getCurrentTimestamp } from "@/lib/utils/dateTime";
@@ -30,11 +30,11 @@ async function getHandler(req: NextRequest) {
     const args: (string | number)[] = [];
 
     if (startDate) {
-      sql += " AND datetime(oi.created_at) >= datetime(?)";
+      sql += " AND oi.created_at >= ?";
       args.push(`${startDate}T00:00:00.000Z`);
     }
     if (endDate) {
-      sql += " AND datetime(oi.created_at) <= datetime(?)";
+      sql += " AND oi.created_at <= ?";
       args.push(`${endDate}T23:59:59.999Z`);
     }
     if (category) {
@@ -44,9 +44,8 @@ async function getHandler(req: NextRequest) {
 
     sql += " ORDER BY oi.created_at DESC";
 
-    const result = await client.execute({ sql, args });
+    const rows = await sqlQuery(sql, args);
 
-    // Get summary
     let summarySql = `
       SELECT 
         COALESCE(SUM(amount), 0) as total_income,
@@ -56,53 +55,35 @@ async function getHandler(req: NextRequest) {
       WHERE 1=1
     `;
     const summaryArgs: (string | number)[] = [];
-
     if (startDate) {
-      summarySql += " AND datetime(created_at) >= datetime(?)";
+      summarySql += " AND created_at >= ?";
       summaryArgs.push(`${startDate}T00:00:00.000Z`);
     }
     if (endDate) {
-      summarySql += " AND datetime(created_at) <= datetime(?)";
+      summarySql += " AND created_at <= ?";
       summaryArgs.push(`${endDate}T23:59:59.999Z`);
     }
-
     summarySql += " GROUP BY category ORDER BY category_total DESC";
+    const summaryRows = await sqlQuery(summarySql, summaryArgs);
 
-    const summaryResult = await client.execute({
-      sql: summarySql,
-      args: summaryArgs,
-    });
-
-    // Get total
-    let totalSql = `
-      SELECT COALESCE(SUM(amount), 0) as total_income
-      FROM other_income
-      WHERE 1=1
-    `;
+    let totalSql = `SELECT COALESCE(SUM(amount), 0) as total_income FROM other_income WHERE 1=1`;
     const totalArgs: (string | number)[] = [];
-
     if (startDate) {
-      totalSql += " AND datetime(created_at) >= datetime(?)";
+      totalSql += " AND created_at >= ?";
       totalArgs.push(`${startDate}T00:00:00.000Z`);
     }
     if (endDate) {
-      totalSql += " AND datetime(created_at) <= datetime(?)";
+      totalSql += " AND created_at <= ?";
       totalArgs.push(`${endDate}T23:59:59.999Z`);
     }
-
-    const totalResult = await client.execute({
-      sql: totalSql,
-      args: totalArgs,
-    });
-    const totalIncome = (
-      totalResult.rows[0] as unknown as { total_income: number }
-    ).total_income;
+    const totalRows = await sqlQuery(totalSql, totalArgs);
+    const totalIncome = Number((totalRows[0] as Record<string, unknown>)?.total_income ?? 0);
 
     return NextResponse.json({
-      income: result.rows,
+      income: rows,
       summary: {
         total_income: totalIncome,
-        by_category: summaryResult.rows,
+        by_category: summaryRows,
       },
     });
   } catch (error) {
@@ -122,10 +103,10 @@ async function postHandler(req: AuthRequest) {
 
     const timestamp = getCurrentTimestamp();
 
-    const result = await client.execute({
-      sql: `INSERT INTO other_income (amount, category, description, payment_method, reference_number, notes, user_id, created_at)
+    const rows = await sqlQuery(
+      `INSERT INTO other_income (amount, category, description, payment_method, reference_number, notes, user_id, created_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`,
-      args: [
+      [
         validated.amount,
         validated.category,
         validated.description || null,
@@ -134,10 +115,10 @@ async function postHandler(req: AuthRequest) {
         validated.notes || null,
         user.userId,
         timestamp,
-      ],
-    });
+      ]
+    );
 
-    return NextResponse.json({ income: result.rows[0] }, { status: 201 });
+    return NextResponse.json({ income: rows[0] }, { status: 201 });
   } catch (error) {
     const validationError = handleValidationError(error);
     if (validationError) return validationError;

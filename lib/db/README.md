@@ -1,77 +1,35 @@
-# Database Initialization Architecture
+# Database (Prisma + PostgreSQL)
 
 ## Overview
 
-The database initialization system is designed to run **once** when the server starts, not on every request. This ensures optimal performance and prevents unnecessary overhead.
+The app uses **Prisma** as the only data layer. Schema and migrations live in `prisma/`; the runtime client is a singleton from `lib/db.ts`.
 
 ## Architecture
 
-### 1. **Server Startup Initialization** (`instrumentation.ts`)
+### 1. **Server startup** (`instrumentation.ts`)
 
-Uses Next.js's instrumentation hook to initialize the database when the server starts:
+On Node.js server start, the instrumentation hook runs `ensureDatabaseInitialized()`, which creates the database if missing, runs migrations, then seeds (idempotent).
 
-```typescript
-// instrumentation.ts
-export async function register() {
-  if (process.env.NEXT_RUNTIME === "nodejs") {
-    await ensureDatabaseInitialized();
-  }
-}
-```
+### 2. **Client** (`lib/db.ts`)
 
-**Benefits:**
+- Exports a **Prisma Client** singleton (Next.js `globalThis` pattern to avoid multiple instances in dev).
+- Also exports helpers `sqlQuery` / `sqlExecute` for the few raw-SQL paths (e.g. reports); they rewrite `?` placeholders to `$1, $2, ...` for PostgreSQL.
 
-- Runs once per server instance
-- Executes before any API routes are called
-- No performance impact on requests
+All API routes and utils import `prisma` (and optionally `sqlQuery`/`sqlExecute`) from `@/lib/db`.
 
-### 2. **Database Client** (`lib/db.ts`)
+### 3. **Init** (`lib/db/init.ts`)
 
-Simple, focused module that only creates and exports the database client:
+- `ensureDatabaseInitialized()` creates the database if missing (`ensureDatabaseExists`), runs migrations (`runMigrations`), then seeds (`runSeed`). Safe to call multiple times (thread-safe, promise-cached).
 
-```typescript
-// lib/db.ts
-const client = createClient({ url: dbPath, authToken: authToken });
-export default client;
-```
+### 4. **Seed** (`lib/db/runSeed.ts`)
 
-**No initialization logic** - keeps the module clean and focused.
+- Uses only Prisma Client (e.g. `prisma.user.upsert`, `prisma.setting.upsert`).
+- Invoked from `prisma/seed.ts` when you run `pnpm run db:seed` or from init when the server starts.
 
-### 3. **Initialization Logic** (`lib/db/init.ts`)
+### 5. **Schema and migrations**
 
-Handles database schema creation and migrations:
-
-```typescript
-// lib/db/init.ts
-export async function ensureDatabaseInitialized(): Promise<void> {
-  // Thread-safe: only runs once, even if called multiple times
-  // Uses promise caching to prevent concurrent initializations
-}
-```
-
-**Features:**
-
-- Thread-safe singleton pattern
-- Promise caching prevents concurrent initializations
-- Idempotent - safe to call multiple times
-
-### 4. **Schema & Migrations** (`lib/db/schema.ts`)
-
-Contains:
-
-- Table creation (CREATE TABLE IF NOT EXISTS)
-- Automatic migrations (ALTER TABLE for new columns)
-- Index creation
-
-**Migration Pattern:**
-
-```typescript
-// Check if column exists
-const tableInfo = await client.execute(`PRAGMA table_info(products)`);
-if (!hasColumn) {
-  await client.execute(`ALTER TABLE products ADD COLUMN ...`);
-}
-```
+- **Schema:** `prisma/schema.prisma` (single source of truth).
+- **Migrations:** `prisma migrate dev` in development; `prisma migrate deploy` in production (e.g. in CI or Vercel build).
 
 ## Flow
 
@@ -81,54 +39,29 @@ Server Start
 instrumentation.ts (register)
     ↓
 ensureDatabaseInitialized()
+    ├── ensureDatabaseExists() (create DB if missing)
+    ├── runMigrations() (prisma migrate deploy)
+    └── runSeed()
     ↓
-initializeDatabase() → Creates tables + runs migrations
-    ↓
-seedDatabase() → Seeds initial data
-    ↓
-Server Ready
-    ↓
-API Routes (no initialization overhead)
-```
-
-## API Routes
-
-**No initialization code needed** - database is already initialized:
-
-```typescript
-// app/api/products/route.ts
-export async function GET(req: NextRequest) {
-  // Database is already initialized - just use it!
-  const result = await client.execute("SELECT ...");
-}
+API routes use prisma / sqlQuery / sqlExecute
 ```
 
 ## Configuration
 
-Enable instrumentation hook in `next.config.js`:
+- **Env:** `DATABASE_URL` must be a PostgreSQL connection string.
+- **Next.js:** No special config required; Prisma Client is used like any Node module.
 
-```javascript
-experimental: {
-  instrumentationHook: true,
-}
-```
-
-## Benefits
-
-✅ **Performance**: Initialization runs once, not per request  
-✅ **Clean Code**: API routes focus on business logic  
-✅ **Reliability**: Thread-safe initialization prevents race conditions  
-✅ **Maintainability**: Clear separation of concerns  
-✅ **Scalability**: Works with serverless and traditional deployments
-
-## Manual Initialization
-
-For manual initialization (e.g., Docker, scripts):
+## Manual seed / init
 
 ```bash
-# Run initialization script
-pnpm tsx scripts/init-db.ts
+# Apply migrations (new DB or after schema changes)
+pnpm run db:migrate          # dev
+pnpm exec prisma migrate deploy   # production
 
-# Or use API endpoint
-curl http://localhost:3000/api/init
+# Seed
+pnpm run init-db
+# or
+pnpm run db:seed
 ```
+
+Or trigger init via the app: `GET /api/init` (calls the same seed logic).

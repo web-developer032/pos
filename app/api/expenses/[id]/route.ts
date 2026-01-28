@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAuth, RouteContext, AuthRequest } from "@/lib/middleware/auth";
-import client from "@/lib/db";
+import { prisma } from "@/lib/db";
 import { z } from "zod";
 
 const updateExpenseSchema = z.object({
@@ -12,30 +12,46 @@ const updateExpenseSchema = z.object({
   notes: z.string().optional(),
 });
 
+function toExpenseResponse(e: { id: number; amount: number; category: string; description: string | null; paymentMethod: string; referenceNumber: string | null; notes: string | null; userId: number; createdAt: Date; user?: { username: string } | null }) {
+  const { user, ...rest } = e;
+  return {
+    id: rest.id,
+    amount: rest.amount,
+    category: rest.category,
+    description: rest.description,
+    payment_method: rest.paymentMethod,
+    reference_number: rest.referenceNumber,
+    notes: rest.notes,
+    user_id: rest.userId,
+    created_at: rest.createdAt,
+    user_name: user?.username ?? null,
+  };
+}
+
 async function getHandler(req: Request, context?: RouteContext) {
   try {
     if (!context) {
       return NextResponse.json({ error: "Invalid request" }, { status: 400 });
     }
     const params = await context.params;
-    const id = parseInt(params.id);
+    const id = parseInt(params.id, 10);
+    if (Number.isNaN(id)) {
+      return NextResponse.json({ error: "Invalid id" }, { status: 400 });
+    }
 
-    const result = await client.execute({
-      sql: `SELECT e.*, u.username as user_name
-            FROM expenses e
-            JOIN users u ON e.user_id = u.id
-            WHERE e.id = ?`,
-      args: [id],
+    const expense = await prisma.expense.findUnique({
+      where: { id },
+      include: { user: { select: { username: true } } },
     });
 
-    if (result.rows.length === 0) {
+    if (!expense) {
       return NextResponse.json(
         { error: "Expense not found" },
         { status: 404 }
       );
     }
 
-    return NextResponse.json({ expense: result.rows[0] });
+    return NextResponse.json({ expense: toExpenseResponse(expense) });
   } catch (error) {
     console.error("Error fetching expense:", error);
     return NextResponse.json(
@@ -51,50 +67,39 @@ async function putHandler(req: AuthRequest, context?: RouteContext) {
       return NextResponse.json({ error: "Invalid request" }, { status: 400 });
     }
     const params = await context.params;
-    const id = parseInt(params.id);
+    const id = parseInt(params.id, 10);
+    if (Number.isNaN(id)) {
+      return NextResponse.json({ error: "Invalid id" }, { status: 400 });
+    }
     const body = await req.json();
     const validated = updateExpenseSchema.parse(body);
 
-    // Verify record exists
-    const checkResult = await client.execute({
-      sql: "SELECT id FROM expenses WHERE id = ?",
-      args: [id],
-    });
-
-    if (checkResult.rows.length === 0) {
+    const existing = await prisma.expense.findUnique({ where: { id } });
+    if (!existing) {
       return NextResponse.json(
         { error: "Expense not found" },
         { status: 404 }
       );
     }
 
-    // Update record
-    await client.execute({
-      sql: `UPDATE expenses 
-            SET amount = ?, category = ?, description = ?, payment_method = ?, 
-                reference_number = ?, notes = ?
-            WHERE id = ?`,
-      args: [
-        validated.amount,
-        validated.category,
-        validated.description || null,
-        validated.payment_method,
-        validated.reference_number || null,
-        validated.notes || null,
-        id,
-      ],
+    await prisma.expense.update({
+      where: { id },
+      data: {
+        amount: validated.amount,
+        category: validated.category,
+        description: validated.description ?? null,
+        paymentMethod: validated.payment_method,
+        referenceNumber: validated.reference_number ?? null,
+        notes: validated.notes ?? null,
+      },
     });
 
-    // Get updated record
-    const result = await client.execute({
-      sql: `SELECT e.*, u.username as user_name
-            FROM expenses e
-            JOIN users u ON e.user_id = u.id
-            WHERE e.id = ?`,
-      args: [id],
+    const expense = await prisma.expense.findUnique({
+      where: { id },
+      include: { user: { select: { username: true } } },
     });
 
-    return NextResponse.json({ expense: result.rows[0] });
+    return NextResponse.json({ expense: expense ? toExpenseResponse(expense) : null });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
@@ -116,26 +121,20 @@ async function deleteHandler(req: Request, context?: RouteContext) {
       return NextResponse.json({ error: "Invalid request" }, { status: 400 });
     }
     const params = await context.params;
-    const id = parseInt(params.id);
+    const id = parseInt(params.id, 10);
+    if (Number.isNaN(id)) {
+      return NextResponse.json({ error: "Invalid id" }, { status: 400 });
+    }
 
-    // Verify record exists
-    const checkResult = await client.execute({
-      sql: "SELECT id FROM expenses WHERE id = ?",
-      args: [id],
-    });
-
-    if (checkResult.rows.length === 0) {
+    const existing = await prisma.expense.findUnique({ where: { id } });
+    if (!existing) {
       return NextResponse.json(
         { error: "Expense not found" },
         { status: 404 }
       );
     }
 
-    // Delete record
-    await client.execute({
-      sql: "DELETE FROM expenses WHERE id = ?",
-      args: [id],
-    });
+    await prisma.expense.delete({ where: { id } });
 
     return NextResponse.json({ message: "Expense deleted successfully" });
   } catch (error) {
@@ -150,4 +149,3 @@ async function deleteHandler(req: Request, context?: RouteContext) {
 export const GET = requireAuth(getHandler);
 export const PUT = requireAuth(putHandler);
 export const DELETE = requireAuth(deleteHandler);
-

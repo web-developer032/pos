@@ -169,8 +169,7 @@ docker-compose down
 cat > .env << EOF
 JWT_SECRET=your-very-secure-secret-key-here
 PORT=8080
-TURSO_DATABASE_URL=libsql://your-db.turso.io
-TURSO_AUTH_TOKEN=your-token
+DATABASE_URL=postgresql://user:password@host:5432/pos
 EOF
 
 # 2. Build and start with production config

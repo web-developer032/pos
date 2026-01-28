@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAuth, AuthRequest, RouteContext } from "@/lib/middleware/auth";
-import client from "@/lib/db";
+import { prisma } from "@/lib/db";
+import type { SalaryPaymentType } from "@/prisma/generated/prisma/client";
 import { z } from "zod";
 import { handleApiError, handleValidationError } from "@/lib/utils/apiHelpers";
 
@@ -13,34 +14,63 @@ const updateSchema = z.object({
   notes: z.string().optional(),
 });
 
+function toPaymentResponse(p: {
+  id: number;
+  employeeId: number;
+  amount: number;
+  paymentType: string;
+  period: string;
+  daysWorked: number | null;
+  paymentMethod: string;
+  notes: string | null;
+  userId: number;
+  createdAt: Date;
+  employee?: { name: string; salaryType: string } | null;
+  user?: { username: string } | null;
+}) {
+  const { employee, user, ...rest } = p;
+  return {
+    id: rest.id,
+    employee_id: rest.employeeId,
+    amount: rest.amount,
+    payment_type: rest.paymentType,
+    period: rest.period,
+    days_worked: rest.daysWorked,
+    payment_method: rest.paymentMethod,
+    notes: rest.notes,
+    user_id: rest.userId,
+    created_at: rest.createdAt,
+    employee_name: employee?.name ?? null,
+    salary_type: employee?.salaryType ?? null,
+    user_name: user?.username ?? null,
+  };
+}
+
 async function getHandler(req: AuthRequest, context?: RouteContext) {
   try {
     const { id } = await context!.params;
-    const paymentId = parseInt(id);
+    const paymentId = parseInt(id, 10);
 
     if (isNaN(paymentId)) {
       return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
     }
 
-    const result = await client.execute({
-      sql: `
-        SELECT sp.*, e.name as employee_name, e.salary_type, u.username as user_name
-        FROM salary_payments sp
-        JOIN employees e ON sp.employee_id = e.id
-        LEFT JOIN users u ON sp.user_id = u.id
-        WHERE sp.id = ?
-      `,
-      args: [paymentId],
+    const payment = await prisma.salaryPayment.findUnique({
+      where: { id: paymentId },
+      include: {
+        employee: { select: { name: true, salaryType: true } },
+        user: { select: { username: true } },
+      },
     });
 
-    if (result.rows.length === 0) {
+    if (!payment) {
       return NextResponse.json(
         { error: "Payment not found" },
         { status: 404 }
       );
     }
 
-    return NextResponse.json({ payment: result.rows[0] });
+    return NextResponse.json({ payment: toPaymentResponse(payment) });
   } catch (error) {
     return handleApiError(error, "fetching salary payment");
   }
@@ -49,7 +79,7 @@ async function getHandler(req: AuthRequest, context?: RouteContext) {
 async function putHandler(req: AuthRequest, context?: RouteContext) {
   try {
     const { id } = await context!.params;
-    const paymentId = parseInt(id);
+    const paymentId = parseInt(id, 10);
 
     if (isNaN(paymentId)) {
       return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
@@ -58,63 +88,49 @@ async function putHandler(req: AuthRequest, context?: RouteContext) {
     const body = await req.json();
     const validated = updateSchema.parse(body);
 
-    // Check if payment exists
-    const existingResult = await client.execute({
-      sql: "SELECT id FROM salary_payments WHERE id = ?",
-      args: [paymentId],
+    const existing = await prisma.salaryPayment.findUnique({
+      where: { id: paymentId },
     });
 
-    if (existingResult.rows.length === 0) {
+    if (!existing) {
       return NextResponse.json(
         { error: "Payment not found" },
         { status: 404 }
       );
     }
 
-    // Build update query dynamically
-    const updates: string[] = [];
-    const args: (string | number | null)[] = [];
+    const data: {
+      amount?: number;
+      paymentType?: SalaryPaymentType;
+      period?: string;
+      daysWorked?: number;
+      paymentMethod?: string;
+      notes?: string | null;
+    } = {};
+    if (validated.amount !== undefined) data.amount = validated.amount;
+    if (validated.payment_type !== undefined) data.paymentType = validated.payment_type as SalaryPaymentType;
+    if (validated.period !== undefined) data.period = validated.period;
+    if (validated.days_worked !== undefined) data.daysWorked = validated.days_worked;
+    if (validated.payment_method !== undefined) data.paymentMethod = validated.payment_method;
+    if (validated.notes !== undefined) data.notes = validated.notes ?? null;
 
-    if (validated.amount !== undefined) {
-      updates.push("amount = ?");
-      args.push(validated.amount);
-    }
-    if (validated.payment_type !== undefined) {
-      updates.push("payment_type = ?");
-      args.push(validated.payment_type);
-    }
-    if (validated.period !== undefined) {
-      updates.push("period = ?");
-      args.push(validated.period);
-    }
-    if (validated.days_worked !== undefined) {
-      updates.push("days_worked = ?");
-      args.push(validated.days_worked);
-    }
-    if (validated.payment_method !== undefined) {
-      updates.push("payment_method = ?");
-      args.push(validated.payment_method);
-    }
-    if (validated.notes !== undefined) {
-      updates.push("notes = ?");
-      args.push(validated.notes || null);
-    }
-
-    if (updates.length === 0) {
+    if (Object.keys(data).length === 0) {
       return NextResponse.json(
         { error: "No fields to update" },
         { status: 400 }
       );
     }
 
-    args.push(paymentId);
-
-    const result = await client.execute({
-      sql: `UPDATE salary_payments SET ${updates.join(", ")} WHERE id = ? RETURNING *`,
-      args,
+    const payment = await prisma.salaryPayment.update({
+      where: { id: paymentId },
+      data,
+      include: {
+        employee: { select: { name: true, salaryType: true } },
+        user: { select: { username: true } },
+      },
     });
 
-    return NextResponse.json({ payment: result.rows[0] });
+    return NextResponse.json({ payment: toPaymentResponse(payment) });
   } catch (error) {
     const validationError = handleValidationError(error);
     if (validationError) return validationError;
@@ -125,28 +141,25 @@ async function putHandler(req: AuthRequest, context?: RouteContext) {
 async function deleteHandler(req: AuthRequest, context?: RouteContext) {
   try {
     const { id } = await context!.params;
-    const paymentId = parseInt(id);
+    const paymentId = parseInt(id, 10);
 
     if (isNaN(paymentId)) {
       return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
     }
 
-    // Check if payment exists
-    const existingResult = await client.execute({
-      sql: "SELECT id FROM salary_payments WHERE id = ?",
-      args: [paymentId],
+    const existing = await prisma.salaryPayment.findUnique({
+      where: { id: paymentId },
     });
 
-    if (existingResult.rows.length === 0) {
+    if (!existing) {
       return NextResponse.json(
         { error: "Payment not found" },
         { status: 404 }
       );
     }
 
-    await client.execute({
-      sql: "DELETE FROM salary_payments WHERE id = ?",
-      args: [paymentId],
+    await prisma.salaryPayment.delete({
+      where: { id: paymentId },
     });
 
     return NextResponse.json({ message: "Payment deleted successfully" });

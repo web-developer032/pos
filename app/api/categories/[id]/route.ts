@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth, RouteContext } from "@/lib/middleware/auth";
-import client from "@/lib/db";
+import { sqlQuery, sqlExecute } from "@/lib/db";
 import { z } from "zod";
 
 const categorySchema = z.object({
@@ -14,19 +14,16 @@ async function getHandler(req: NextRequest, context?: RouteContext) {
       return NextResponse.json({ error: "Invalid request" }, { status: 400 });
     }
     const params = await context.params;
-    const result = await client.execute({
-      sql: "SELECT * FROM categories WHERE id = ?",
-      args: [params.id],
-    });
+    const rows = await sqlQuery("SELECT * FROM categories WHERE id = ?", [params.id]);
 
-    if (result.rows.length === 0) {
+    if (rows.length === 0) {
       return NextResponse.json(
         { error: "Category not found" },
         { status: 404 }
       );
     }
 
-    return NextResponse.json({ category: result.rows[0] });
+    return NextResponse.json({ category: rows[0] });
   } catch (error) {
     console.error("Error fetching category:", error);
     return NextResponse.json(
@@ -66,12 +63,12 @@ async function putHandler(req: NextRequest, context?: RouteContext) {
 
     values.push(params.id);
 
-    const result = await client.execute({
-      sql: `UPDATE categories SET ${updates.join(", ")} WHERE id = ? RETURNING *`,
-      args: values,
-    });
+    const rows = await sqlQuery(
+      `UPDATE categories SET ${updates.join(", ")} WHERE id = ? RETURNING *`,
+      values
+    );
 
-    return NextResponse.json({ category: result.rows[0] });
+    return NextResponse.json({ category: rows[0] });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
@@ -93,10 +90,7 @@ async function deleteHandler(req: NextRequest, context?: RouteContext) {
       return NextResponse.json({ error: "Invalid request" }, { status: 400 });
     }
     const params = await context.params;
-    await client.execute({
-      sql: "DELETE FROM categories WHERE id = ?",
-      args: [params.id],
-    });
+    await sqlExecute("DELETE FROM categories WHERE id = ?", [params.id]);
 
     return NextResponse.json({ message: "Category deleted successfully" });
   } catch (error) {

@@ -11,10 +11,15 @@ export interface AuthRequest extends NextRequest {
 
 export type RouteContext = { params: Promise<{ [key: string]: string }> };
 
+type RequireAuthHandler = (
+  req: NextRequest,
+  context: RouteContext
+) => Promise<NextResponse>;
+
 export function requireAuth(
   handler: (req: AuthRequest, context?: RouteContext) => Promise<NextResponse>,
   allowedRoles?: string[]
-) {
+): RequireAuthHandler {
   return async (
     req: NextRequest,
     context?: RouteContext

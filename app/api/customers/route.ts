@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/middleware/auth";
-import client from "@/lib/db";
+import { sqlQuery, sqlExecute } from "@/lib/db";
 import { z } from "zod";
 import {
   getPaginationParams,
@@ -60,19 +60,19 @@ async function postHandler(req: NextRequest) {
     const body = await req.json();
     const validated = customerSchema.parse(body);
 
-    const result = await client.execute({
-      sql: "INSERT INTO customers (name, email, phone, address, loyalty_points, created_at) VALUES (?, ?, ?, ?, ?, ?) RETURNING *",
-      args: [
+    const rows = await sqlQuery(
+      "INSERT INTO customers (name, email, phone, address, loyalty_points, created_at) VALUES (?, ?, ?, ?, ?, ?) RETURNING *",
+      [
         validated.name,
         validated.email || null,
         validated.phone || null,
         validated.address || null,
-        validated.loyalty_points || 0,
+        validated.loyalty_points ?? 0,
         getCurrentTimestamp(),
-      ],
-    });
+      ]
+    );
 
-    return NextResponse.json({ customer: result.rows[0] }, { status: 201 });
+    return NextResponse.json({ customer: rows[0] }, { status: 201 });
   } catch (error) {
     const validationError = handleValidationError(error);
     if (validationError) return validationError;
@@ -86,7 +86,7 @@ async function deleteHandler(req: NextRequest) {
     const deleteAll = searchParams.get("delete_all") === "true";
 
     if (deleteAll) {
-      await client.execute("DELETE FROM customers");
+      await sqlExecute("DELETE FROM customers", []);
       return NextResponse.json({
         message: "All customers deleted successfully",
       });

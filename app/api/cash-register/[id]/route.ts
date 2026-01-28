@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import client from "@/lib/db";
+import { sqlQuery, sqlExecute } from "@/lib/db";
 import { getCurrentTimestamp } from "@/lib/utils/dateTime";
 import {
   serializeSession,
@@ -33,13 +33,12 @@ export async function GET(
       );
     }
 
-    // Get session details
-    const sessionResult = await client.execute({
-      sql: `${SESSION_SELECT_SQL} WHERE crs.id = ?`,
-      args: [sessionId],
-    });
+    const sessionRows = await sqlQuery(
+      `${SESSION_SELECT_SQL} WHERE crs.id = ?`,
+      [sessionId]
+    );
 
-    if (sessionResult.rows.length === 0) {
+    if (sessionRows.length === 0) {
       return NextResponse.json(
         { error: "Session not found" },
         { status: 404 }
@@ -47,54 +46,44 @@ export async function GET(
     }
 
     const session = serializeSession(
-      sessionResult.rows[0] as unknown as SessionRow
+      sessionRows[0] as unknown as SessionRow
     );
 
-    // Use current timestamp if session is still open
     const openedAt = session.opened_at;
     const closedAt = session.closed_at || getCurrentTimestamp();
 
-    // Get sales during this session
-    const salesResult = await client.execute({
-      sql: `
-        SELECT payment_method, COUNT(*) as transaction_count,
+    const salesRows = await sqlQuery(
+      `SELECT payment_method, COUNT(*)::bigint as transaction_count,
                COALESCE(SUM(final_amount), 0) as total_amount
         FROM sales
         WHERE created_at >= ? AND created_at <= ?
-        GROUP BY payment_method
-      `,
-      args: [openedAt, closedAt],
-    });
+        GROUP BY payment_method`,
+      [openedAt, closedAt]
+    );
 
-    // Get returns during this session
-    const returnsResult = await client.execute({
-      sql: `
-        SELECT refund_method, COUNT(*) as return_count,
+    const returnsRows = await sqlQuery(
+      `SELECT refund_method, COUNT(*)::bigint as return_count,
                COALESCE(SUM(refund_amount), 0) as total_refund
         FROM returns
         WHERE created_at >= ? AND created_at <= ?
-        GROUP BY refund_method
-      `,
-      args: [openedAt, closedAt],
-    });
+        GROUP BY refund_method`,
+      [openedAt, closedAt]
+    );
 
-    // Get expenses during this session
-    const expensesResult = await client.execute({
-      sql: `
-        SELECT payment_method, category, COUNT(*) as expense_count,
+    const expensesRows = await sqlQuery(
+      `SELECT payment_method, category, COUNT(*)::bigint as expense_count,
                COALESCE(SUM(amount), 0) as total_amount
         FROM expenses
         WHERE created_at >= ? AND created_at <= ?
-        GROUP BY payment_method, category
-      `,
-      args: [openedAt, closedAt],
-    });
+        GROUP BY payment_method, category`,
+      [openedAt, closedAt]
+    );
 
     return NextResponse.json({
       session,
-      sales: salesResult.rows,
-      returns: returnsResult.rows,
-      expenses: expensesResult.rows,
+      sales: salesRows,
+      returns: returnsRows,
+      expenses: expensesRows,
     });
   } catch (error) {
     console.error("Error fetching session details:", error);
@@ -124,20 +113,19 @@ export async function PATCH(
     const body = await request.json();
     const validatedData = updateSessionSchema.parse(body);
 
-    // Get current session
-    const sessionResult = await client.execute({
-      sql: `SELECT id, status, opening_balance, opened_at FROM cash_register_sessions WHERE id = ?`,
-      args: [sessionId],
-    });
+    const sessionRows = await sqlQuery(
+      `SELECT id, status, opening_balance, opened_at FROM cash_register_sessions WHERE id = ?`,
+      [sessionId]
+    );
 
-    if (sessionResult.rows.length === 0) {
+    if (sessionRows.length === 0) {
       return NextResponse.json(
         { error: "Session not found" },
         { status: 404 }
       );
     }
 
-    const currentSession = sessionResult.rows[0] as unknown as {
+    const currentSession = sessionRows[0] as unknown as {
       id: number;
       status: string;
       opening_balance: number;
@@ -188,41 +176,34 @@ export async function PATCH(
         validatedData.opening_balance ?? currentSession.opening_balance;
       const openedAt = currentSession.opened_at;
 
-      // Get cash totals for recalculation
-      const cashSalesResult = await client.execute({
-        sql: `SELECT COALESCE(SUM(final_amount), 0) as total FROM sales WHERE payment_method = 'cash' AND created_at >= ?`,
-        args: [openedAt],
-      });
-      const cashSales =
-        (cashSalesResult.rows[0] as unknown as { total: number }).total || 0;
+      const cashSalesRows = await sqlQuery(
+        `SELECT COALESCE(SUM(final_amount), 0) as total FROM sales WHERE payment_method = 'cash' AND created_at >= ?`,
+        [openedAt]
+      );
+      const cashSales = Number((cashSalesRows[0] as Record<string, unknown>)?.total ?? 0);
 
-      const cashRefundsResult = await client.execute({
-        sql: `SELECT COALESCE(SUM(refund_amount), 0) as total FROM returns WHERE refund_method = 'cash' AND created_at >= ?`,
-        args: [openedAt],
-      });
-      const cashRefunds =
-        (cashRefundsResult.rows[0] as unknown as { total: number }).total || 0;
+      const cashRefundsRows = await sqlQuery(
+        `SELECT COALESCE(SUM(refund_amount), 0) as total FROM returns WHERE refund_method = 'cash' AND created_at >= ?`,
+        [openedAt]
+      );
+      const cashRefunds = Number((cashRefundsRows[0] as Record<string, unknown>)?.total ?? 0);
 
-      const cashExpensesResult = await client.execute({
-        sql: `SELECT COALESCE(SUM(amount), 0) as total FROM expenses WHERE payment_method = 'cash' AND created_at >= ?`,
-        args: [openedAt],
-      });
-      const cashExpenses =
-        (cashExpensesResult.rows[0] as unknown as { total: number }).total || 0;
+      const cashExpensesRows = await sqlQuery(
+        `SELECT COALESCE(SUM(amount), 0) as total FROM expenses WHERE payment_method = 'cash' AND created_at >= ?`,
+        [openedAt]
+      );
+      const cashExpenses = Number((cashExpensesRows[0] as Record<string, unknown>)?.total ?? 0);
 
       const expectedBalance =
         openingBalance + cashSales - cashRefunds - cashExpenses;
 
-      // Get current or new closing balance
       let closingBalance = validatedData.closing_balance;
       if (closingBalance === undefined) {
-        const closingResult = await client.execute({
-          sql: `SELECT closing_balance FROM cash_register_sessions WHERE id = ?`,
-          args: [sessionId],
-        });
-        closingBalance = (
-          closingResult.rows[0] as unknown as { closing_balance: number }
-        ).closing_balance;
+        const closingRows = await sqlQuery(
+          `SELECT closing_balance FROM cash_register_sessions WHERE id = ?`,
+          [sessionId]
+        );
+        closingBalance = (closingRows[0] as Record<string, unknown>)?.closing_balance as number;
       }
 
       const variance = closingBalance - expectedBalance;
@@ -236,21 +217,19 @@ export async function PATCH(
     // Add session ID for WHERE clause
     args.push(sessionId);
 
-    // Execute update
-    await client.execute({
-      sql: `UPDATE cash_register_sessions SET ${updates.join(", ")} WHERE id = ?`,
-      args,
-    });
+    await sqlExecute(
+      `UPDATE cash_register_sessions SET ${updates.join(", ")} WHERE id = ?`,
+      args
+    );
 
-    // Fetch updated session
-    const updatedResult = await client.execute({
-      sql: `${SESSION_SELECT_SQL} WHERE crs.id = ?`,
-      args: [sessionId],
-    });
+    const updatedRows = await sqlQuery(
+      `${SESSION_SELECT_SQL} WHERE crs.id = ?`,
+      [sessionId]
+    );
 
     return NextResponse.json({
       message: "Session updated successfully",
-      session: serializeSession(updatedResult.rows[0] as unknown as SessionRow),
+      session: serializeSession(updatedRows[0] as unknown as SessionRow),
     });
   } catch (error) {
     if (error instanceof z.ZodError) {

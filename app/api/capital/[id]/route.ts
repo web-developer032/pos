@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAuth, RouteContext, AuthRequest } from "@/lib/middleware/auth";
-import client from "@/lib/db";
+import { prisma } from "@/lib/db";
 import { z } from "zod";
 
 const updateCapitalSchema = z.object({
@@ -10,30 +10,44 @@ const updateCapitalSchema = z.object({
   notes: z.string().optional(),
 });
 
+function toCapitalResponse(c: { id: number; amount: number; description: string | null; transactionType: string; notes: string | null; userId: number; createdAt: Date; user?: { username: string } | null }) {
+  const { user, ...rest } = c;
+  return {
+    id: rest.id,
+    amount: rest.amount,
+    description: rest.description,
+    transaction_type: rest.transactionType,
+    notes: rest.notes,
+    user_id: rest.userId,
+    created_at: rest.createdAt,
+    user_name: user?.username ?? null,
+  };
+}
+
 async function getHandler(req: Request, context?: RouteContext) {
   try {
     if (!context) {
       return NextResponse.json({ error: "Invalid request" }, { status: 400 });
     }
     const params = await context.params;
-    const id = parseInt(params.id);
+    const id = parseInt(params.id, 10);
+    if (Number.isNaN(id)) {
+      return NextResponse.json({ error: "Invalid id" }, { status: 400 });
+    }
 
-    const result = await client.execute({
-      sql: `SELECT c.*, u.username as user_name
-            FROM capital c
-            JOIN users u ON c.user_id = u.id
-            WHERE c.id = ?`,
-      args: [id],
+    const capital = await prisma.capital.findUnique({
+      where: { id },
+      include: { user: { select: { username: true } } },
     });
 
-    if (result.rows.length === 0) {
+    if (!capital) {
       return NextResponse.json(
         { error: "Capital record not found" },
         { status: 404 }
       );
     }
 
-    return NextResponse.json({ capital: result.rows[0] });
+    return NextResponse.json({ capital: toCapitalResponse(capital) });
   } catch (error) {
     console.error("Error fetching capital record:", error);
     return NextResponse.json(
@@ -49,47 +63,37 @@ async function putHandler(req: AuthRequest, context?: RouteContext) {
       return NextResponse.json({ error: "Invalid request" }, { status: 400 });
     }
     const params = await context.params;
-    const id = parseInt(params.id);
+    const id = parseInt(params.id, 10);
+    if (Number.isNaN(id)) {
+      return NextResponse.json({ error: "Invalid id" }, { status: 400 });
+    }
     const body = await req.json();
     const validated = updateCapitalSchema.parse(body);
 
-    // Verify record exists
-    const checkResult = await client.execute({
-      sql: "SELECT id FROM capital WHERE id = ?",
-      args: [id],
-    });
-
-    if (checkResult.rows.length === 0) {
+    const existing = await prisma.capital.findUnique({ where: { id } });
+    if (!existing) {
       return NextResponse.json(
         { error: "Capital record not found" },
         { status: 404 }
       );
     }
 
-    // Update record
-    await client.execute({
-      sql: `UPDATE capital 
-            SET amount = ?, description = ?, transaction_type = ?, notes = ?
-            WHERE id = ?`,
-      args: [
-        validated.amount,
-        validated.description || null,
-        validated.transaction_type,
-        validated.notes || null,
-        id,
-      ],
+    await prisma.capital.update({
+      where: { id },
+      data: {
+        amount: validated.amount,
+        description: validated.description ?? null,
+        transactionType: validated.transaction_type,
+        notes: validated.notes ?? null,
+      },
     });
 
-    // Get updated record
-    const result = await client.execute({
-      sql: `SELECT c.*, u.username as user_name
-            FROM capital c
-            JOIN users u ON c.user_id = u.id
-            WHERE c.id = ?`,
-      args: [id],
+    const capital = await prisma.capital.findUnique({
+      where: { id },
+      include: { user: { select: { username: true } } },
     });
 
-    return NextResponse.json({ capital: result.rows[0] });
+    return NextResponse.json({ capital: capital ? toCapitalResponse(capital) : null });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
@@ -111,26 +115,20 @@ async function deleteHandler(req: Request, context?: RouteContext) {
       return NextResponse.json({ error: "Invalid request" }, { status: 400 });
     }
     const params = await context.params;
-    const id = parseInt(params.id);
+    const id = parseInt(params.id, 10);
+    if (Number.isNaN(id)) {
+      return NextResponse.json({ error: "Invalid id" }, { status: 400 });
+    }
 
-    // Verify record exists
-    const checkResult = await client.execute({
-      sql: "SELECT id FROM capital WHERE id = ?",
-      args: [id],
-    });
-
-    if (checkResult.rows.length === 0) {
+    const existing = await prisma.capital.findUnique({ where: { id } });
+    if (!existing) {
       return NextResponse.json(
         { error: "Capital record not found" },
         { status: 404 }
       );
     }
 
-    // Delete record
-    await client.execute({
-      sql: "DELETE FROM capital WHERE id = ?",
-      args: [id],
-    });
+    await prisma.capital.delete({ where: { id } });
 
     return NextResponse.json({ message: "Capital record deleted successfully" });
   } catch (error) {
@@ -145,4 +143,3 @@ async function deleteHandler(req: Request, context?: RouteContext) {
 export const GET = requireAuth(getHandler);
 export const PUT = requireAuth(putHandler);
 export const DELETE = requireAuth(deleteHandler);
-

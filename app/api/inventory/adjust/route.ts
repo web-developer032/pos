@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/middleware/auth";
-import client from "@/lib/db";
+import { prisma } from "@/lib/db";
 import { z } from "zod";
 import { updateProductQuantity } from "@/lib/utils/productQuantity";
 
@@ -16,35 +16,28 @@ async function postHandler(req: NextRequest) {
     const body = await req.json();
     const validated = adjustSchema.parse(body);
 
-    // Get product details including relationships
-    const productResult = await client.execute({
-      sql: `SELECT base_product_id, stock_quantity 
-            FROM products WHERE id = ? AND deleted_at IS NULL`,
-      args: [validated.product_id],
+    const product = await prisma.product.findFirst({
+      where: { id: validated.product_id, deletedAt: null },
+      select: { baseProductId: true, stockQuantity: true },
     });
 
-    if (productResult.rows.length === 0) {
+    if (!product) {
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
     }
 
-    const product = productResult.rows[0] as unknown as {
-      base_product_id: number | null;
-      stock_quantity: number;
-    };
+    const currentStock = product.stockQuantity;
 
     // Prevent direct adjustments for related products
-    if (product.base_product_id) {
+    if (product.baseProductId) {
       return NextResponse.json(
         {
           error: "Cannot adjust related product directly. Please adjust the base product instead.",
-          base_product_id: product.base_product_id,
+          base_product_id: product.baseProductId,
         },
         { status: 400 }
       );
     }
 
-    const currentStock = product.stock_quantity;
-    
     let adjustmentQuantity = validated.quantity;
     let operation: 'add' | 'subtract' = 'add';
 
@@ -82,16 +75,11 @@ async function postHandler(req: NextRequest) {
       validated.transaction_type
     );
     
-    // Get the new stock for response (for base/simple products)
-    // For packings/composites, we'd need to check the base product, but for simplicity
-    // we'll just return the adjusted product's stock
-    const updatedProductResult = await client.execute({
-      sql: "SELECT stock_quantity FROM products WHERE id = ? AND deleted_at IS NULL",
-      args: [validated.product_id],
+    const updated = await prisma.product.findFirst({
+      where: { id: validated.product_id, deletedAt: null },
+      select: { stockQuantity: true },
     });
-    const newStock = updatedProductResult.rows.length > 0
-      ? (updatedProductResult.rows[0] as unknown as { stock_quantity: number }).stock_quantity
-      : currentStock;
+    const newStock = updated?.stockQuantity ?? currentStock;
 
     return NextResponse.json({
       message: "Inventory adjusted successfully",

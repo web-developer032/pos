@@ -39,11 +39,11 @@ export function Modal({
   if (!isOpen || !mounted) return null;
 
   const sizeClasses = {
-    sm: "max-w-md",
-    md: "max-w-lg",
-    lg: "max-w-2xl",
-    xl: "max-w-4xl",
-    "2xl": "max-w-5xl",
+    sm: "max-w-md w-full",
+    md: "max-w-lg w-full",
+    lg: "max-w-2xl w-full",
+    xl: "max-w-4xl w-full",
+    "2xl": "max-w-5xl w-full",
   };
 
   const modalContent = (
@@ -52,7 +52,7 @@ export function Modal({
         <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" />
 
         <div
-          className={`relative transform overflow-hidden rounded-lg bg-white text-left shadow-xl transition-all ${sizeClasses[size]} flex max-h-[90vh] w-full flex-col sm:w-auto`}
+          className={`relative transform overflow-hidden rounded-lg bg-white text-left shadow-xl transition-all ${sizeClasses[size]} flex max-h-[90vh] flex-col`}
         >
           <div className="flex-shrink-0 border-b border-gray-200 px-6 py-4">
             <div className="flex items-center justify-between">

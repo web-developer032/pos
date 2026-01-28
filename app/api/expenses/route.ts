@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth, AuthRequest } from "@/lib/middleware/auth";
-import client from "@/lib/db";
+import { sqlQuery } from "@/lib/db";
 import { z } from "zod";
 import { getCurrentTimestamp } from "@/lib/utils/dateTime";
 import { roundPrice } from "@/lib/utils/apiHelpers";
@@ -30,11 +30,11 @@ async function getHandler(req: NextRequest) {
     const args: (string | number)[] = [];
 
     if (startDate) {
-      sql += " AND datetime(e.created_at) >= datetime(?)";
+      sql += " AND e.created_at >= ?";
       args.push(`${startDate}T00:00:00.000Z`);
     }
     if (endDate) {
-      sql += " AND datetime(e.created_at) <= datetime(?)";
+      sql += " AND e.created_at <= ?";
       args.push(`${endDate}T23:59:59.999Z`);
     }
     if (category) {
@@ -44,34 +44,34 @@ async function getHandler(req: NextRequest) {
 
     sql += " ORDER BY e.created_at DESC";
 
-    const result = await client.execute({ sql, args });
+    const rows = await sqlQuery(sql, args);
 
-    // Calculate totals
-    const totalsResult = await client.execute({
-      sql: `
-        SELECT 
-          SUM(amount) as total_expenses,
-          category,
-          SUM(amount) as category_total
-        FROM expenses
-        WHERE 1=1
-        ${startDate ? "AND created_at >= ?" : ""}
-        ${endDate ? "AND created_at <= ?" : ""}
-        GROUP BY category
-      `,
-      args: args.slice(0, startDate || endDate ? 2 : 0),
-    });
+    const totalsArgs = []; 
+    if (startDate) totalsArgs.push(`${startDate}T00:00:00.000Z`); 
+    if (endDate) totalsArgs.push(`${endDate}T23:59:59.999Z`);
+    let totalsSql = `
+      SELECT 
+        COALESCE(SUM(amount), 0) as total_expenses,
+        category,
+        COALESCE(SUM(amount), 0) as category_total
+      FROM expenses
+      WHERE 1=1
+    `;
+    if (startDate) totalsSql += " AND created_at >= ?";
+    if (endDate) totalsSql += " AND created_at <= ?";
+    totalsSql += " GROUP BY category";
+    const totalsRows = await sqlQuery(totalsSql, totalsArgs);
 
-    const totalExpenses = result.rows.reduce(
-      (sum, row) => sum + ((row as unknown as { amount: number }).amount || 0),
+    const totalExpenses = rows.reduce<number>(
+      (sum, row) => sum + Number((row as Record<string, unknown>).amount ?? 0),
       0
     );
 
     return NextResponse.json({
-      expenses: result.rows,
+      expenses: rows,
       summary: {
         total_expenses: totalExpenses,
-        by_category: totalsResult.rows,
+        by_category: totalsRows,
       },
     });
   } catch (error) {
@@ -95,10 +95,10 @@ async function postHandler(req: AuthRequest) {
 
     const timestamp = getCurrentTimestamp();
 
-    const result = await client.execute({
-      sql: `INSERT INTO expenses (amount, category, description, payment_method, reference_number, notes, user_id, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`,
-      args: [
+    const insertRows = await sqlQuery<{ id: number }>(
+      `INSERT INTO expenses (amount, category, description, payment_method, reference_number, notes, user_id, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
+      [
         roundPrice(validated.amount),
         validated.category,
         validated.description || null,
@@ -107,19 +107,18 @@ async function postHandler(req: AuthRequest) {
         validated.notes || null,
         user.userId,
         timestamp,
-      ],
-    });
+      ]
+    );
 
-    // Get full record with user name
-    const fullResult = await client.execute({
-      sql: `SELECT e.*, u.username as user_name
+    const fullRows = await sqlQuery(
+      `SELECT e.*, u.username as user_name
             FROM expenses e
             JOIN users u ON e.user_id = u.id
             WHERE e.id = ?`,
-      args: [(result.rows[0] as unknown as { id: number }).id],
-    });
+      [insertRows[0].id]
+    );
 
-    return NextResponse.json({ expense: fullResult.rows[0] }, { status: 201 });
+    return NextResponse.json({ expense: fullRows[0] }, { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(

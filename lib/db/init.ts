@@ -1,34 +1,32 @@
-import { initializeDatabase } from "./schema";
-import { seedDatabase } from "./seed";
+import { ensureDatabaseExists } from "./ensureDatabaseExists";
+import { runMigrations } from "./runMigrations";
+import { runSeed } from "./runSeed";
 
 let initialized = false;
 let initializationPromise: Promise<void> | null = null;
 
 /**
- * Ensures database is initialized (runs migrations and seeds)
- * This function is safe to call multiple times - it will only run once
+ * Ensures database exists, migrations are applied, and seed is run.
+ * Safe to call multiple times.
  */
 export async function ensureDatabaseInitialized(): Promise<void> {
-  // If already initialized, return immediately
   if (initialized) {
     return;
   }
-
-  // If initialization is in progress, wait for it
   if (initializationPromise) {
     return initializationPromise;
   }
 
-  // Start initialization
   initializationPromise = (async () => {
     try {
-      await initializeDatabase();
-      await seedDatabase();
+      await ensureDatabaseExists();
+      await runMigrations();
+      await runSeed();
       initialized = true;
-      console.log("[DB] Database initialization completed");
+      console.log("[DB] Database initialization (seed) completed");
     } catch (error) {
       console.error("[DB] Error initializing database:", error);
-      initializationPromise = null; // Reset so we can retry
+      initializationPromise = null;
       throw error;
     }
   })();

@@ -38,7 +38,9 @@ The database is stored in a Docker volume named `pos-database`. This ensures:
 - ✅ Data survives container restarts
 - ✅ Easy backup and restore
 
-### Viewing Database Volume
+### Viewing Database Volume (Postgres data)
+
+When using the included `postgres` service, data is stored in the `pos-database` volume.
 
 ```bash
 # List volumes
@@ -46,37 +48,28 @@ docker volume ls
 
 # Inspect volume
 docker volume inspect pos-database
-
-# Backup database
-docker run --rm -v pos-database:/data -v $(pwd):/backup alpine tar czf /backup/db-backup.tar.gz -C /data .
 ```
 
-### Restoring Database
-
-```bash
-# Restore from backup
-docker run --rm -v pos-database:/data -v $(pwd):/backup alpine sh -c "cd /data && tar xzf /backup/db-backup.tar.gz"
-```
+For PostgreSQL backups/restores, use `pg_dump` / `pg_restore` or your host’s backup tools against the Postgres container or external DB.
 
 ## Environment Variables
 
-### Option 1: Local File Database (Default)
+The application requires **PostgreSQL**. Set `DATABASE_URL` to your Postgres connection string.
 
-The application uses a local SQLite database stored in the Docker volume. No additional configuration needed.
+### Using the included Postgres service (default in docker-compose)
 
-### Option 2: Turso Cloud Database
+If you use the provided `docker-compose.yml`, a `postgres` service is included and `DATABASE_URL` is set automatically. No `.env` file is required for basic use.
 
-For production deployments, you can use Turso cloud database:
+### Using an external PostgreSQL instance
 
 1. Create a `.env` file:
 
 ```env
-TURSO_DATABASE_URL=libsql://your-database-url.turso.io
-TURSO_AUTH_TOKEN=your_turso_auth_token
+DATABASE_URL=postgresql://user:password@host:5432/pos
 JWT_SECRET=your-secret-key-change-in-production
 ```
 
-2. Update `docker-compose.yml` to use these variables (uncomment the environment lines)
+2. In `docker-compose.yml`, ensure the `pos` service receives `DATABASE_URL` (e.g. from env_file or environment)
 
 ## Production Deployment
 
@@ -93,11 +86,11 @@ docker-compose -f docker-compose.yml -f .docker-compose.prod.yml up -d
 # Build the image
 docker build -t pos-application:latest .
 
-# Run with custom port
+# Run with custom port (requires DATABASE_URL for PostgreSQL)
 docker run -d \
   --name pos-app \
   -p 8080:3000 \
-  -v pos-db-data:/app/data/db \
+  -e DATABASE_URL=postgresql://user:password@host:5432/pos \
   -e JWT_SECRET=your-secret-key \
   pos-application:latest
 ```
@@ -210,7 +203,7 @@ Add to crontab:
 
 For high-traffic deployments, consider:
 
-- Using Turso cloud database instead of local file
+- Using a managed PostgreSQL service (e.g. Vercel Postgres, Neon, AWS RDS)
 - Adding a reverse proxy (nginx/traefik)
 - Using Docker Swarm or Kubernetes for orchestration
 - Implementing load balancing

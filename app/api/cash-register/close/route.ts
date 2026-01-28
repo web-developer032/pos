@@ -1,14 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import client from "@/lib/db";
-import { getCurrentTimestamp } from "@/lib/utils/dateTime";
+import { prisma } from "@/lib/db";
 import {
   serializeSession,
   SessionRow,
-  SESSION_SELECT_SQL,
 } from "@/lib/utils/cashRegisterHelpers";
 
-// Disable caching for this route
 export const dynamic = "force-dynamic";
 
 const closeSessionSchema = z.object({
@@ -16,96 +13,86 @@ const closeSessionSchema = z.object({
   notes: z.string().optional(),
 });
 
-// POST /api/cash-register/close - Close the current session
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const validatedData = closeSessionSchema.parse(body);
 
-    // Find the open session
-    const openSession = await client.execute({
-      sql: `SELECT id, opening_balance, opened_at FROM cash_register_sessions WHERE status = 'open' LIMIT 1`,
-      args: [],
+    const session = await prisma.cashRegisterSession.findFirst({
+      where: { status: "open" },
     });
-
-    if (openSession.rows.length === 0) {
+    if (!session) {
       return NextResponse.json(
         { error: "No open session found to close" },
         { status: 400 }
       );
     }
 
-    const session = openSession.rows[0] as unknown as {
-      id: number;
-      opening_balance: number;
-      opened_at: string;
-    };
+    const openedAt = session.openedAt;
 
-    const openedAt = session.opened_at;
+    const [cashSalesAgg, cashRefundsAgg, cashExpensesAgg] = await Promise.all([
+      prisma.sale.aggregate({
+        where: {
+          paymentMethod: "cash",
+          createdAt: { gte: openedAt },
+        },
+        _sum: { finalAmount: true },
+      }),
+      prisma.return.aggregate({
+        where: {
+          refundMethod: "cash",
+          createdAt: { gte: openedAt },
+        },
+        _sum: { refundAmount: true },
+      }),
+      prisma.expense.aggregate({
+        where: {
+          paymentMethod: "cash",
+          createdAt: { gte: openedAt },
+        },
+        _sum: { amount: true },
+      }),
+    ]);
 
-    // Get cash sales
-    const cashSalesResult = await client.execute({
-      sql: `SELECT COALESCE(SUM(final_amount), 0) as total FROM sales WHERE payment_method = 'cash' AND created_at >= ?`,
-      args: [openedAt],
-    });
-    const cashSales =
-      (cashSalesResult.rows[0] as unknown as { total: number }).total || 0;
-
-    // Get cash refunds
-    const cashRefundsResult = await client.execute({
-      sql: `SELECT COALESCE(SUM(refund_amount), 0) as total FROM returns WHERE refund_method = 'cash' AND created_at >= ?`,
-      args: [openedAt],
-    });
-    const cashRefunds =
-      (cashRefundsResult.rows[0] as unknown as { total: number }).total || 0;
-
-    // Get cash expenses
-    const cashExpensesResult = await client.execute({
-      sql: `SELECT COALESCE(SUM(amount), 0) as total FROM expenses WHERE payment_method = 'cash' AND created_at >= ?`,
-      args: [openedAt],
-    });
-    const cashExpenses =
-      (cashExpensesResult.rows[0] as unknown as { total: number }).total || 0;
-
-    // Calculate expected balance
+    const cashSales = Number(cashSalesAgg._sum.finalAmount ?? 0);
+    const cashRefunds = Number(cashRefundsAgg._sum.refundAmount ?? 0);
+    const cashExpenses = Number(cashExpensesAgg._sum.amount ?? 0);
     const expectedBalance =
-      session.opening_balance + cashSales - cashRefunds - cashExpenses;
+      session.openingBalance + cashSales - cashRefunds - cashExpenses;
     const variance = validatedData.closing_balance - expectedBalance;
 
-    // Update the session with explicit local timestamp
-    const timestamp = getCurrentTimestamp();
-    await client.execute({
-      sql: `
-        UPDATE cash_register_sessions
-        SET closing_balance = ?, expected_balance = ?, variance = ?,
-            status = 'closed', closed_at = ?,
-            notes = CASE WHEN ? IS NOT NULL THEN ? ELSE notes END
-        WHERE id = ?
-      `,
-      args: [
-        validatedData.closing_balance,
+    const updated = await prisma.cashRegisterSession.update({
+      where: { id: session.id },
+      data: {
+        closingBalance: validatedData.closing_balance,
         expectedBalance,
         variance,
-        timestamp,
-        validatedData.notes || null,
-        validatedData.notes || null,
-        session.id,
-      ],
+        status: "closed",
+        closedAt: new Date(),
+        notes: validatedData.notes ?? session.notes,
+      },
+      include: { user: { select: { username: true } } },
     });
 
-    // Fetch the updated session
-    const updatedSessionResult = await client.execute({
-      sql: `${SESSION_SELECT_SQL} WHERE crs.id = ?`,
-      args: [session.id],
-    });
+    const row: SessionRow = {
+      id: updated.id,
+      user_id: updated.userId,
+      opening_balance: updated.openingBalance,
+      closing_balance: updated.closingBalance,
+      expected_balance: updated.expectedBalance,
+      variance: updated.variance,
+      status: updated.status,
+      opened_at: updated.openedAt.toISOString(),
+      closed_at: updated.closedAt?.toISOString() ?? null,
+      notes: updated.notes,
+      user_name: updated.user?.username ?? null,
+    };
 
     return NextResponse.json({
       message: "Day closed successfully",
-      session: serializeSession(
-        updatedSessionResult.rows[0] as unknown as SessionRow
-      ),
+      session: serializeSession(row),
       summary: {
-        opening_balance: session.opening_balance,
+        opening_balance: session.openingBalance,
         cash_sales: cashSales,
         cash_refunds: cashRefunds,
         cash_expenses: cashExpenses,

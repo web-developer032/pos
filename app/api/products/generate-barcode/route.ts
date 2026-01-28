@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/middleware/auth";
-import client from "@/lib/db";
+import { sqlQuery } from "@/lib/db";
 
 /**
  * Generate a unique barcode
@@ -27,15 +27,14 @@ async function getHandler(_req: NextRequest) {
     while (attempts < maxAttempts && !isUnique) {
       barcode = generateRandomBarcode();
 
-      // Check if barcode already exists in database (including additional_barcodes)
-      const existing = await client.execute({
-        sql: `SELECT id FROM products WHERE barcode = ? AND deleted_at IS NULL
+      const existing = await sqlQuery(
+        `SELECT id FROM products WHERE barcode = ? AND deleted_at IS NULL
               UNION
               SELECT product_id as id FROM product_barcodes WHERE barcode = ?`,
-        args: [barcode, barcode],
-      });
+        [barcode, barcode]
+      );
 
-      if (existing.rows.length === 0) {
+      if (existing.length === 0) {
         isUnique = true;
       } else {
         attempts++;
@@ -48,15 +47,14 @@ async function getHandler(_req: NextRequest) {
       const random = Math.floor(Math.random() * 10000).toString().padStart(4, "0");
       barcode = `2${timestamp.slice(-7)}${random}`;
 
-      // Final check
-      const finalCheck = await client.execute({
-        sql: `SELECT id FROM products WHERE barcode = ? AND deleted_at IS NULL
+      const finalCheck = await sqlQuery(
+        `SELECT id FROM products WHERE barcode = ? AND deleted_at IS NULL
               UNION
               SELECT product_id as id FROM product_barcodes WHERE barcode = ?`,
-        args: [barcode, barcode],
-      });
+        [barcode, barcode]
+      );
 
-      if (finalCheck.rows.length > 0) {
+      if (finalCheck.length > 0) {
         // Last resort: use full timestamp
         barcode = `2${Date.now().toString().slice(-11)}`;
       }

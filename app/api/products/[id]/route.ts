@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth, RouteContext } from "@/lib/middleware/auth";
-import client from "@/lib/db";
+import { sqlQuery, sqlExecute } from "@/lib/db";
 import { z } from "zod";
 import { roundPrice } from "@/lib/utils/apiHelpers";
 
@@ -64,43 +64,39 @@ async function getHandler(req: NextRequest, context?: RouteContext) {
       return NextResponse.json({ error: "Invalid request" }, { status: 400 });
     }
     const params = await context.params;
-    const result = await client.execute({
-      sql: `SELECT p.*, c.name as category_name,
+    const rows = await sqlQuery(
+      `SELECT p.*, c.name as category_name,
                    bp.stock_quantity as base_product_stock
             FROM products p
             LEFT JOIN categories c ON p.category_id = c.id
             LEFT JOIN products bp ON p.base_product_id = bp.id
             WHERE p.id = ? AND p.deleted_at IS NULL`,
-      args: [params.id],
-    });
+      [params.id]
+    );
 
-    if (result.rows.length === 0) {
+    if (rows.length === 0) {
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
     }
 
-    // Fetch additional barcodes
-    const barcodesResult = await client.execute({
-      sql: "SELECT barcode FROM product_barcodes WHERE product_id = ?",
-      args: [params.id],
-    });
-
-    const additionalBarcodes = barcodesResult.rows.map(
-      (row) => (row as unknown as { barcode: string }).barcode
+    const barcodeRows = await sqlQuery<{ barcode: string }>(
+      "SELECT barcode FROM product_barcodes WHERE product_id = ?",
+      [params.id]
     );
 
-    const product = result.rows[0] as unknown as Record<string, unknown>;
+    const additionalBarcodes = barcodeRows.map((r) => r.barcode);
+
+    const product = rows[0] as unknown as Record<string, unknown>;
     product.additional_barcodes = additionalBarcodes;
 
-    // Fetch sub-products (products that have this product as base_product_id)
-    const subProductsResult = await client.execute({
-      sql: `SELECT id, name, barcode, quantity_multiplier, cost_price, selling_price, unit
+    const subProductsRows = await sqlQuery(
+      `SELECT id, name, barcode, quantity_multiplier, cost_price, selling_price, unit
             FROM products 
             WHERE base_product_id = ? AND deleted_at IS NULL
             ORDER BY name`,
-      args: [params.id],
-    });
+      [params.id]
+    );
 
-    const subProducts = subProductsResult.rows.map((row) => row as unknown as {
+    const subProducts = subProductsRows.map((row) => row as unknown as {
       id: number;
       name: string;
       barcode: string | null;
@@ -134,17 +130,17 @@ async function putHandler(req: NextRequest, context?: RouteContext) {
       validated.base_product_id !== undefined &&
       validated.base_product_id !== null
     ) {
-      const baseProduct = await client.execute({
-        sql: "SELECT id, sku, base_product_id FROM products WHERE id = ? AND deleted_at IS NULL",
-        args: [validated.base_product_id],
-      });
-      if (baseProduct.rows.length === 0) {
+      const baseProductRows = await sqlQuery(
+        "SELECT id, sku, base_product_id FROM products WHERE id = ? AND deleted_at IS NULL",
+        [validated.base_product_id]
+      );
+      if (baseProductRows.length === 0) {
         return NextResponse.json(
           { error: "Base product not found" },
           { status: 400 }
         );
       }
-      const baseProductData = baseProduct.rows[0] as unknown as {
+      const baseProductData = baseProductRows[0] as unknown as {
         id: number;
         sku: string | null;
         base_product_id: number | null;
@@ -198,31 +194,27 @@ async function putHandler(req: NextRequest, context?: RouteContext) {
       updates.push("updated_at = CURRENT_TIMESTAMP");
       values.push(params.id);
 
-      await client.execute({
-        sql: `UPDATE products SET ${updates.join(", ")} WHERE id = ?`,
-        args: values,
-      });
+      await sqlExecute(
+        `UPDATE products SET ${updates.join(", ")} WHERE id = ?`,
+        values
+      );
     }
 
-    // Update additional barcodes if provided
     if (additionalBarcodes !== undefined) {
-      // Delete existing additional barcodes
-      await client.execute({
-        sql: "DELETE FROM product_barcodes WHERE product_id = ?",
-        args: [params.id],
-      });
+      await sqlExecute(
+        "DELETE FROM product_barcodes WHERE product_id = ?",
+        [params.id]
+      );
 
-      // Insert new additional barcodes
       if (additionalBarcodes.length > 0) {
         for (const barcode of additionalBarcodes) {
-          if (barcode && barcode.trim()) {
+          if (barcode?.trim()) {
             try {
-              await client.execute({
-                sql: "INSERT INTO product_barcodes (product_id, barcode) VALUES (?, ?)",
-                args: [params.id, barcode.trim()],
-              });
+              await sqlExecute(
+                "INSERT INTO product_barcodes (product_id, barcode) VALUES (?, ?)",
+                [params.id, barcode.trim()]
+              );
             } catch (error) {
-              // Ignore duplicate barcode errors
               console.warn(`Failed to add barcode ${barcode}:`, error);
             }
           }
@@ -230,30 +222,26 @@ async function putHandler(req: NextRequest, context?: RouteContext) {
       }
     }
 
-    // Fetch updated product with barcodes
-    const result = await client.execute({
-      sql: `SELECT p.*, c.name as category_name
+    const resultRows = await sqlQuery(
+      `SELECT p.*, c.name as category_name
             FROM products p
             LEFT JOIN categories c ON p.category_id = c.id
             WHERE p.id = ? AND p.deleted_at IS NULL`,
-      args: [params.id],
-    });
+      [params.id]
+    );
 
-    if (result.rows.length === 0) {
+    if (resultRows.length === 0) {
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
     }
 
-    // Fetch additional barcodes
-    const barcodesResult = await client.execute({
-      sql: "SELECT barcode FROM product_barcodes WHERE product_id = ?",
-      args: [params.id],
-    });
-
-    const fetchedBarcodes = barcodesResult.rows.map(
-      (row) => (row as unknown as { barcode: string }).barcode
+    const barcodeRows = await sqlQuery<{ barcode: string }>(
+      "SELECT barcode FROM product_barcodes WHERE product_id = ?",
+      [params.id]
     );
 
-    const product = result.rows[0] as unknown as Record<string, unknown>;
+    const fetchedBarcodes = barcodeRows.map((r) => r.barcode);
+
+    const product = resultRows[0] as unknown as Record<string, unknown>;
     product.additional_barcodes = fetchedBarcodes;
 
     return NextResponse.json({ product });
@@ -279,21 +267,19 @@ async function deleteHandler(req: NextRequest, context?: RouteContext) {
     }
     const params = await context.params;
 
-    // Check if product exists and is not already deleted
-    const productCheck = await client.execute({
-      sql: "SELECT id, name FROM products WHERE id = ?",
-      args: [params.id],
-    });
+    const productRows = await sqlQuery(
+      "SELECT id, name FROM products WHERE id = ?",
+      [params.id]
+    );
 
-    if (productCheck.rows.length === 0) {
+    if (productRows.length === 0) {
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
     }
 
-    // Soft delete: set deleted_at timestamp
-    await client.execute({
-      sql: "UPDATE products SET deleted_at = CURRENT_TIMESTAMP WHERE id = ?",
-      args: [params.id],
-    });
+    await sqlExecute(
+      "UPDATE products SET deleted_at = CURRENT_TIMESTAMP WHERE id = ?",
+      [params.id]
+    );
 
     return NextResponse.json({ message: "Product deleted successfully" });
   } catch (error) {

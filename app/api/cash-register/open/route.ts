@@ -1,14 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import client from "@/lib/db";
-import { getCurrentTimestamp } from "@/lib/utils/dateTime";
+import { prisma } from "@/lib/db";
 import {
   serializeSession,
   SessionRow,
-  SESSION_SELECT_SQL,
 } from "@/lib/utils/cashRegisterHelpers";
 
-// Disable caching for this route
 export const dynamic = "force-dynamic";
 
 const openSessionSchema = z.object({
@@ -17,50 +14,48 @@ const openSessionSchema = z.object({
   notes: z.string().optional(),
 });
 
-// POST /api/cash-register/open - Open a new day session
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const validatedData = openSessionSchema.parse(body);
 
-    // Check if there's already an open session
-    const existingSession = await client.execute({
-      sql: `SELECT id FROM cash_register_sessions WHERE status = 'open' LIMIT 1`,
-      args: [],
+    const existing = await prisma.cashRegisterSession.findFirst({
+      where: { status: "open" },
     });
-
-    if (existingSession.rows.length > 0) {
+    if (existing) {
       return NextResponse.json(
         { error: "A session is already open. Please close it first." },
         { status: 400 }
       );
     }
 
-    // Create new session with explicit local timestamp (consistent with sales)
-    const timestamp = getCurrentTimestamp();
-    const result = await client.execute({
-      sql: `
-        INSERT INTO cash_register_sessions (user_id, opening_balance, status, notes, opened_at)
-        VALUES (?, ?, 'open', ?, ?)
-      `,
-      args: [
-        validatedData.user_id,
-        validatedData.opening_balance,
-        validatedData.notes || null,
-        timestamp,
-      ],
+    const session = await prisma.cashRegisterSession.create({
+      data: {
+        userId: validatedData.user_id,
+        openingBalance: validatedData.opening_balance,
+        status: "open",
+        notes: validatedData.notes ?? null,
+      },
+      include: { user: { select: { username: true } } },
     });
 
-    // Fetch the created session
-    const sessionId = Number(result.lastInsertRowid);
-    const sessionResult = await client.execute({
-      sql: `${SESSION_SELECT_SQL} WHERE crs.id = ?`,
-      args: [sessionId],
-    });
+    const row: SessionRow = {
+      id: session.id,
+      user_id: session.userId,
+      opening_balance: session.openingBalance,
+      closing_balance: session.closingBalance,
+      expected_balance: session.expectedBalance,
+      variance: session.variance,
+      status: session.status,
+      opened_at: session.openedAt.toISOString(),
+      closed_at: session.closedAt?.toISOString() ?? null,
+      notes: session.notes,
+      user_name: session.user?.username ?? null,
+    };
 
     return NextResponse.json({
       message: "Day opened successfully",
-      session: serializeSession(sessionResult.rows[0] as unknown as SessionRow),
+      session: serializeSession(row),
     });
   } catch (error) {
     if (error instanceof z.ZodError) {

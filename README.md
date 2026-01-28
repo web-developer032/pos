@@ -1,14 +1,14 @@
 # POS System
 
-A Next.js application with Redux Toolkit for state management, libSQL for database, TypeScript, ESLint, and Prettier.
+A Next.js application with Redux Toolkit for state management, PostgreSQL via Prisma for the database, TypeScript, ESLint, and Prettier.
 
 ## Tech Stack
 
-- **Next.js 14** - React framework with App Router
+- **Next.js 16** - React framework with App Router
 - **TypeScript** - Type safety
 - **Redux Toolkit (RTK)** - State management
 - **RTK Query** - API handling and data fetching
-- **libSQL** - SQLite-compatible database
+- **PostgreSQL + Prisma** - Database (Prisma ORM, migrations, single `DATABASE_URL`)
 - **Tailwind CSS** - Styling
 - **ESLint** - Code linting
 - **Prettier** - Code formatting
@@ -65,35 +65,22 @@ pnpm install
 ```
 
 2. Set up environment variables:
-   Create a `.env.local` file in the root directory:
-
-For local development (optional - will use local file database if not set):
+   Create a `.env` or `.env.local` file in the root directory:
 
 ```env
-DATABASE_URL=file:./data/db/local.db
-DATABASE_AUTH_TOKEN=your_auth_token_if_needed
+DATABASE_URL=postgresql://user:password@localhost:5432/pos
 JWT_SECRET=your-secret-key-change-in-production
 ```
 
-For production/Vercel deployment:
+Use a local PostgreSQL instance or a hosted one (e.g. Vercel Postgres, Neon, Supabase). For Vercel deployment, set `DATABASE_URL` in the project environment (Vercel Postgres provides it automatically).
 
-```env
-TURSO_DATABASE_URL=libsql://your-database-url.turso.io
-TURSO_AUTH_TOKEN=your_turso_auth_token
-JWT_SECRET=your-secret-key-change-in-production
-```
-
-3. Initialize the database:
-
-```bash
-pnpm run init-db
-```
-
-4. Run the development server:
+3. Run the development server (database is created automatically if missing, migrations and seed run on first start):
 
 ```bash
 pnpm run dev
 ```
+
+Or to set up manually first: `pnpm run db:migrate` then `pnpm run init-db`.
 
 Open [http://localhost:3000](http://localhost:3000) in your browser.
 
@@ -108,7 +95,7 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 │   └── Providers.tsx      # Redux Provider wrapper
 ├── lib/                   # Utilities and configurations
 │   ├── api/              # RTK Query API slices
-│   ├── db.ts             # libSQL database client
+│   ├── db.ts             # Prisma client singleton
 │   ├── store.ts          # Redux store configuration
 │   └── hooks.ts          # Typed Redux hooks
 └── public/               # Static assets
@@ -122,28 +109,21 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 - `pnpm run lint` - Run ESLint
 - `pnpm run format` - Format code with Prettier
 - `pnpm run format:check` - Check code formatting
-- `pnpm run init-db` - Initialize database schema and seed data
+- `pnpm run init-db` - Seed database (run after migrations)
+- `pnpm run db:migrate` - Run Prisma migrations (dev)
+- `pnpm run db:seed` - Run seed script
 
 ## Database Setup
 
-This project uses libSQL (Turso).
+This project uses **PostgreSQL** with **Prisma** (schema in `prisma/schema.prisma`, migrations in `prisma/migrations/`).
 
-**For local development:**
+- **Required:** Set `DATABASE_URL` to a PostgreSQL connection string (e.g. `postgresql://user:password@host:5432/dbname`).
+- **Local:** Use a local Postgres instance or a hosted one (Neon, Supabase, etc.).
+- **Vercel:** Use Vercel Postgres or any Postgres; set `DATABASE_URL` in project settings.
+- **Migrations:** Run `pnpm run db:migrate` in development; in production use `prisma migrate deploy` (e.g. in build or release).
+- **Seed:** Run `pnpm run init-db` or `pnpm run db:seed` after migrations to load default data (e.g. admin user).
 
-- The database is automatically stored in the `data/db` folder (default: `data/db/local.db`)
-- The directory is created automatically when the application starts
-- No environment variables are required for local file-based database
-
-**For production/Vercel deployment:**
-
-- Set `TURSO_DATABASE_URL` to your Turso database URL (e.g., `libsql://your-db.turso.io`)
-- Set `TURSO_AUTH_TOKEN` to your Turso authentication token
-- The application will automatically use these variables when deployed
-
-**For Docker deployment:**
-
-- Database is automatically persisted in a Docker volume
-- See [DOCKER_SETUP.md](./DOCKER_SETUP.md) for details
+**Docker:** See [DOCKER_SETUP.md](./DOCKER_SETUP.md) for running with PostgreSQL in Docker.
 
 ## Docker Deployment
 

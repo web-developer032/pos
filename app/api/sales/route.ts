@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth, AuthRequest } from "@/lib/middleware/auth";
-import client from "@/lib/db";
+import { sqlQuery, sqlExecute } from "@/lib/db";
 import { z } from "zod";
 import {
   getPaginationParams,
@@ -76,13 +76,11 @@ async function getHandler(req: NextRequest) {
     const args: (string | number)[] = [];
 
     if (startDate) {
-      // Use datetime() to normalize both timestamp formats for comparison
-      sql += " AND datetime(s.created_at) >= datetime(?)";
+      sql += " AND s.created_at >= ?";
       args.push(`${startDate}T00:00:00.000Z`);
     }
     if (endDate) {
-      // Use datetime() to normalize both timestamp formats for comparison
-      sql += " AND datetime(s.created_at) <= datetime(?)";
+      sql += " AND s.created_at <= ?";
       args.push(`${endDate}T23:59:59.999Z`);
     }
     if (search) {
@@ -101,11 +99,11 @@ async function getHandler(req: NextRequest) {
     `;
     const countArgs: (string | number)[] = [];
     if (startDate) {
-      countSql += " AND datetime(s.created_at) >= datetime(?)";
+      countSql += " AND s.created_at >= ?";
       countArgs.push(`${startDate}T00:00:00.000Z`);
     }
     if (endDate) {
-      countSql += " AND datetime(s.created_at) <= datetime(?)";
+      countSql += " AND s.created_at <= ?";
       countArgs.push(`${endDate}T23:59:59.999Z`);
     }
     if (search) {
@@ -115,24 +113,17 @@ async function getHandler(req: NextRequest) {
       countArgs.push(searchTerm, searchTerm, searchTerm);
     }
 
-    const countResult = await client.execute({
-      sql: countSql,
-      args: countArgs,
-    });
-    const total = (countResult.rows[0] as unknown as { total: number }).total;
+    const countRows = await sqlQuery<{ total: number }>(countSql, countArgs);
+    const total = Number(countRows[0]?.total ?? 0);
 
-    // Execute paginated query
     const paginatedSql = `${sql} ORDER BY s.created_at DESC LIMIT ? OFFSET ?`;
     const paginatedArgs = [...args, limit, offset];
-    const dataResult = await client.execute({
-      sql: paginatedSql,
-      args: paginatedArgs,
-    });
+    const dataRows = await sqlQuery(paginatedSql, paginatedArgs);
 
     const pagination = buildPaginationResponse(total, page, limit);
 
     return NextResponse.json({
-      sales: dataResult.rows,
+      sales: dataRows,
       pagination,
     });
   } catch (error) {
@@ -211,27 +202,26 @@ async function postHandler(req: AuthRequest) {
     const { getCurrentTimestamp } = await import("@/lib/utils/dateTime");
     const timestamp = getCurrentTimestamp();
 
-    const saleResult = await client.execute({
-      sql: `INSERT INTO sales (sale_number, customer_id, user_id, total_amount, 
+    const saleRows = await sqlQuery<{ id: number }>(
+      `INSERT INTO sales (sale_number, customer_id, user_id, total_amount, 
             discount_amount, tax_amount, final_amount, payment_method, payment_status, created_at) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`,
-      args: [
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
+      [
         saleNumber,
         validated.customer_id || null,
         user.userId,
-        netTotalAmount, // Use net amount (after returns)
+        netTotalAmount,
         discountAmount,
         taxAmount,
         finalAmount,
         validated.payment_method,
         paymentStatus,
         timestamp,
-      ],
-    });
+      ]
+    );
 
-    const saleId = (saleResult.rows[0] as unknown as { id: number }).id;
+    const saleId = saleRows[0].id;
 
-    // Create sale items and update inventory
     for (const item of validated.items) {
       const roundedUnitPrice = roundPrice(item.unit_price);
       const roundedDiscount = roundPrice(item.discount || 0);
@@ -239,22 +229,18 @@ async function postHandler(req: AuthRequest) {
         item.quantity * roundedUnitPrice - roundedDiscount
       );
 
-      // Get current cost_price from product to store with sale
-      const productResult = await client.execute({
-        sql: "SELECT cost_price FROM products WHERE id = ?",
-        args: [item.product_id],
-      });
+      const productRows = await sqlQuery<{ cost_price: number }>(
+        "SELECT cost_price FROM products WHERE id = ?",
+        [item.product_id]
+      );
       const costPrice =
-        productResult.rows.length > 0
-          ? roundPrice(
-              (productResult.rows[0] as unknown as { cost_price: number })
-                .cost_price || 0
-            )
+        productRows.length > 0
+          ? roundPrice(Number(productRows[0]?.cost_price ?? 0))
           : 0;
 
-      await client.execute({
-        sql: "INSERT INTO sale_items (sale_id, product_id, quantity, unit_price, cost_price, discount, subtotal) VALUES (?, ?, ?, ?, ?, ?, ?)",
-        args: [
+      await sqlExecute(
+        "INSERT INTO sale_items (sale_id, product_id, quantity, unit_price, cost_price, discount, subtotal) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        [
           saleId,
           item.product_id,
           item.quantity,
@@ -262,8 +248,8 @@ async function postHandler(req: AuthRequest) {
           costPrice,
           roundedDiscount,
           subtotal,
-        ],
-      });
+        ]
+      );
 
       // Update inventory with relationship logic
       await updateProductQuantity(
@@ -275,75 +261,59 @@ async function postHandler(req: AuthRequest) {
       );
     }
 
-    // Create payment record (only for amount actually paid)
     if (amountPaid > 0) {
-      await client.execute({
-        sql: "INSERT INTO payments (sale_id, payment_method, amount) VALUES (?, ?, ?)",
-        args: [saleId, validated.payment_method, amountPaid],
-      });
+      await sqlExecute(
+        "INSERT INTO payments (sale_id, payment_method, amount) VALUES (?, ?, ?)",
+        [saleId, validated.payment_method, amountPaid]
+      );
     }
 
-    // Update customer's credit balance if this is a credit sale
     if (creditAmount > 0 && validated.customer_id) {
-      await client.execute({
-        sql: "UPDATE customers SET credit_balance = credit_balance + ?, updated_at = ? WHERE id = ?",
-        args: [creditAmount, timestamp, validated.customer_id],
-      });
+      await sqlExecute(
+        "UPDATE customers SET credit_balance = credit_balance + ?, updated_at = ? WHERE id = ?",
+        [creditAmount, timestamp, validated.customer_id]
+      );
     }
 
-    // Process inline returns if any
     if (validated.return_items && validated.return_items.length > 0) {
-      // Create a return record linked to the current sale
       const returnNumber = `RET-${Date.now()}`;
 
-      const returnResult = await client.execute({
-        sql: `INSERT INTO returns (return_number, sale_id, user_id, total_amount, refund_amount, 
+      const returnRows = await sqlQuery<{ id: number }>(
+        `INSERT INTO returns (return_number, sale_id, user_id, total_amount, refund_amount, 
               refund_method, reason, created_at) 
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`,
-        args: [
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
+        [
           returnNumber,
-          saleId, // Link to the current sale being created
+          saleId,
           user.userId,
           returnsTotal,
-          0, // Refund amount is 0 since it's applied to the new sale
-          "store_credit", // Applied as credit to new purchase
+          0,
+          "store_credit",
           "Inline return with new purchase",
           timestamp,
-        ],
-      });
+        ]
+      );
 
-      const returnId = (returnResult.rows[0] as unknown as { id: number }).id;
+      const returnId = returnRows[0].id;
 
-      // Create return items and restore inventory
       for (const returnItem of validated.return_items) {
-        let costPrice = returnItem.cost_price || 0;
+        let costPrice = returnItem.cost_price ?? 0;
 
-        // If linked to a sale item, get cost_price from original sale_item
         if (returnItem.sale_item_id) {
-          const originalSaleItemResult = await client.execute({
-            sql: "SELECT cost_price FROM sale_items WHERE id = ?",
-            args: [returnItem.sale_item_id],
-          });
-          if (originalSaleItemResult.rows.length > 0) {
-            costPrice = roundPrice(
-              (
-                originalSaleItemResult.rows[0] as unknown as {
-                  cost_price: number;
-                }
-              ).cost_price || costPrice
-            );
+          const originalRows = await sqlQuery<{ cost_price: number }>(
+            "SELECT cost_price FROM sale_items WHERE id = ?",
+            [returnItem.sale_item_id]
+          );
+          if (originalRows.length > 0) {
+            costPrice = roundPrice(Number(originalRows[0]?.cost_price ?? costPrice));
           }
         } else if (!costPrice) {
-          // For generic returns without cost_price, get from product
-          const productResult = await client.execute({
-            sql: "SELECT cost_price FROM products WHERE id = ?",
-            args: [returnItem.product_id],
-          });
-          if (productResult.rows.length > 0) {
-            costPrice = roundPrice(
-              (productResult.rows[0] as unknown as { cost_price: number })
-                .cost_price || 0
-            );
+          const productRows = await sqlQuery<{ cost_price: number }>(
+            "SELECT cost_price FROM products WHERE id = ?",
+            [returnItem.product_id]
+          );
+          if (productRows.length > 0) {
+            costPrice = roundPrice(Number(productRows[0]?.cost_price ?? 0));
           }
         }
 
@@ -351,20 +321,19 @@ async function postHandler(req: AuthRequest) {
           returnItem.quantity * roundPrice(returnItem.unit_price)
         );
 
-        await client.execute({
-          sql: `INSERT INTO return_items (return_id, sale_item_id, product_id, quantity, 
+        await sqlExecute(
+          `INSERT INTO return_items (return_id, sale_item_id, product_id, quantity, 
                 unit_price, refund_amount) VALUES (?, ?, ?, ?, ?, ?)`,
-          args: [
+          [
             returnId,
-            returnItem.sale_item_id || null, // May be null for generic returns
+            returnItem.sale_item_id ?? null,
             returnItem.product_id,
             returnItem.quantity,
             roundPrice(returnItem.unit_price),
             refundAmount,
-          ],
-        });
+          ]
+        );
 
-        // Restore inventory for returned items
         await updateProductQuantity(
           returnItem.product_id,
           returnItem.quantity,
@@ -375,33 +344,30 @@ async function postHandler(req: AuthRequest) {
       }
     }
 
-    // Get full sale details
-    const fullSaleResult = await client.execute({
-      sql: `SELECT s.*, u.username as user_name, c.name as customer_name, c.phone as customer_phone
+    const fullSaleRows = await sqlQuery(
+      `SELECT s.*, u.username as user_name, c.name as customer_name, c.phone as customer_phone
             FROM sales s
             LEFT JOIN users u ON s.user_id = u.id
             LEFT JOIN customers c ON s.customer_id = c.id
             WHERE s.id = ?`,
-      args: [saleId],
-    });
+      [saleId]
+    );
 
-    // Get sale items with product details (use LEFT JOIN to handle deleted products)
-    // Use stored cost_price from sale_items instead of current product cost_price
-    const saleItemsResult = await client.execute({
-      sql: `SELECT si.*, 
+    const saleItemsRows = await sqlQuery(
+      `SELECT si.*, 
                    COALESCE(p.name, 'Deleted Product') as product_name, 
                    p.barcode
             FROM sale_items si
             LEFT JOIN products p ON si.product_id = p.id
             WHERE si.sale_id = ?
             ORDER BY si.id`,
-      args: [saleId],
-    });
+      [saleId]
+    );
 
     return NextResponse.json(
       {
-        sale: fullSaleResult.rows[0],
-        items: saleItemsResult.rows,
+        sale: fullSaleRows[0],
+        items: saleItemsRows,
       },
       { status: 201 }
     );
@@ -418,36 +384,22 @@ async function deleteHandler(req: NextRequest) {
     const deleteAll = searchParams.get("delete_all") === "true";
 
     if (deleteAll) {
-      // Delete all related records first to avoid foreign key constraints
-      // Delete return items
-      await client.execute(`
-        DELETE FROM return_items 
-        WHERE return_id IN (SELECT id FROM returns)
-      `);
-
-      // Delete inventory transactions for returns
-      await client.execute(`
-        DELETE FROM inventory_transactions 
-        WHERE transaction_type = 'return'
-      `);
-
-      // Delete returns
-      await client.execute("DELETE FROM returns");
-
-      // Delete inventory transactions for sales
-      await client.execute(`
-        DELETE FROM inventory_transactions 
-        WHERE transaction_type = 'sale'
-      `);
-
-      // Delete payments
-      await client.execute("DELETE FROM payments");
-
-      // Delete sale items
-      await client.execute("DELETE FROM sale_items");
-
-      // Finally delete sales
-      await client.execute("DELETE FROM sales");
+      await sqlExecute(
+        `DELETE FROM return_items WHERE return_id IN (SELECT id FROM returns)`,
+        []
+      );
+      await sqlExecute(
+        `DELETE FROM inventory_transactions WHERE transaction_type = 'return'`,
+        []
+      );
+      await sqlExecute("DELETE FROM returns", []);
+      await sqlExecute(
+        `DELETE FROM inventory_transactions WHERE transaction_type = 'sale'`,
+        []
+      );
+      await sqlExecute("DELETE FROM payments", []);
+      await sqlExecute("DELETE FROM sale_items", []);
+      await sqlExecute("DELETE FROM sales", []);
 
       return NextResponse.json({ message: "All sales deleted successfully" });
     }

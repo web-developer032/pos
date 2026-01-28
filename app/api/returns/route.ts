@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth, AuthRequest } from "@/lib/middleware/auth";
-import client from "@/lib/db";
+import { sqlQuery, sqlExecute } from "@/lib/db";
 import { z } from "zod";
 import { getCurrentTimestamp } from "@/lib/utils/dateTime";
 import { roundPrice } from "@/lib/utils/apiHelpers";
@@ -42,9 +42,9 @@ async function getHandler(req: NextRequest) {
 
     sql += " ORDER BY r.created_at DESC";
 
-    const result = await client.execute({ sql, args });
+    const rows = await sqlQuery(sql, args);
 
-    return NextResponse.json({ returns: result.rows });
+    return NextResponse.json({ returns: rows });
   } catch (error) {
     console.error("Error fetching returns:", error);
     return NextResponse.json(
@@ -64,36 +64,35 @@ async function postHandler(req: AuthRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Verify sale exists
-    const saleCheck = await client.execute({
-      sql: "SELECT id, final_amount FROM sales WHERE id = ?",
-      args: [validated.sale_id],
-    });
+    const saleCheckRows = await sqlQuery(
+      "SELECT id, final_amount FROM sales WHERE id = ?",
+      [validated.sale_id]
+    );
 
-    if (saleCheck.rows.length === 0) {
+    if (saleCheckRows.length === 0) {
       return NextResponse.json({ error: "Sale not found" }, { status: 404 });
     }
 
     // Verify sale items and check quantities
     for (const returnItem of validated.items) {
-      const saleItemCheck = await client.execute({
-        sql: `SELECT si.*, 
+      const saleItemRows = await sqlQuery(
+        `SELECT si.*, 
                      COALESCE(SUM(ri.quantity), 0) as already_returned
               FROM sale_items si
               LEFT JOIN return_items ri ON si.id = ri.sale_item_id
               WHERE si.id = ? AND si.sale_id = ?
               GROUP BY si.id`,
-        args: [returnItem.sale_item_id, validated.sale_id],
-      });
+        [returnItem.sale_item_id, validated.sale_id]
+      );
 
-      if (saleItemCheck.rows.length === 0) {
+      if (saleItemRows.length === 0) {
         return NextResponse.json(
           { error: `Sale item ${returnItem.sale_item_id} not found` },
           { status: 404 }
         );
       }
 
-      const saleItem = saleItemCheck.rows[0] as unknown as {
+      const saleItem = saleItemRows[0] as unknown as {
         quantity: number;
         already_returned: number;
       };
@@ -122,11 +121,10 @@ async function postHandler(req: AuthRequest) {
 
     const timestamp = getCurrentTimestamp();
 
-    // Create return record
-    const returnResult = await client.execute({
-      sql: `INSERT INTO returns (return_number, sale_id, user_id, total_amount, refund_amount, refund_method, reason, notes, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`,
-      args: [
+    const returnRows = await sqlQuery<{ id: number }>(
+      `INSERT INTO returns (return_number, sale_id, user_id, total_amount, refund_amount, refund_method, reason, notes, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
+      [
         returnNumber,
         validated.sale_id,
         user.userId,
@@ -136,56 +134,52 @@ async function postHandler(req: AuthRequest) {
         validated.reason || null,
         validated.notes || null,
         timestamp,
-      ],
-    });
+      ]
+    );
 
-    const returnId = (returnResult.rows[0] as unknown as { id: number }).id;
+    const returnId = returnRows[0].id;
 
-    // Create return items and restore inventory
     for (const item of validated.items) {
       const roundedUnitPrice = roundPrice(item.unit_price);
       const refundAmount = roundPrice(item.quantity * roundedUnitPrice);
 
-      await client.execute({
-        sql: `INSERT INTO return_items (return_id, sale_item_id, product_id, quantity, unit_price, refund_amount)
+      await sqlExecute(
+        `INSERT INTO return_items (return_id, sale_item_id, product_id, quantity, unit_price, refund_amount)
               VALUES (?, ?, ?, ?, ?, ?)`,
-        args: [
+        [
           returnId,
           item.sale_item_id,
           item.product_id,
           item.quantity,
           roundedUnitPrice,
           refundAmount,
-        ],
-      });
+        ]
+      );
 
-      // Restore inventory with relationship logic
-      await updateProductQuantity(item.product_id, item.quantity, 'add', returnId, 'return');
+      await updateProductQuantity(item.product_id, item.quantity, "add", returnId, "return");
     }
 
-    // Get full return details
-    const fullReturnResult = await client.execute({
-      sql: `SELECT r.*, u.username as user_name, s.sale_number
+    const fullReturnRows = await sqlQuery(
+      `SELECT r.*, u.username as user_name, s.sale_number
             FROM returns r
             JOIN users u ON r.user_id = u.id
             JOIN sales s ON r.sale_id = s.id
             WHERE r.id = ?`,
-      args: [returnId],
-    });
+      [returnId]
+    );
 
-    // Get return items
-    const returnItemsResult = await client.execute({
-      sql: `SELECT ri.*, p.name as product_name, p.barcode
+    const returnItemsRows = await sqlQuery(
+      `SELECT ri.*, p.name as product_name, p.barcode
             FROM return_items ri
             JOIN products p ON ri.product_id = p.id
             WHERE ri.return_id = ?`,
-      args: [returnId],
-    });
+      [returnId]
+    );
 
     return NextResponse.json(
       {
-        return: fullReturnResult.rows[0],
-        items: returnItemsResult.rows,
+        return: fullReturnRows[0],
+        items: returnItemsRows,
       },
       { status: 201 }
     );

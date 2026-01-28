@@ -1,69 +1,59 @@
-import { createClient } from "@libsql/client";
-import { mkdirSync, existsSync } from "fs";
-import { join } from "path";
+import { PrismaClient } from "@/prisma/generated/prisma/client";
+import { PrismaPg } from "@prisma/adapter-pg";
 
-// Ensure data/db directory exists
-function ensureDbDirectory() {
-  if (typeof window === "undefined") {
-    // Only run on server side
-    const dbDir = join(process.cwd(), "data", "db");
-    if (!existsSync(dbDir)) {
-      mkdirSync(dbDir, { recursive: true });
+const connectionString = process.env.DATABASE_URL ?? "";
+const adapter = new PrismaPg({ connectionString });
+
+const globalForPrisma = globalThis as unknown as { prisma: PrismaClient };
+export const prisma =
+  globalForPrisma.prisma ??
+  new PrismaClient({
+    adapter,
+    log:
+      process.env.PRISMA_LOG_QUERIES === "1"
+        ? ["query", "error", "warn"]
+        : ["error"],
+  });
+if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+
+/** Convert ? placeholders to $1,$2,... for PostgreSQL */
+function toPgPlaceholders(sql: string): string {
+  let i = 0;
+  return sql.replace(/\?/g, () => `$${++i}`);
+}
+
+/** Recursively convert BigInt/Date for JSON and query compatibility. */
+function toSerializable<T>(obj: T): T {
+  if (typeof obj === "bigint") return Number(obj) as T;
+  if (obj instanceof Date) return obj.toISOString() as T;
+  if (Array.isArray(obj)) return obj.map(toSerializable) as T;
+  if (obj !== null && typeof obj === "object") {
+    const result = {} as Record<string, unknown>;
+    for (const [k, v] of Object.entries(obj)) {
+      result[k] = toSerializable(v);
     }
+    return result as T;
   }
+  return obj;
 }
 
-// Initialize libSQL client
-// For production/Vercel: use TURSO_DATABASE_URL and TURSO_AUTH_TOKEN
-// For local development: database is stored in data/db folder
-const getDbPath = () => {
-  // Check for Turso database URL (production/Vercel)
-  if (process.env.TURSO_DATABASE_URL) {
-    return process.env.TURSO_DATABASE_URL;
-  }
-  // Fallback to DATABASE_URL for backward compatibility
-  if (process.env.DATABASE_URL) {
-    return process.env.DATABASE_URL;
-  }
-  // Use absolute path to ensure consistency for local development
-  const dbDir = join(process.cwd(), "data", "db");
-  const dbFile = join(dbDir, "local.db");
-
-  // Log the path for debugging
-  if (process.env.NODE_ENV === "development") {
-    console.log("[DB] Database path (absolute):", dbFile);
-    console.log("[DB] Database exists:", existsSync(dbFile));
-  }
-
-  // For libSQL on Windows, use file:/// with three slashes for absolute paths
-  // Convert Windows backslashes to forward slashes
-  const normalizedPath = dbFile.replace(/\\/g, "/");
-  // Use file:/// format (three slashes) for absolute paths on Windows
-  const fileUrl = `file:///${normalizedPath}`;
-
-  if (process.env.NODE_ENV === "development") {
-    console.log("[DB] Database URL:", fileUrl);
-  }
-
-  return fileUrl;
-};
-
-// Get auth token (Turso token for production, optional for local)
-const getAuthToken = () => {
-  return process.env.TURSO_AUTH_TOKEN || process.env.DATABASE_AUTH_TOKEN;
-};
-
-// Ensure directory exists before creating client (only for local file database)
-if (!process.env.TURSO_DATABASE_URL && !process.env.DATABASE_URL) {
-  ensureDbDirectory();
+/** Run raw SELECT; returns rows. BigInt values are converted to Number for JSON compatibility. */
+export async function sqlQuery<T = unknown>(
+  sql: string,
+  args: unknown[] = []
+): Promise<T[]> {
+  const pgSql = toPgPlaceholders(sql);
+  const result = await prisma.$queryRawUnsafe(pgSql, ...args);
+  return (result as T[]).map((row) => toSerializable(row));
 }
 
-const dbPath = getDbPath();
-const authToken = getAuthToken();
+/** Run raw INSERT/UPDATE/DELETE; returns number of rows affected. */
+export async function sqlExecute(
+  sql: string,
+  args: unknown[] = []
+): Promise<number> {
+  const pgSql = toPgPlaceholders(sql);
+  return prisma.$executeRawUnsafe(pgSql, ...args);
+}
 
-const client = createClient({
-  url: dbPath,
-  authToken: authToken,
-});
-
-export default client;
+export default prisma;

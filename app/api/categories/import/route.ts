@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/middleware/auth";
-import client from "@/lib/db";
+import { sqlExecute } from "@/lib/db";
 import { z } from "zod";
 
 const categorySchema = z.object({
@@ -23,10 +23,10 @@ async function postHandler(req: NextRequest) {
     for (let i = 0; i < validated.categories.length; i++) {
       const category = validated.categories[i];
       try {
-        await client.execute({
-          sql: "INSERT INTO categories (name, description) VALUES (?, ?)",
-          args: [category.name, category.description || null],
-        });
+        await sqlExecute(
+          "INSERT INTO categories (name, description) VALUES (?, ?)",
+          [category.name, category.description || null]
+        );
         imported++;
       } catch (error) {
         const errorMessage =

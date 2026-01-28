@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/middleware/auth";
-import client from "@/lib/db";
+import { sqlQuery } from "@/lib/db";
 
 async function getHandler(req: NextRequest) {
   try {
@@ -10,30 +10,28 @@ async function getHandler(req: NextRequest) {
 
     let sql = `
       SELECT 
-        DATE(created_at) as date,
-        COUNT(*) as total_sales,
-        SUM(final_amount) as total_revenue,
-        AVG(final_amount) as average_order_value
+        (created_at)::date as date,
+        COUNT(*)::bigint as total_sales,
+        COALESCE(SUM(final_amount), 0) as total_revenue,
+        COALESCE(AVG(final_amount), 0) as average_order_value
       FROM sales
       WHERE 1=1
     `;
     const args: (string | number)[] = [];
 
     if (startDate) {
-      // Use datetime() to normalize timestamp formats for comparison
-      sql += " AND datetime(created_at) >= datetime(?)";
+      sql += " AND created_at >= ?";
       args.push(`${startDate}T00:00:00.000Z`);
     }
     if (endDate) {
-      // Use datetime() to normalize timestamp formats for comparison
-      sql += " AND datetime(created_at) <= datetime(?)";
+      sql += " AND created_at <= ?";
       args.push(`${endDate}T23:59:59.999Z`);
     }
 
-    sql += " GROUP BY DATE(created_at) ORDER BY date";
+    sql += " GROUP BY (created_at)::date ORDER BY date";
 
-    const result = await client.execute({ sql, args });
-    return NextResponse.json({ report: result.rows });
+    const rows = await sqlQuery(sql, args);
+    return NextResponse.json({ report: rows });
   } catch (error) {
     console.error("Error generating sales report:", error);
     return NextResponse.json(

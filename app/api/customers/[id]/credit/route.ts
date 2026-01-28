@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth, RouteContext } from "@/lib/middleware/auth";
-import client from "@/lib/db";
+import { sqlQuery } from "@/lib/db";
 import { handleApiError } from "@/lib/utils/apiHelpers";
 
 // GET - Get credit summary for a customer (balance, unpaid sales)
@@ -12,30 +12,27 @@ async function getHandler(req: NextRequest, context?: RouteContext) {
     const params = await context.params;
     const customerId = params.id;
 
-    // Get customer with credit balance
-    const customerResult = await client.execute({
-      sql: "SELECT id, name, phone, credit_balance FROM customers WHERE id = ?",
-      args: [customerId],
-    });
+    const customerRows = await sqlQuery(
+      "SELECT id, name, phone, credit_balance FROM customers WHERE id = ?",
+      [customerId]
+    );
 
-    if (customerResult.rows.length === 0) {
+    if (customerRows.length === 0) {
       return NextResponse.json(
         { error: "Customer not found" },
         { status: 404 }
       );
     }
 
-    const customer = customerResult.rows[0] as unknown as {
+    const customer = customerRows[0] as unknown as {
       id: number;
       name: string;
       phone: string | null;
       credit_balance: number;
     };
 
-    // Get unpaid/partial sales for this customer
-    const salesResult = await client.execute({
-      sql: `
-        SELECT 
+    const salesRows = await sqlQuery(
+      `SELECT 
           s.id,
           s.sale_number,
           s.final_amount,
@@ -48,49 +45,41 @@ async function getHandler(req: NextRequest, context?: RouteContext) {
         LEFT JOIN payments p ON s.id = p.sale_id
         WHERE s.customer_id = ? AND s.payment_status IN ('pending', 'partial')
         GROUP BY s.id
-        ORDER BY s.created_at DESC
-      `,
-      args: [customerId],
-    });
+        ORDER BY s.created_at DESC`,
+      [customerId]
+    );
 
-    // Get recent payments
-    const paymentsResult = await client.execute({
-      sql: `
-        SELECT cp.*, u.username as recorded_by
+    const paymentsRows = await sqlQuery(
+      `SELECT cp.*, u.username as recorded_by
         FROM customer_payments cp
         LEFT JOIN users u ON cp.user_id = u.id
         WHERE cp.customer_id = ?
         ORDER BY cp.created_at DESC
-        LIMIT 10
-      `,
-      args: [customerId],
-    });
+        LIMIT 10`,
+      [customerId]
+    );
 
-    // Get total credit given (sum of all credit sales)
-    const creditStatsResult = await client.execute({
-      sql: `
-        SELECT 
-          COUNT(*) as total_credit_sales,
+    const creditStatsRows = await sqlQuery(
+      `SELECT 
+          COUNT(*)::bigint as total_credit_sales,
           COALESCE(SUM(final_amount), 0) as total_credit_amount
         FROM sales
-        WHERE customer_id = ? AND payment_status IN ('pending', 'partial')
-      `,
-      args: [customerId],
-    });
+        WHERE customer_id = ? AND payment_status IN ('pending', 'partial')`,
+      [customerId]
+    );
 
-    const creditStats = creditStatsResult.rows[0] as unknown as {
+    const creditStats = creditStatsRows[0] as unknown as {
       total_credit_sales: number;
       total_credit_amount: number;
     };
 
-    // Get total payments received
-    const totalPaymentsResult = await client.execute({
-      sql: "SELECT COALESCE(SUM(amount), 0) as total_payments FROM customer_payments WHERE customer_id = ?",
-      args: [customerId],
-    });
-    const totalPayments = (
-      totalPaymentsResult.rows[0] as unknown as { total_payments: number }
-    ).total_payments;
+    const totalPaymentsRows = await sqlQuery(
+      "SELECT COALESCE(SUM(amount), 0) as total_payments FROM customer_payments WHERE customer_id = ?",
+      [customerId]
+    );
+    const totalPayments = Number(
+      (totalPaymentsRows[0] as Record<string, unknown>)?.total_payments ?? 0
+    );
 
     return NextResponse.json({
       customer: {
@@ -99,8 +88,8 @@ async function getHandler(req: NextRequest, context?: RouteContext) {
         phone: customer.phone,
         credit_balance: customer.credit_balance,
       },
-      unpaid_sales: salesResult.rows,
-      recent_payments: paymentsResult.rows,
+      unpaid_sales: salesRows,
+      recent_payments: paymentsRows,
       summary: {
         total_credit_sales: creditStats.total_credit_sales,
         total_credit_amount: creditStats.total_credit_amount,

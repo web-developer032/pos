@@ -12,7 +12,7 @@ interface UseScrollToErrorOptions {
   /** Behavior of scroll animation */
   scrollBehavior?: ScrollBehavior;
   /** Container element to scroll within (default: document) */
-  containerRef?: React.RefObject<HTMLElement>;
+  containerRef?: React.RefObject<HTMLElement | null>;
 }
 
 /**

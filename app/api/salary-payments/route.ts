@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth, AuthRequest } from "@/lib/middleware/auth";
-import client from "@/lib/db";
+import { sqlQuery } from "@/lib/db";
 import { z } from "zod";
 import { handleApiError, handleValidationError } from "@/lib/utils/apiHelpers";
 import { getCurrentTimestamp } from "@/lib/utils/dateTime";
@@ -39,11 +39,11 @@ async function getHandler(req: NextRequest) {
       args.push(period);
     }
     if (startDate) {
-      whereClause += " AND datetime(sp.created_at) >= datetime(?)";
+      whereClause += " AND sp.created_at >= ?";
       args.push(`${startDate}T00:00:00.000Z`);
     }
     if (endDate) {
-      whereClause += " AND datetime(sp.created_at) <= datetime(?)";
+      whereClause += " AND sp.created_at <= ?";
       args.push(`${endDate}T23:59:59.999Z`);
     }
     if (search) {
@@ -53,15 +53,13 @@ async function getHandler(req: NextRequest) {
       args.push(searchTerm, searchTerm, searchTerm);
     }
 
-    // Get total count
-    const countResult = await client.execute({
-      sql: `SELECT COUNT(*) as total FROM salary_payments sp JOIN employees e ON sp.employee_id = e.id ${whereClause}`,
-      args,
-    });
-    const total = (countResult.rows[0] as unknown as { total: number }).total;
+    const countRows = await sqlQuery<{ total: number }>(
+      `SELECT COUNT(*)::bigint as total FROM salary_payments sp JOIN employees e ON sp.employee_id = e.id ${whereClause}`,
+      args
+    );
+    const total = Number(countRows[0]?.total ?? 0);
 
-    // Get paginated data
-    const sql = `
+    const dataSql = `
       SELECT sp.*, e.name as employee_name, e.salary_type, u.username as user_name
       FROM salary_payments sp
       JOIN employees e ON sp.employee_id = e.id
@@ -70,13 +68,8 @@ async function getHandler(req: NextRequest) {
       ORDER BY sp.created_at DESC
       LIMIT ? OFFSET ?
     `;
+    const resultRows = await sqlQuery(dataSql, [...args, limit, offset]);
 
-    const result = await client.execute({
-      sql,
-      args: [...args, limit, offset],
-    });
-
-    // Get summary (for all matching records, not just current page)
     const summarySql = `
       SELECT 
         COALESCE(SUM(CASE WHEN sp.payment_type = 'salary' THEN sp.amount ELSE 0 END), 0) as total_salary,
@@ -88,15 +81,11 @@ async function getHandler(req: NextRequest) {
       JOIN employees e ON sp.employee_id = e.id
       ${whereClause}
     `;
-
-    const summaryResult = await client.execute({
-      sql: summarySql,
-      args,
-    });
+    const summaryRows = await sqlQuery(summarySql, args);
 
     return NextResponse.json({
-      payments: result.rows,
-      summary: summaryResult.rows[0],
+      payments: resultRows,
+      summary: summaryRows[0],
       pagination: {
         page,
         limit,
@@ -119,13 +108,12 @@ async function postHandler(req: AuthRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Verify employee exists
-    const employeeResult = await client.execute({
-      sql: "SELECT id, name FROM employees WHERE id = ?",
-      args: [validated.employee_id],
-    });
+    const employeeRows = await sqlQuery(
+      "SELECT id, name FROM employees WHERE id = ?",
+      [validated.employee_id]
+    );
 
-    if (employeeResult.rows.length === 0) {
+    if (employeeRows.length === 0) {
       return NextResponse.json(
         { error: "Employee not found" },
         { status: 404 }
@@ -134,23 +122,23 @@ async function postHandler(req: AuthRequest) {
 
     const timestamp = getCurrentTimestamp();
 
-    const result = await client.execute({
-      sql: `INSERT INTO salary_payments (employee_id, amount, payment_type, period, days_worked, payment_method, notes, user_id, created_at)
+    const rows = await sqlQuery(
+      `INSERT INTO salary_payments (employee_id, amount, payment_type, period, days_worked, payment_method, notes, user_id, created_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`,
-      args: [
+      [
         validated.employee_id,
         validated.amount,
         validated.payment_type,
         validated.period,
-        validated.days_worked || null,
+        validated.days_worked ?? null,
         validated.payment_method,
-        validated.notes || null,
+        validated.notes ?? null,
         user.userId,
         timestamp,
-      ],
-    });
+      ]
+    );
 
-    return NextResponse.json({ payment: result.rows[0] }, { status: 201 });
+    return NextResponse.json({ payment: rows[0] }, { status: 201 });
   } catch (error) {
     const validationError = handleValidationError(error);
     if (validationError) return validationError;

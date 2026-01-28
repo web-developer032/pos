@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth, AuthRequest } from "@/lib/middleware/auth";
-import client from "@/lib/db";
+import { sqlQuery } from "@/lib/db";
 import { z } from "zod";
 import { handleApiError, handleValidationError } from "@/lib/utils/apiHelpers";
 import { getCurrentTimestamp } from "@/lib/utils/dateTime";
@@ -44,21 +44,21 @@ async function getHandler(req: NextRequest) {
 
     sql += " ORDER BY e.name ASC";
 
-    const result = await client.execute({ sql, args });
+    const rows = await sqlQuery(sql, args);
 
-    // Get summary
-    const summaryResult = await client.execute(`
+    const summarySql = `
       SELECT 
-        COUNT(*) as total_employees,
-        SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as active_employees,
-        SUM(CASE WHEN salary_type = 'monthly' THEN base_salary ELSE 0 END) as monthly_salary_total,
-        SUM(CASE WHEN salary_type = 'daily' THEN base_salary ELSE 0 END) as daily_rate_total
+        COUNT(*)::bigint as total_employees,
+        SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END)::bigint as active_employees,
+        COALESCE(SUM(CASE WHEN salary_type = 'monthly' THEN base_salary ELSE 0 END), 0) as monthly_salary_total,
+        COALESCE(SUM(CASE WHEN salary_type = 'daily' THEN base_salary ELSE 0 END), 0) as daily_rate_total
       FROM employees
-    `);
+    `;
+    const summaryRows = await sqlQuery(summarySql, []);
 
     return NextResponse.json({
-      employees: result.rows,
-      summary: summaryResult.rows[0],
+      employees: rows,
+      summary: summaryRows[0],
     });
   } catch (error) {
     return handleApiError(error, "fetching employees");
@@ -72,10 +72,10 @@ async function postHandler(req: AuthRequest) {
 
     const timestamp = getCurrentTimestamp();
 
-    const result = await client.execute({
-      sql: `INSERT INTO employees (name, phone, address, salary_type, base_salary, join_date, status, notes, created_at, updated_at)
+    const rows = await sqlQuery(
+      `INSERT INTO employees (name, phone, address, salary_type, base_salary, join_date, status, notes, created_at, updated_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`,
-      args: [
+      [
         validated.name,
         validated.phone || null,
         validated.address || null,
@@ -86,10 +86,10 @@ async function postHandler(req: AuthRequest) {
         validated.notes || null,
         timestamp,
         timestamp,
-      ],
-    });
+      ]
+    );
 
-    return NextResponse.json({ employee: result.rows[0] }, { status: 201 });
+    return NextResponse.json({ employee: rows[0] }, { status: 201 });
   } catch (error) {
     const validationError = handleValidationError(error);
     if (validationError) return validationError;

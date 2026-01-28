@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/middleware/auth";
-import client from "@/lib/db";
+import { sqlQuery } from "@/lib/db";
 import { generateRandomSKU } from "@/lib/utils/skuGenerator";
 
 /**
@@ -18,13 +18,12 @@ async function getHandler(_req: NextRequest) {
     while (attempts < maxAttempts && !isUnique) {
       sku = generateRandomSKU();
 
-      // Check if SKU already exists in database
-      const existing = await client.execute({
-        sql: "SELECT id FROM products WHERE sku = ? AND deleted_at IS NULL",
-        args: [sku],
-      });
+      const existing = await sqlQuery(
+        "SELECT id FROM products WHERE sku = ? AND deleted_at IS NULL",
+        [sku]
+      );
 
-      if (existing.rows.length === 0) {
+      if (existing.length === 0) {
         isUnique = true;
       } else {
         attempts++;
@@ -52,13 +51,12 @@ async function getHandler(_req: NextRequest) {
 
       sku = `SKU-${segment1}-${segment2}`;
 
-      // Double-check this one too
-      const finalCheck = await client.execute({
-        sql: "SELECT id FROM products WHERE sku = ? AND deleted_at IS NULL",
-        args: [sku],
-      });
+      const finalCheck = await sqlQuery(
+        "SELECT id FROM products WHERE sku = ? AND deleted_at IS NULL",
+        [sku]
+      );
 
-      if (finalCheck.rows.length > 0) {
+      if (finalCheck.length > 0) {
         // Last resort: use date-based format that's still readable
         const dateStr = new Date().toISOString().slice(2, 10).replace(/-/g, ""); // YYMMDD format
         const randomPart =

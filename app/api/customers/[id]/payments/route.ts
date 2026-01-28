@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth, AuthRequest, RouteContext } from "@/lib/middleware/auth";
-import client from "@/lib/db";
+import { sqlQuery, sqlExecute } from "@/lib/db";
 import { z } from "zod";
 import { getCurrentTimestamp } from "@/lib/utils/dateTime";
 import {
@@ -28,37 +28,30 @@ async function getHandler(req: NextRequest, context?: RouteContext) {
 
     const { page, limit, offset } = getPaginationParams(req);
 
-    // Get total count
-    const countResult = await client.execute({
-      sql: "SELECT COUNT(*) as total FROM customer_payments WHERE customer_id = ?",
-      args: [customerId],
-    });
-    const total = (countResult.rows[0] as unknown as { total: number }).total;
+    const countRows = await sqlQuery<{ total: number }>(
+      "SELECT COUNT(*)::bigint as total FROM customer_payments WHERE customer_id = ?",
+      [customerId]
+    );
+    const total = Number(countRows[0]?.total ?? 0);
 
-    // Get payments with pagination
-    const result = await client.execute({
-      sql: `
-        SELECT cp.*, u.username as recorded_by
+    const rows = await sqlQuery(
+      `SELECT cp.*, u.username as recorded_by
         FROM customer_payments cp
         LEFT JOIN users u ON cp.user_id = u.id
         WHERE cp.customer_id = ?
         ORDER BY cp.created_at DESC
-        LIMIT ? OFFSET ?
-      `,
-      args: [customerId, limit, offset],
-    });
+        LIMIT ? OFFSET ?`,
+      [customerId, limit, offset]
+    );
 
-    // Get total paid amount
-    const totalPaidResult = await client.execute({
-      sql: "SELECT COALESCE(SUM(amount), 0) as total_paid FROM customer_payments WHERE customer_id = ?",
-      args: [customerId],
-    });
-    const totalPaid = (
-      totalPaidResult.rows[0] as unknown as { total_paid: number }
-    ).total_paid;
+    const totalPaidRows = await sqlQuery(
+      "SELECT COALESCE(SUM(amount), 0) as total_paid FROM customer_payments WHERE customer_id = ?",
+      [customerId]
+    );
+    const totalPaid = Number((totalPaidRows[0] as Record<string, unknown>)?.total_paid ?? 0);
 
     return NextResponse.json({
-      payments: result.rows,
+      payments: rows,
       total_paid: totalPaid,
       pagination: buildPaginationResponse(total, page, limit),
     });
@@ -84,20 +77,19 @@ async function postHandler(req: AuthRequest, context?: RouteContext) {
     const body = await req.json();
     const validated = paymentSchema.parse(body);
 
-    // Check if customer exists and get current balance
-    const customerResult = await client.execute({
-      sql: "SELECT id, name, credit_balance FROM customers WHERE id = ?",
-      args: [customerId],
-    });
+    const customerRows = await sqlQuery(
+      "SELECT id, name, credit_balance FROM customers WHERE id = ?",
+      [customerId]
+    );
 
-    if (customerResult.rows.length === 0) {
+    if (customerRows.length === 0) {
       return NextResponse.json(
         { error: "Customer not found" },
         { status: 404 }
       );
     }
 
-    const customer = customerResult.rows[0] as unknown as {
+    const customer = customerRows[0] as unknown as {
       id: number;
       name: string;
       credit_balance: number;
@@ -105,14 +97,11 @@ async function postHandler(req: AuthRequest, context?: RouteContext) {
 
     const timestamp = getCurrentTimestamp();
 
-    // Create payment record
-    const paymentResult = await client.execute({
-      sql: `
-        INSERT INTO customer_payments (customer_id, amount, payment_method, reference_number, notes, user_id, created_at)
+    const paymentRows = await sqlQuery(
+      `INSERT INTO customer_payments (customer_id, amount, payment_method, reference_number, notes, user_id, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?)
-        RETURNING *
-      `,
-      args: [
+        RETURNING *`,
+      [
         customerId,
         validated.amount,
         validated.payment_method,
@@ -120,15 +109,14 @@ async function postHandler(req: AuthRequest, context?: RouteContext) {
         validated.notes || null,
         user.userId,
         timestamp,
-      ],
-    });
+      ]
+    );
 
-    // Update customer's credit balance
     const newBalance = customer.credit_balance - validated.amount;
-    await client.execute({
-      sql: "UPDATE customers SET credit_balance = ?, updated_at = ? WHERE id = ?",
-      args: [newBalance, timestamp, customerId],
-    });
+    await sqlExecute(
+      "UPDATE customers SET credit_balance = ?, updated_at = ? WHERE id = ?",
+      [newBalance, timestamp, customerId]
+    );
 
     const message =
       newBalance < 0
@@ -139,7 +127,7 @@ async function postHandler(req: AuthRequest, context?: RouteContext) {
 
     return NextResponse.json(
       {
-        payment: paymentResult.rows[0],
+        payment: paymentRows[0],
         new_balance: newBalance,
         message,
       },

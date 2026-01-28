@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth, RouteContext } from "@/lib/middleware/auth";
-import client from "@/lib/db";
+import { sqlQuery } from "@/lib/db";
 
 async function getHandler(req: NextRequest, context?: RouteContext) {
   try {
@@ -10,33 +10,27 @@ async function getHandler(req: NextRequest, context?: RouteContext) {
     const params = await context.params;
     const barcode = params.barcode as string;
 
-    // Search in both products.barcode and product_barcodes table
-    const result = await client.execute({
-      sql: `SELECT DISTINCT p.*, c.name as category_name
+    const sql = `SELECT DISTINCT p.*, c.name as category_name
             FROM products p
             LEFT JOIN categories c ON p.category_id = c.id
             LEFT JOIN product_barcodes pb ON p.id = pb.product_id
             WHERE (p.barcode = ? OR pb.barcode = ?) 
               AND p.deleted_at IS NULL
-            LIMIT 1`,
-      args: [barcode, barcode],
-    });
+            LIMIT 1`;
+    const rows = await sqlQuery<Record<string, unknown> & { id: number }>(sql, [barcode, barcode]);
 
-    if (result.rows.length === 0) {
+    if (rows.length === 0) {
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
     }
 
-    const product = result.rows[0];
+    const product = rows[0];
 
-    // Fetch additional barcodes for this product
-    const barcodesResult = await client.execute({
-      sql: `SELECT barcode FROM product_barcodes WHERE product_id = ?`,
-      args: [product.id],
-    });
-
-    const additional_barcodes = barcodesResult.rows.map(
-      (row) => row.barcode as string
+    const barcodeRows = await sqlQuery<{ barcode: string }>(
+      "SELECT barcode FROM product_barcodes WHERE product_id = ?",
+      [product.id]
     );
+
+    const additional_barcodes = barcodeRows.map((row) => row.barcode);
 
     return NextResponse.json({
       product: {

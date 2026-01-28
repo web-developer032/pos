@@ -37,12 +37,8 @@ Create a `.env` file:
 # JWT Secret (REQUIRED - Change this!)
 JWT_SECRET=your-very-secure-secret-key-minimum-32-characters
 
-# Database (Optional - uses local file by default)
-DATABASE_URL=file:///app/data/db/local.db
-
-# Or use Turso Cloud Database
-# TURSO_DATABASE_URL=libsql://your-database-url.turso.io
-# TURSO_AUTH_TOKEN=your_turso_auth_token
+# Database (REQUIRED - PostgreSQL)
+DATABASE_URL=postgresql://user:password@host:5432/pos
 
 # Application Port
 PORT=3000
@@ -164,7 +160,7 @@ Best for scalability and reliability.
 
 **Recommended Setup:**
 
-- Use managed database (Turso, AWS RDS, etc.)
+- Use managed PostgreSQL (Vercel Postgres, Neon, AWS RDS, etc.)
 - Use container orchestration (ECS, Kubernetes)
 - Set up load balancing
 - Configure auto-scaling
