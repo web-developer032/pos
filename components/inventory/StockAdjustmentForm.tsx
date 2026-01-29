@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAdjustInventoryMutation } from "@/lib/api/inventoryApi";
 import { useGetProductQuery } from "@/lib/api/productsApi";
 import { Input } from "@/components/ui/Input";
@@ -11,27 +11,35 @@ import toast from "react-hot-toast";
 
 interface StockAdjustmentFormProps {
   productId: number;
+  initialQuantity?: number;
   onSuccess?: () => void;
 }
 
 export function StockAdjustmentForm({
   productId,
+  initialQuantity,
   onSuccess,
 }: StockAdjustmentFormProps) {
   const { data: productData, isLoading: isLoadingProduct } =
     useGetProductQuery(productId);
   const [adjustInventory, { isLoading: isAdjusting }] =
     useAdjustInventoryMutation();
-  const [quantity, setQuantity] = useState("");
+  const [quantity, setQuantity] = useState(
+    initialQuantity != null ? String(initialQuantity) : ""
+  );
   const [transactionType, setTransactionType] = useState<
     "sale" | "purchase" | "adjustment"
   >("adjustment");
+
+  useEffect(() => {
+    setQuantity(initialQuantity != null ? String(initialQuantity) : "");
+  }, [productId, initialQuantity]);
   const [notes, setNotes] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isAdjusting) return; // Prevent double submission
-    
+
     // Check if product is a related product (has base_product_id)
     if (productData?.product && productData.product.base_product_id) {
       toast.error(
@@ -40,7 +48,7 @@ export function StockAdjustmentForm({
       );
       return;
     }
-    
+
     try {
       await adjustInventory({
         product_id: productId,

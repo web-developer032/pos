@@ -16,7 +16,10 @@ export function InventoryList() {
   const [limit, setLimit] = useState(25);
   const { data, isLoading, refetch } = useGetInventoryQuery({ page, limit });
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedProduct, setSelectedProduct] = useState<number | null>(null);
+  const [selectedProduct, setSelectedProduct] = useState<{
+    id: number;
+    stock_quantity: number;
+  } | null>(null);
 
   if (isLoading) {
     return <div>Loading...</div>;
@@ -126,7 +129,10 @@ export function InventoryList() {
                     ) : (
                       <button
                         onClick={() => {
-                          setSelectedProduct(item.id);
+                          setSelectedProduct({
+                            id: item.id,
+                            stock_quantity: item.stock_quantity,
+                          });
                           setIsModalOpen(true);
                         }}
                         className="text-indigo-600 hover:text-indigo-900"
@@ -169,14 +175,17 @@ export function InventoryList() {
         }}
         title="Adjust Stock"
       >
-        <StockAdjustmentForm
-          productId={selectedProduct!}
-          onSuccess={() => {
-            setIsModalOpen(false);
-            setSelectedProduct(null);
-            refetch();
-          }}
-        />
+        {selectedProduct && (
+          <StockAdjustmentForm
+            productId={selectedProduct.id}
+            initialQuantity={selectedProduct.stock_quantity}
+            onSuccess={() => {
+              setIsModalOpen(false);
+              setSelectedProduct(null);
+              refetch();
+            }}
+          />
+        )}
       </Modal>
     </div>
   );

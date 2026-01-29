@@ -256,7 +256,7 @@ model PurchaseOrderItem {
   id          Int     @id @default(autoincrement())
   poId        Int     @map("po_id")
   productId   Int     @map("product_id")
-  quantity    Int
+  quantity    Float
   unitCost    Float   @map("unit_cost")
   retailPrice Float?  @map("retail_price")
   productName String? @map("product_name")
@@ -272,7 +272,7 @@ model InventoryTransaction {
   id               Int                    @id @default(autoincrement())
   productId        Int                    @map("product_id")
   transactionType InventoryTransactionType @map("transaction_type")
-  quantity         Int
+  quantity         Float
   referenceId      Int?                   @map("reference_id")
   notes           String?
   createdAt        DateTime               @default(now()) @map("created_at")

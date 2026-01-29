@@ -13,7 +13,8 @@
     "db:migrate": "prisma migrate dev",
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
-    "init-db": "tsx scripts/init-db.ts"
+    "init-db": "tsx scripts/init-db.ts",
+    "migrate:libsql": "tsx scripts/migrate-libsql-to-postgres.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
@@ -51,6 +52,7 @@
     "prettier": "^3.4.0",
     "prettier-plugin-tailwindcss": "^0.7.1",
     "prisma": "^7.0.0",
+    "sql.js": "^1.13.0",
     "tailwindcss": "^3.4.14",
     "tsx": "^4.20.6",
     "typescript": "^5.6.0"

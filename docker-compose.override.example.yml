@@ -1,0 +1,13 @@
+# Copy to docker-compose.override.yml to use a bind mount for PostgreSQL data.
+# This stores data in ./postgres-data on your host (like mounting local.db with LibSQL).
+#
+# Usage:
+#   cp docker-compose.override.example.yml docker-compose.override.yml
+#   mkdir -p postgres-data
+#   # On Linux/macOS: chown 999:999 postgres-data
+#   docker compose up -d
+
+services:
+  postgres:
+    volumes:
+      - ./postgres-data:/var/lib/postgresql/data
