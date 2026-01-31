@@ -49,71 +49,28 @@ This guide explains how to migrate your data from the old LibSQL `local.db` file
 
 ---
 
-## 2. Volume Mount for PostgreSQL (like local.db)
+## 2. Docker and PostgreSQL data
 
-With LibSQL, you mounted a single file: `local.db`. PostgreSQL stores data in a **directory**, not a single file. You have two options:
+The single `docker-compose.yml` uses a **bind mount** so the database lives in `./postgres-data` on your host:
 
-### Option A: Named Docker Volume (default)
+- Data persists across container restarts.
+- You can back up by copying the folder or creating a tarball.
+- You can move or reuse the data on another machine or project.
 
-The current `docker-compose.yml` uses a named volume:
+**First run:** Create the folder (Docker will create it if missing; on Linux/macOS you may need `chown 999:999 postgres-data`). Then:
 
-```yaml
-volumes:
-  pos-db-data:
-    driver: local
-    name: pos-database
+```bash
+docker compose up -d
 ```
 
-Data persists in Docker's volume storage. To back up or move it, see [DOCKER_VOLUME_TRANSFER.md](./DOCKER_VOLUME_TRANSFER.md).
-
-### Option B: Bind Mount (folder on your host)
-
-To store PostgreSQL data in a folder on your machine (like having `local.db` in a known location):
-
-1. Create a `docker-compose.override.yml` in the project root:
-
-```yaml
-services:
-  postgres:
-    volumes:
-      - ./postgres-data:/var/lib/postgresql/data
-```
-
-2. Create the folder and set permissions (PostgreSQL runs as user 999 in the container):
-
-   **Linux/macOS:**
-
-   ```bash
-   mkdir -p postgres-data
-   chown 999:999 postgres-data
-   ```
-
-   **Windows (Docker Desktop):** Create `postgres-data` in the project root; Docker Desktop handles permissions.
-
-3. Start with the override:
-
-   ```bash
-   docker compose up -d
-   ```
-
-4. Your PostgreSQL data will now live in `./postgres-data/` on your host. You can:
-   - Back it up by copying the folder
-   - Move it to another machine
-   - Inspect files (though the format is PostgreSQL-specific, not a single `.db` file)
-
-### Important notes for bind mount
-
-- **First run:** If `postgres-data` is empty, PostgreSQL will initialize it. If you already have data from a named volume, you'd need to copy it into `postgres-data` first.
-- **One or the other:** Use either the named volume OR the bind mount, not both. The override replaces the volume for the postgres service.
-- **Backup:** For bind mount, backup = `cp -r postgres-data postgres-data-backup`. For named volume, use the commands in DOCKER_VOLUME_TRANSFER.md.
+**Backup:** `cp -r postgres-data postgres-data-backup` or `tar czf db-backup.tar.gz postgres-data`.
 
 ---
 
 ## Summary
 
-| Task                             | Command / Action                                                                  |
-| -------------------------------- | --------------------------------------------------------------------------------- |
-| Migrate local.db → PostgreSQL    | `pnpm run migrate:libsql`                                                         |
-| Use bind mount for PG data       | Add `docker-compose.override.yml` with `./postgres-data:/var/lib/postgresql/data` |
-| Backup PostgreSQL (bind mount)   | Copy `./postgres-data` folder                                                     |
-| Backup PostgreSQL (named volume) | See DOCKER_VOLUME_TRANSFER.md                                                     |
+| Task                          | Command / Action              |
+| ----------------------------- | ----------------------------- |
+| Migrate local.db → PostgreSQL | `pnpm run migrate:libsql`     |
+| Run app with Docker           | `docker compose up -d`        |
+| Backup PostgreSQL             | Copy `./postgres-data` folder |

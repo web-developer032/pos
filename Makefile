@@ -21,13 +21,13 @@ logs: ## View application logs
 restart: ## Restart the application
 	docker-compose restart
 
-clean: ## Remove containers and volumes (WARNING: Deletes database!)
-	docker-compose down -v
+clean: ## Remove containers (database in ./postgres-data is kept)
+	docker-compose down
 	docker system prune -f
 
-backup: ## Backup database
+backup: ## Backup database (./postgres-data -> backups/db-YYYYMMDD-HHMMSS.tar.gz)
 	@mkdir -p backups
-	@docker run --rm -v pos-database:/data -v $(PWD)/backups:/backup alpine tar czf /backup/db-$$(date +%Y%m%d-%H%M%S).tar.gz -C /data .
+	@tar czf backups/db-$$(date +%Y%m%d-%H%M%S).tar.gz postgres-data 2>/dev/null || (echo "No postgres-data folder or it is empty"; exit 1)
 	@echo "Backup completed in ./backups/"
 
 restore: ## Restore database from backup (usage: make restore BACKUP=backups/db-20240101-120000.tar.gz)
@@ -35,30 +35,23 @@ restore: ## Restore database from backup (usage: make restore BACKUP=backups/db-
 		echo "Usage: make restore BACKUP=backups/db-20240101-120000.tar.gz"; \
 		exit 1; \
 	fi
-	@docker run --rm -v pos-database:/data -v $(PWD):/backup alpine sh -c "cd /data && tar xzf /backup/$(BACKUP)"
+	@mkdir -p postgres-data
+	@tar xzf $(BACKUP) -C .
 	@echo "Database restored from $(BACKUP)"
 
-export-volume: ## Export database volume for transfer to another PC
+export-volume: ## Export database for transfer to another PC
 	@mkdir -p backups
-	@echo "Exporting database volume..."
-	@docker run --rm -v pos-database:/data -v $(PWD)/backups:/backup alpine tar czf /backup/pos-database-$$(date +%Y%m%d-%H%M%S).tar.gz -C /data .
-	@echo "Volume exported to ./backups/pos-database-*.tar.gz"
-	@echo "Copy this file to the destination PC and use 'make import-volume'"
+	@tar czf backups/pos-database-$$(date +%Y%m%d-%H%M%S).tar.gz postgres-data 2>/dev/null || (echo "No postgres-data folder"; exit 1)
+	@echo "Exported to ./backups/pos-database-*.tar.gz - copy to destination and use 'make import-volume'"
 
-import-volume: ## Import database volume from backup (usage: make import-volume BACKUP=backups/pos-database-20240101-120000.tar.gz)
+import-volume: ## Import database from backup (usage: make import-volume BACKUP=backups/pos-database-20240101-120000.tar.gz)
 	@if [ -z "$(BACKUP)" ]; then \
 		echo "Usage: make import-volume BACKUP=backups/pos-database-20240101-120000.tar.gz"; \
 		exit 1; \
 	fi
-	@if [ ! -f "$(BACKUP)" ]; then \
-		echo "Error: Backup file $(BACKUP) not found"; \
-		exit 1; \
-	fi
-	@echo "Creating volume if it doesn't exist..."
-	@docker volume create pos-database 2>/dev/null || true
-	@echo "Importing database from $(BACKUP)..."
-	@docker run --rm -v pos-database:/data -v $(PWD):/backup alpine sh -c "cd /data && rm -rf * && tar xzf /backup/$(BACKUP)"
-	@echo "Database volume imported successfully from $(BACKUP)"
+	@mkdir -p postgres-data
+	@tar xzf $(BACKUP) -C .
+	@echo "Database imported from $(BACKUP)"
 
 export-image: ## Export Docker image for transfer (usage: make export-image)
 	@mkdir -p backups
@@ -92,12 +85,12 @@ status: ## Show container status
 health: ## Check application health
 	@curl -s http://localhost:3000/api/health | jq . || echo "Health check failed"
 
-prod: ## Start with production configuration
-	docker-compose -f docker-compose.yml -f .docker-compose.prod.yml up -d
+prod: ## Start application (same as up; set JWT_SECRET/DATABASE_URL in env for production)
+	docker-compose up -d
 
-prod-build: ## Build for production
-	docker-compose -f docker-compose.yml -f .docker-compose.prod.yml build
+prod-build: ## Build Docker image
+	docker-compose build
 
-prod-logs: ## View production logs
-	docker-compose -f docker-compose.yml -f .docker-compose.prod.yml logs -f
+prod-logs: ## View application logs
+	docker-compose logs -f
 
