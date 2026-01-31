@@ -44,7 +44,7 @@ The application will be available at `http://localhost:3000`
 
 ### Database Persistence
 
-The database is automatically stored in a Docker volume (`pos-database`) and persists across container restarts and updates.
+The database is stored in `./postgres-data` on your host and persists across container restarts. You can backup or reuse this folder elsewhere.
 
 **Transferring to Another PC?** See [DOCKER_VOLUME_TRANSFER.md](./DOCKER_VOLUME_TRANSFER.md) for step-by-step instructions.
 
@@ -133,18 +133,15 @@ This project uses **PostgreSQL** with **Prisma** (schema in `prisma/schema.prism
 docker-compose up -d
 ```
 
-### Production Deployment
-
-```bash
-# Use production configuration
-docker-compose -f docker-compose.yml -f .docker-compose.prod.yml up -d
-```
-
 ### Database Backup
 
+Database data is stored in `./postgres-data` on the host. To backup:
+
 ```bash
-# Backup database volume
-docker run --rm -v pos-database:/data -v $(pwd):/backup alpine tar czf /backup/db-backup.tar.gz -C /data .
+# Copy the folder (e.g. to another machine or archive)
+cp -r postgres-data postgres-data-backup
+# Or create a tarball
+tar czf db-backup.tar.gz postgres-data
 ```
 
 For complete Docker documentation, see [DOCKER_SETUP.md](./DOCKER_SETUP.md)

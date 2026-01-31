@@ -39,6 +39,7 @@ next-env.d.ts
 data/db
 *.db
 *.tar
+/postgres-data
 
 # Prisma 7 generated client (created at build by prisma generate)
 prisma/generated

@@ -77,6 +77,7 @@ COPY --from=builder /app/scripts ./scripts
 COPY --from=builder /app/lib ./lib
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/tsconfig.json ./tsconfig.json
+COPY prisma.config.ts ./
 
 # Install dependencies (include dev so prisma CLI is available for migrate deploy in entrypoint)
 RUN corepack enable && corepack prepare pnpm@latest --activate
