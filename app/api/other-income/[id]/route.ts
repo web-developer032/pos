@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAuth, AuthRequest, RouteContext } from "@/lib/middleware/auth";
+import { getCurrentUserId, whereUserId } from "@/lib/auth/requestContext";
 import { prisma } from "@/lib/db";
 import { z } from "zod";
 import { handleApiError, handleValidationError } from "@/lib/utils/apiHelpers";
@@ -31,6 +32,7 @@ function toIncomeResponse(o: { id: number; amount: number; category: string; des
 
 async function getHandler(req: AuthRequest, context?: RouteContext) {
   try {
+    const userId = getCurrentUserId(req);
     const { id } = await context!.params;
     const incomeId = parseInt(id, 10);
 
@@ -38,8 +40,8 @@ async function getHandler(req: AuthRequest, context?: RouteContext) {
       return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
     }
 
-    const income = await prisma.otherIncome.findUnique({
-      where: { id: incomeId },
+    const income = await prisma.otherIncome.findFirst({
+      where: { id: incomeId, ...whereUserId(userId) },
       include: { user: { select: { username: true } } },
     });
 
@@ -68,8 +70,9 @@ async function putHandler(req: AuthRequest, context?: RouteContext) {
     const body = await req.json();
     const validated = updateSchema.parse(body);
 
-    const existing = await prisma.otherIncome.findUnique({
-      where: { id: incomeId },
+    const userId = getCurrentUserId(req);
+    const existing = await prisma.otherIncome.findFirst({
+      where: { id: incomeId, ...whereUserId(userId) },
     });
 
     if (!existing) {
@@ -94,11 +97,17 @@ async function putHandler(req: AuthRequest, context?: RouteContext) {
       );
     }
 
-    const income = await prisma.otherIncome.update({
-      where: { id: incomeId },
+    await prisma.otherIncome.updateMany({
+      where: { id: incomeId, ...whereUserId(userId) },
       data,
+    });
+    const income = await prisma.otherIncome.findFirst({
+      where: { id: incomeId, ...whereUserId(userId) },
       include: { user: { select: { username: true } } },
     });
+    if (!income) {
+      return NextResponse.json({ error: "Other income not found" }, { status: 404 });
+    }
 
     return NextResponse.json({ income: toIncomeResponse(income) });
   } catch (error) {
@@ -110,6 +119,7 @@ async function putHandler(req: AuthRequest, context?: RouteContext) {
 
 async function deleteHandler(req: AuthRequest, context?: RouteContext) {
   try {
+    const userId = getCurrentUserId(req);
     const { id } = await context!.params;
     const incomeId = parseInt(id, 10);
 
@@ -117,8 +127,8 @@ async function deleteHandler(req: AuthRequest, context?: RouteContext) {
       return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
     }
 
-    const existing = await prisma.otherIncome.findUnique({
-      where: { id: incomeId },
+    const existing = await prisma.otherIncome.findFirst({
+      where: { id: incomeId, ...whereUserId(userId) },
     });
 
     if (!existing) {
@@ -128,8 +138,8 @@ async function deleteHandler(req: AuthRequest, context?: RouteContext) {
       );
     }
 
-    await prisma.otherIncome.delete({
-      where: { id: incomeId },
+    await prisma.otherIncome.deleteMany({
+      where: { id: incomeId, ...whereUserId(userId) },
     });
 
     return NextResponse.json({ message: "Other income deleted successfully" });
@@ -138,6 +148,6 @@ async function deleteHandler(req: AuthRequest, context?: RouteContext) {
   }
 }
 
-export const GET = requireAuth(getHandler);
-export const PUT = requireAuth(putHandler);
-export const DELETE = requireAuth(deleteHandler);
+export const GET = requireAuth(getHandler, { requiredFeature: "finance" });
+export const PUT = requireAuth(putHandler, { requiredFeature: "finance" });
+export const DELETE = requireAuth(deleteHandler, { requiredFeature: "finance" });

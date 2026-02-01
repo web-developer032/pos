@@ -1,9 +1,11 @@
-import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/middleware/auth";
+import { NextResponse } from "next/server";
+import { requireAuth, type AuthRequest } from "@/lib/middleware/auth";
+import { getCurrentUserId } from "@/lib/auth/requestContext";
 import { sqlQuery } from "@/lib/db";
 
-async function getHandler(req: NextRequest) {
+async function getHandler(req: AuthRequest) {
   try {
+    const userId = getCurrentUserId(req);
     const { searchParams } = new URL(req.url);
     const productId = searchParams.get("product_id");
 
@@ -11,10 +13,10 @@ async function getHandler(req: NextRequest) {
       SELECT it.*, 
              COALESCE(p.name, 'Deleted Product') as product_name
       FROM inventory_transactions it
-      LEFT JOIN products p ON it.product_id = p.id
-      WHERE 1=1
+      LEFT JOIN products p ON it.product_id = p.id AND p.user_id = ?
+      WHERE p.user_id = ?
     `;
-    const args: (string | number)[] = [];
+    const args: (string | number)[] = [userId, userId];
 
     if (productId) {
       sql += " AND it.product_id = ?";
@@ -34,4 +36,4 @@ async function getHandler(req: NextRequest) {
   }
 }
 
-export const GET = requireAuth(getHandler);
+export const GET = requireAuth(getHandler, { requiredFeature: "inventory" });

@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/middleware/auth";
+import { NextResponse } from "next/server";
+import { requireAuth, type AuthRequest } from "@/lib/middleware/auth";
+import { getCurrentUserId, whereUserId } from "@/lib/auth/requestContext";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import {
@@ -14,17 +15,19 @@ const categorySchema = z.object({
   description: z.string().optional(),
 });
 
-async function getHandler(req: NextRequest) {
+async function getHandler(req: AuthRequest) {
   try {
+    const userId = getCurrentUserId(req);
     const { page, limit, offset } = getPaginationParams(req);
 
     const [categories, total] = await Promise.all([
       prisma.category.findMany({
+        where: whereUserId(userId),
         orderBy: { name: "asc" },
         skip: offset,
         take: limit,
       }),
-      prisma.category.count(),
+      prisma.category.count({ where: whereUserId(userId) }),
     ]);
 
     return NextResponse.json({
@@ -36,13 +39,15 @@ async function getHandler(req: NextRequest) {
   }
 }
 
-async function postHandler(req: NextRequest) {
+async function postHandler(req: AuthRequest) {
   try {
+    const userId = getCurrentUserId(req);
     const body = await req.json();
     const validated = categorySchema.parse(body);
 
     const category = await prisma.category.create({
       data: {
+        userId,
         name: validated.name,
         description: validated.description ?? undefined,
       },
@@ -56,13 +61,14 @@ async function postHandler(req: NextRequest) {
   }
 }
 
-async function deleteHandler(req: NextRequest) {
+async function deleteHandler(req: AuthRequest) {
   try {
+    const userId = getCurrentUserId(req);
     const { searchParams } = new URL(req.url);
     const deleteAll = searchParams.get("delete_all") === "true";
 
     if (deleteAll) {
-      await prisma.category.deleteMany();
+      await prisma.category.deleteMany({ where: whereUserId(userId) });
       return NextResponse.json({
         message: "All categories deleted successfully",
       });
@@ -74,6 +80,6 @@ async function deleteHandler(req: NextRequest) {
   }
 }
 
-export const GET = requireAuth(getHandler);
-export const POST = requireAuth(postHandler);
-export const DELETE = requireAuth(deleteHandler);
+export const GET = requireAuth(getHandler, { requiredFeature: "categories" });
+export const POST = requireAuth(postHandler, { requiredFeature: "categories" });
+export const DELETE = requireAuth(deleteHandler, { requiredFeature: "categories" });

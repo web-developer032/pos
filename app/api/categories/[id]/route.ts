@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth, RouteContext } from "@/lib/middleware/auth";
+import { requireAuth, RouteContext, type AuthRequest } from "@/lib/middleware/auth";
+import { getCurrentUserId } from "@/lib/auth/requestContext";
 import { sqlQuery, sqlExecute } from "@/lib/db";
 import { z } from "zod";
 
@@ -8,13 +9,14 @@ const categorySchema = z.object({
   description: z.string().optional(),
 });
 
-async function getHandler(req: NextRequest, context?: RouteContext) {
+async function getHandler(req: AuthRequest, context?: RouteContext) {
   try {
+    const userId = getCurrentUserId(req);
     if (!context) {
       return NextResponse.json({ error: "Invalid request" }, { status: 400 });
     }
     const params = await context.params;
-    const rows = await sqlQuery("SELECT * FROM categories WHERE id = ?", [params.id]);
+    const rows = await sqlQuery("SELECT * FROM categories WHERE id = ? AND user_id = ?", [params.id, userId]);
 
     if (rows.length === 0) {
       return NextResponse.json(
@@ -33,8 +35,9 @@ async function getHandler(req: NextRequest, context?: RouteContext) {
   }
 }
 
-async function putHandler(req: NextRequest, context?: RouteContext) {
+async function putHandler(req: AuthRequest, context?: RouteContext) {
   try {
+    const userId = getCurrentUserId(req);
     if (!context) {
       return NextResponse.json({ error: "Invalid request" }, { status: 400 });
     }
@@ -61,10 +64,10 @@ async function putHandler(req: NextRequest, context?: RouteContext) {
       );
     }
 
-    values.push(params.id);
+    values.push(params.id, String(userId));
 
     const rows = await sqlQuery(
-      `UPDATE categories SET ${updates.join(", ")} WHERE id = ? RETURNING *`,
+      `UPDATE categories SET ${updates.join(", ")} WHERE id = ? AND user_id = ? RETURNING *`,
       values
     );
 
@@ -84,13 +87,14 @@ async function putHandler(req: NextRequest, context?: RouteContext) {
   }
 }
 
-async function deleteHandler(req: NextRequest, context?: RouteContext) {
+async function deleteHandler(req: AuthRequest, context?: RouteContext) {
   try {
+    const userId = getCurrentUserId(req);
     if (!context) {
       return NextResponse.json({ error: "Invalid request" }, { status: 400 });
     }
     const params = await context.params;
-    await sqlExecute("DELETE FROM categories WHERE id = ?", [params.id]);
+    await sqlExecute("DELETE FROM categories WHERE id = ? AND user_id = ?", [params.id, userId]);
 
     return NextResponse.json({ message: "Category deleted successfully" });
   } catch (error) {
@@ -102,6 +106,6 @@ async function deleteHandler(req: NextRequest, context?: RouteContext) {
   }
 }
 
-export const GET = requireAuth(getHandler);
-export const PUT = requireAuth(putHandler);
-export const DELETE = requireAuth(deleteHandler);
+export const GET = requireAuth(getHandler, { requiredFeature: "categories" });
+export const PUT = requireAuth(putHandler, { requiredFeature: "categories" });
+export const DELETE = requireAuth(deleteHandler, { requiredFeature: "categories" });

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth, AuthRequest, RouteContext } from "@/lib/middleware/auth";
+import { getCurrentUserId } from "@/lib/auth/requestContext";
 import { sqlQuery, sqlExecute } from "@/lib/db";
 import { z } from "zod";
 import { getCurrentTimestamp } from "@/lib/utils/dateTime";
@@ -18,8 +19,9 @@ const paymentSchema = z.object({
 });
 
 // GET - List payment history for a customer
-async function getHandler(req: NextRequest, context?: RouteContext) {
+async function getHandler(req: AuthRequest, context?: RouteContext) {
   try {
+    const userId = getCurrentUserId(req);
     if (!context) {
       return NextResponse.json({ error: "Invalid request" }, { status: 400 });
     }
@@ -29,8 +31,8 @@ async function getHandler(req: NextRequest, context?: RouteContext) {
     const { page, limit, offset } = getPaginationParams(req);
 
     const countRows = await sqlQuery<{ total: number }>(
-      "SELECT COUNT(*)::bigint as total FROM customer_payments WHERE customer_id = ?",
-      [customerId]
+      "SELECT COUNT(*)::bigint as total FROM customer_payments WHERE customer_id = ? AND user_id = ?",
+      [customerId, userId]
     );
     const total = Number(countRows[0]?.total ?? 0);
 
@@ -38,15 +40,15 @@ async function getHandler(req: NextRequest, context?: RouteContext) {
       `SELECT cp.*, u.username as recorded_by
         FROM customer_payments cp
         LEFT JOIN users u ON cp.user_id = u.id
-        WHERE cp.customer_id = ?
+        WHERE cp.customer_id = ? AND cp.user_id = ?
         ORDER BY cp.created_at DESC
         LIMIT ? OFFSET ?`,
-      [customerId, limit, offset]
+      [customerId, userId, limit, offset]
     );
 
     const totalPaidRows = await sqlQuery(
-      "SELECT COALESCE(SUM(amount), 0) as total_paid FROM customer_payments WHERE customer_id = ?",
-      [customerId]
+      "SELECT COALESCE(SUM(amount), 0) as total_paid FROM customer_payments WHERE customer_id = ? AND user_id = ?",
+      [customerId, userId]
     );
     const totalPaid = Number((totalPaidRows[0] as Record<string, unknown>)?.total_paid ?? 0);
 
@@ -78,8 +80,8 @@ async function postHandler(req: AuthRequest, context?: RouteContext) {
     const validated = paymentSchema.parse(body);
 
     const customerRows = await sqlQuery(
-      "SELECT id, name, credit_balance FROM customers WHERE id = ?",
-      [customerId]
+      "SELECT id, name, credit_balance FROM customers WHERE id = ? AND user_id = ?",
+      [customerId, user.userId]
     );
 
     if (customerRows.length === 0) {
@@ -114,8 +116,8 @@ async function postHandler(req: AuthRequest, context?: RouteContext) {
 
     const newBalance = customer.credit_balance - validated.amount;
     await sqlExecute(
-      "UPDATE customers SET credit_balance = ?, updated_at = ? WHERE id = ?",
-      [newBalance, timestamp, customerId]
+      "UPDATE customers SET credit_balance = ?, updated_at = ? WHERE id = ? AND user_id = ?",
+      [newBalance, timestamp, customerId, user.userId]
     );
 
     const message =
@@ -140,5 +142,5 @@ async function postHandler(req: AuthRequest, context?: RouteContext) {
   }
 }
 
-export const GET = requireAuth(getHandler);
-export const POST = requireAuth(postHandler);
+export const GET = requireAuth(getHandler, { requiredFeature: "customers" });
+export const POST = requireAuth(postHandler, { requiredFeature: "customers" });

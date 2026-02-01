@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { requireAuth, AuthRequest } from "@/lib/middleware/auth";
+import { getCurrentUserId } from "@/lib/auth/requestContext";
 import { sqlQuery } from "@/lib/db";
 import { z } from "zod";
 import { handleApiError, handleValidationError } from "@/lib/utils/apiHelpers";
@@ -14,8 +15,9 @@ const otherIncomeSchema = z.object({
   notes: z.string().optional(),
 });
 
-async function getHandler(req: NextRequest) {
+async function getHandler(req: AuthRequest) {
   try {
+    const userId = getCurrentUserId(req);
     const { searchParams } = new URL(req.url);
     const startDate = searchParams.get("start_date");
     const endDate = searchParams.get("end_date");
@@ -25,9 +27,9 @@ async function getHandler(req: NextRequest) {
       SELECT oi.*, u.username as user_name
       FROM other_income oi
       LEFT JOIN users u ON oi.user_id = u.id
-      WHERE 1=1
+      WHERE oi.user_id = ?
     `;
-    const args: (string | number)[] = [];
+    const args: (string | number)[] = [userId];
 
     if (startDate) {
       sql += " AND oi.created_at >= ?";
@@ -52,9 +54,9 @@ async function getHandler(req: NextRequest) {
         category,
         COALESCE(SUM(amount), 0) as category_total
       FROM other_income
-      WHERE 1=1
+      WHERE user_id = ?
     `;
-    const summaryArgs: (string | number)[] = [];
+    const summaryArgs: (string | number)[] = [userId];
     if (startDate) {
       summarySql += " AND created_at >= ?";
       summaryArgs.push(`${startDate}T00:00:00.000Z`);
@@ -126,5 +128,5 @@ async function postHandler(req: AuthRequest) {
   }
 }
 
-export const GET = requireAuth(getHandler);
-export const POST = requireAuth(postHandler);
+export const GET = requireAuth(getHandler, { requiredFeature: "finance" });
+export const POST = requireAuth(postHandler, { requiredFeature: "finance" });

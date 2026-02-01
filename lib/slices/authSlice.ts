@@ -5,6 +5,10 @@ interface User {
   username: string;
   email: string;
   role: string;
+  plan?: string | null;
+  subscriptionInterval?: string | null;
+  subscriptionStatus?: string | null;
+  features?: string[];
 }
 
 interface AuthState {

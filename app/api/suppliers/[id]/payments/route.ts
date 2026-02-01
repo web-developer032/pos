@@ -29,8 +29,8 @@ async function postHandler(req: AuthRequest, context?: RouteContext) {
     }
 
     const supplierRows = await sqlQuery(
-      "SELECT id FROM suppliers WHERE id = ?",
-      [supplierId]
+      "SELECT id FROM suppliers WHERE id = ? AND user_id = ?",
+      [supplierId, user.userId]
     );
 
     if (supplierRows.length === 0) {
@@ -42,8 +42,8 @@ async function postHandler(req: AuthRequest, context?: RouteContext) {
 
     if (validated.purchase_order_id) {
       const poRows = await sqlQuery(
-        "SELECT id, supplier_id FROM purchase_orders WHERE id = ?",
-        [validated.purchase_order_id]
+        "SELECT id, supplier_id FROM purchase_orders WHERE id = ? AND user_id = ?",
+        [validated.purchase_order_id, user.userId]
       );
 
       if (poRows.length === 0) {
@@ -94,4 +94,4 @@ async function postHandler(req: AuthRequest, context?: RouteContext) {
   }
 }
 
-export const POST = requireAuth(postHandler);
+export const POST = requireAuth(postHandler, { requiredFeature: "suppliers" });

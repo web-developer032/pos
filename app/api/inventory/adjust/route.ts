@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/middleware/auth";
+import { NextResponse } from "next/server";
+import { requireAuth, type AuthRequest } from "@/lib/middleware/auth";
+import { getCurrentUserId, whereUserId } from "@/lib/auth/requestContext";
 import { prisma } from "@/lib/db";
 import { z } from "zod";
 import { updateProductQuantity } from "@/lib/utils/productQuantity";
@@ -11,13 +12,14 @@ const adjustSchema = z.object({
   notes: z.string().optional(),
 });
 
-async function postHandler(req: NextRequest) {
+async function postHandler(req: AuthRequest) {
   try {
+    const userId = getCurrentUserId(req);
     const body = await req.json();
     const validated = adjustSchema.parse(body);
 
     const product = await prisma.product.findFirst({
-      where: { id: validated.product_id, deletedAt: null },
+      where: { id: validated.product_id, deletedAt: null, ...whereUserId(userId) },
       select: { baseProductId: true, stockQuantity: true },
     });
 
@@ -100,4 +102,4 @@ async function postHandler(req: NextRequest) {
   }
 }
 
-export const POST = requireAuth(postHandler);
+export const POST = requireAuth(postHandler, { requiredFeature: "inventory" });

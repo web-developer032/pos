@@ -9,11 +9,13 @@ import { setCredentials } from "@/lib/slices/authSlice";
 interface ProtectedRouteProps {
   children: React.ReactNode;
   allowedRoles?: string[];
+  allowedFeatures?: string[];
 }
 
 export function ProtectedRoute({
   children,
   allowedRoles,
+  allowedFeatures,
 }: ProtectedRouteProps) {
   const router = useRouter();
   const dispatch = useAppDispatch();
@@ -47,13 +49,22 @@ export function ProtectedRoute({
       } else if (
         data?.user &&
         allowedRoles &&
+        allowedRoles.length > 0 &&
         !allowedRoles.includes(data.user.role)
       ) {
-        // User is authenticated but doesn't have required role
         router.push("/dashboard");
+      } else if (
+        data?.user &&
+        data.user.role !== "admin" &&
+        allowedFeatures &&
+        allowedFeatures.length > 0 &&
+        data.user.features &&
+        !allowedFeatures.some((f) => data.user!.features!.includes(f))
+      ) {
+        router.push("/subscription");
       }
     }
-  }, [isLoading, error, data, allowedRoles, router]);
+  }, [isLoading, error, data, allowedRoles, allowedFeatures, router]);
 
   if (isLoading) {
     return (
@@ -72,12 +83,29 @@ export function ProtectedRoute({
     return null;
   }
 
-  // If we have user data, check role permissions
+  // If we have user data, check role and feature permissions
   if (data?.user) {
-    if (allowedRoles && !allowedRoles.includes(data.user.role)) {
+    if (allowedRoles && allowedRoles.length > 0 && !allowedRoles.includes(data.user.role)) {
       return (
         <div className="flex min-h-screen items-center justify-center">
           <div className="text-lg text-red-600">Access Denied</div>
+        </div>
+      );
+    }
+    if (
+      data.user.role !== "admin" &&
+      allowedFeatures &&
+      allowedFeatures.length > 0 &&
+      (!data.user.features || !allowedFeatures.some((f) => data.user!.features!.includes(f)))
+    ) {
+      return (
+        <div className="flex min-h-screen items-center justify-center">
+          <div className="text-center text-red-600">
+            <p className="text-lg">This feature is not included in your plan.</p>
+            <a href="/subscription" className="mt-2 inline-block text-indigo-600 underline">
+              Upgrade plan
+            </a>
+          </div>
         </div>
       );
     }

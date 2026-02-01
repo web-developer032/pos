@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/middleware/auth";
+import { NextResponse } from "next/server";
+import { requireAuth, type AuthRequest } from "@/lib/middleware/auth";
+import { getCurrentUserId } from "@/lib/auth/requestContext";
 import { sqlQuery, sqlExecute } from "@/lib/db";
 import { z } from "zod";
 import { roundPrice } from "@/lib/utils/apiHelpers";
@@ -64,29 +65,30 @@ const importSchema = z.object({
   products: z.array(productSchema),
 });
 
-async function postHandler(req: NextRequest) {
+async function postHandler(req: AuthRequest) {
   try {
+    const userId = getCurrentUserId(req);
     const body = await req.json();
     const validated = importSchema.parse(body);
 
-    // Get "Other" category ID (create if it doesn't exist)
+    // Get "Other" category ID for this user (create if it doesn't exist)
     let otherCategoryId: number | null = null;
 
     try {
       const categoryRows = await sqlQuery(
-        "SELECT id FROM categories WHERE name = ?",
-        ["Other"]
+        "SELECT id FROM categories WHERE user_id = ? AND name = ?",
+        [userId, "Other"]
       );
       if (categoryRows.length > 0) {
         otherCategoryId = (categoryRows[0] as Record<string, unknown>).id as number;
       } else {
         await sqlExecute(
-          "INSERT INTO categories (name, description) VALUES (?, ?)",
-          ["Other", "Default category for uncategorized items"]
+          "INSERT INTO categories (user_id, name, description) VALUES (?, ?, ?)",
+          [userId, "Other", "Default category for uncategorized items"]
         );
         const newCategoryRows = await sqlQuery(
-          "SELECT id FROM categories WHERE name = ?",
-          ["Other"]
+          "SELECT id FROM categories WHERE user_id = ? AND name = ?",
+          [userId, "Other"]
         );
         otherCategoryId = (newCategoryRows[0] as Record<string, unknown>)?.id as number;
       }
@@ -94,16 +96,15 @@ async function postHandler(req: NextRequest) {
       console.warn("Error getting/creating Other category:", error);
     }
 
-    // Clean up any existing products with empty string barcodes/skus (convert to NULL)
-    // This must run before importing to prevent UNIQUE constraint violations
+    // Clean up any existing products with empty string barcodes/skus (convert to NULL) for this user
     try {
       await sqlExecute(
-        "UPDATE products SET barcode = NULL WHERE barcode = '' OR barcode IS NULL",
-        []
+        "UPDATE products SET barcode = NULL WHERE (barcode = '' OR barcode IS NULL) AND user_id = ?",
+        [userId]
       );
       await sqlExecute(
-        "UPDATE products SET sku = NULL WHERE sku = '' OR sku IS NULL",
-        []
+        "UPDATE products SET sku = NULL WHERE (sku = '' OR sku IS NULL) AND user_id = ?",
+        [userId]
       );
     } catch (cleanupError) {
       console.warn("Cleanup warning (non-fatal):", cleanupError);
@@ -138,8 +139,8 @@ async function postHandler(req: NextRequest) {
 
         if (categoryId) {
           const categoryRows = await sqlQuery(
-            "SELECT id FROM categories WHERE id = ?",
-            [categoryId]
+            "SELECT id FROM categories WHERE id = ? AND user_id = ?",
+            [categoryId, userId]
           );
           if (categoryRows.length === 0) {
             categoryId = otherCategoryId;
@@ -149,10 +150,11 @@ async function postHandler(req: NextRequest) {
         }
 
         await sqlExecute(
-          `INSERT INTO products (name, barcode, sku, description, category_id, 
+          `INSERT INTO products (user_id, name, barcode, sku, description, category_id, 
                 cost_price, selling_price, stock_quantity, min_stock_level, unit, image_url) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
+            userId,
             product.name.trim(),
             barcode,
             sku,
@@ -194,4 +196,4 @@ async function postHandler(req: NextRequest) {
   }
 }
 
-export const POST = requireAuth(postHandler);
+export const POST = requireAuth(postHandler, { requiredFeature: "products" });

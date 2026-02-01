@@ -7,65 +7,76 @@ import { useAppSelector, useAppDispatch } from "@/lib/hooks";
 import { logout } from "@/lib/slices/authSlice";
 import { useRouter } from "next/navigation";
 
+import type { FeatureKey } from "@/lib/constants/planFeatures";
+
 interface MenuItem {
   name: string;
   href: string;
   icon: string;
   roles?: string[];
+  feature?: FeatureKey;
 }
 
 const menuItems: MenuItem[] = [
-  { name: "Dashboard", href: "/dashboard", icon: "📊" },
+  { name: "Dashboard", href: "/dashboard", icon: "📊", feature: "dashboard" },
   {
     name: "POS",
     href: "/pos",
     icon: "🛒",
     roles: ["admin", "cashier", "manager"],
+    feature: "pos",
   },
-  { name: "Products", href: "/products", icon: "📦" },
-  { name: "Categories", href: "/categories", icon: "📁" },
-  { name: "Suppliers", href: "/suppliers", icon: "🚚" },
-  { name: "Customers", href: "/customers", icon: "👥" },
-  { name: "Inventory", href: "/inventory", icon: "📊" },
-  { name: "Purchase Orders", href: "/purchase-orders", icon: "📋" },
-  { name: "Sales", href: "/sales", icon: "💰" },
+  { name: "Products", href: "/products", icon: "📦", feature: "products" },
+  { name: "Categories", href: "/categories", icon: "📁", feature: "categories" },
+  { name: "Suppliers", href: "/suppliers", icon: "🚚", feature: "suppliers" },
+  { name: "Customers", href: "/customers", icon: "👥", feature: "customers" },
+  { name: "Inventory", href: "/inventory", icon: "📊", feature: "inventory" },
+  { name: "Purchase Orders", href: "/purchase-orders", icon: "📋", feature: "purchase_orders" },
+  { name: "Sales", href: "/sales", icon: "💰", feature: "sales" },
   {
     name: "Cash Register",
     href: "/cash-register",
     icon: "🗓️",
     roles: ["admin", "cashier", "manager"],
+    feature: "cash_register",
   },
-  { name: "Reports", href: "/reports", icon: "📈" },
+  { name: "Reports", href: "/reports", icon: "📈", feature: "reports" },
   {
     name: "Employees",
     href: "/employees",
     icon: "👷",
     roles: ["admin", "manager"],
+    feature: "employees",
   },
   {
     name: "Finance",
     href: "/finance",
     icon: "💵",
     roles: ["admin", "manager"],
+    feature: "finance",
   },
   { name: "Users", href: "/users", icon: "👤", roles: ["admin"] },
+  { name: "Subscription", href: "/subscription", icon: "📄" },
   {
     name: "Settings",
     href: "/settings",
     icon: "⚙️",
     roles: ["admin", "manager"],
+    feature: "settings",
   },
   {
     name: "Print Settings",
     href: "/print-settings",
     icon: "🖨️",
     roles: ["admin", "manager"],
+    feature: "print_settings",
   },
   {
     name: "Barcode Generator",
     href: "/barcode-generator",
     icon: "📇",
     roles: ["admin", "manager"],
+    feature: "barcode_generator",
   },
 ];
 
@@ -109,9 +120,14 @@ export function Sidebar() {
     }
   };
 
-  const filteredMenuItems = menuItems.filter(
-    (item) => !item.roles || (user && item.roles.includes(user.role))
-  );
+  const filteredMenuItems = menuItems.filter((item) => {
+    const hasRole = !item.roles || (user && item.roles.includes(user.role));
+    const hasFeature =
+      !item.feature ||
+      user?.role === "admin" ||
+      (user?.features && user.features.includes(item.feature));
+    return hasRole && hasFeature;
+  });
 
   return (
     <aside

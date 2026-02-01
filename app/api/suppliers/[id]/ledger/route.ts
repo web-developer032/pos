@@ -63,4 +63,4 @@ async function getHandler(req: NextRequest, context?: RouteContext) {
   }
 }
 
-export const GET = requireAuth(getHandler);
+export const GET = requireAuth(getHandler, { requiredFeature: "suppliers" });

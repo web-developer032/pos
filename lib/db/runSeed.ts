@@ -13,7 +13,7 @@ export async function runSeed(): Promise<void> {
   console.log("[DB] Seeding database with default data...");
 
   const passwordHash = await bcrypt.hash("admin123", 10);
-  await prisma.user.upsert({
+  const admin = await prisma.user.upsert({
     where: { username: "admin" },
     create: {
       username: "admin",
@@ -23,6 +23,40 @@ export async function runSeed(): Promise<void> {
     },
     update: {},
   });
+
+  // Ensure admin has an active subscription (enterprise lifetime)
+  const existingSub = await prisma.subscription.findFirst({
+    where: { userId: admin.id, status: "active" },
+  });
+  if (!existingSub) {
+    await prisma.subscription.create({
+      data: {
+        userId: admin.id,
+        plan: "enterprise",
+        interval: "lifetime",
+        status: "active",
+      },
+    });
+  }
+
+  // Backfill: give any user without an active subscription an enterprise lifetime one
+  const usersWithoutSub = await prisma.user.findMany({
+    where: {
+      subscriptions: {
+        none: { status: "active" },
+      },
+    },
+  });
+  for (const u of usersWithoutSub) {
+    await prisma.subscription.create({
+      data: {
+        userId: u.id,
+        plan: "enterprise",
+        interval: "lifetime",
+        status: "active",
+      },
+    });
+  }
 
   const categories = [
     { name: "Other", description: "Default category for uncategorized items" },
@@ -35,18 +69,19 @@ export async function runSeed(): Promise<void> {
 
   for (const category of categories) {
     await prisma.category.upsert({
-      where: { name: category.name },
-      create: category,
+      where: { userId_name: { userId: admin.id, name: category.name } },
+      create: { ...category, userId: admin.id },
       update: {},
     });
   }
 
   const existingSupplier = await prisma.supplier.findFirst({
-    where: { name: "Other" },
+    where: { userId: admin.id, name: "Other" },
   });
   if (!existingSupplier) {
     await prisma.supplier.create({
       data: {
+        userId: admin.id,
         name: "Other",
         contactPerson: "Default Supplier",
         email: "other@pos.com",
@@ -63,8 +98,8 @@ export async function runSeed(): Promise<void> {
 
   for (const setting of settings) {
     await prisma.setting.upsert({
-      where: { key: setting.key },
-      create: setting,
+      where: { userId_key: { userId: admin.id, key: setting.key } },
+      create: { ...setting, userId: admin.id },
       update: { value: setting.value },
     });
   }

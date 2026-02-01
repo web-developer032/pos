@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth, RouteContext, AuthRequest } from "@/lib/middleware/auth";
+import { getCurrentUserId } from "@/lib/auth/requestContext";
 import { sqlQuery, sqlExecute } from "@/lib/db";
 import { z } from "zod";
 import { roundPrice } from "@/lib/utils/apiHelpers";
 import { updateProductQuantity } from "@/lib/utils/productQuantity";
 
-async function getHandler(req: NextRequest, context?: RouteContext) {
+async function getHandler(req: AuthRequest, context?: RouteContext) {
   try {
+    const userId = getCurrentUserId(req);
     if (!context) {
       return NextResponse.json({ error: "Invalid request" }, { status: 400 });
     }
@@ -14,10 +16,10 @@ async function getHandler(req: NextRequest, context?: RouteContext) {
     const poRows = await sqlQuery(
       `SELECT po.*, s.name as supplier_name, u.username as user_name
             FROM purchase_orders po
-            JOIN suppliers s ON po.supplier_id = s.id
+            JOIN suppliers s ON po.supplier_id = s.id AND s.user_id = ?
             JOIN users u ON po.user_id = u.id
-            WHERE po.id = ?`,
-      [params.id]
+            WHERE po.id = ? AND po.user_id = ?`,
+      [userId, params.id, userId]
     );
 
     if (poRows.length === 0) {
@@ -90,6 +92,7 @@ const updateItemsSchema = z.object({
 
 async function putHandler(req: AuthRequest, context?: RouteContext) {
   try {
+    const userId = getCurrentUserId(req);
     if (!context) {
       return NextResponse.json({ error: "Invalid request" }, { status: 400 });
     }
@@ -103,8 +106,8 @@ async function putHandler(req: AuthRequest, context?: RouteContext) {
       const poId = parseInt(params.id);
 
       const poCheckRows = await sqlQuery(
-        "SELECT status FROM purchase_orders WHERE id = ?",
-        [poId]
+        "SELECT status FROM purchase_orders WHERE id = ? AND user_id = ?",
+        [poId, userId]
       );
 
       if (poCheckRows.length === 0) {
@@ -118,8 +121,8 @@ async function putHandler(req: AuthRequest, context?: RouteContext) {
 
       if (validated.supplier_id) {
         await sqlExecute(
-          "UPDATE purchase_orders SET supplier_id = ? WHERE id = ?",
-          [validated.supplier_id, poId]
+          "UPDATE purchase_orders SET supplier_id = ? WHERE id = ? AND user_id = ?",
+          [validated.supplier_id, poId, userId]
         );
       }
 
@@ -363,10 +366,10 @@ async function putHandler(req: AuthRequest, context?: RouteContext) {
       const updatedPORows = await sqlQuery(
         `SELECT po.*, s.name as supplier_name, u.username as user_name
               FROM purchase_orders po
-              JOIN suppliers s ON po.supplier_id = s.id
+              JOIN suppliers s ON po.supplier_id = s.id AND s.user_id = ?
               JOIN users u ON po.user_id = u.id
-              WHERE po.id = ?`,
-        [poId]
+              WHERE po.id = ? AND po.user_id = ?`,
+        [userId, poId, userId]
       );
 
       return NextResponse.json({ purchase_order: updatedPORows[0] });
@@ -379,14 +382,14 @@ async function putHandler(req: AuthRequest, context?: RouteContext) {
       }
 
       const resultRows = await sqlQuery(
-        "UPDATE purchase_orders SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? RETURNING *",
-        [status, params.id]
+        "UPDATE purchase_orders SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ? RETURNING *",
+        [status, params.id, userId]
       );
 
       if (status === "completed") {
         const poRows = await sqlQuery(
-          "SELECT discount_type, discount_value, total_amount FROM purchase_orders WHERE id = ?",
-          [params.id]
+          "SELECT discount_type, discount_value, total_amount FROM purchase_orders WHERE id = ? AND user_id = ?",
+          [params.id, userId]
         );
 
         const po = poRows[0] as unknown as {
@@ -504,6 +507,7 @@ async function putHandler(req: AuthRequest, context?: RouteContext) {
 
 async function deleteHandler(req: AuthRequest, context?: RouteContext) {
   try {
+    const userId = getCurrentUserId(req);
     if (!context) {
       return NextResponse.json({ error: "Invalid request" }, { status: 400 });
     }
@@ -511,8 +515,8 @@ async function deleteHandler(req: AuthRequest, context?: RouteContext) {
     const poId = parseInt(params.id);
 
     const poCheckRows = await sqlQuery(
-      "SELECT id, status FROM purchase_orders WHERE id = ?",
-      [poId]
+      "SELECT id, status FROM purchase_orders WHERE id = ? AND user_id = ?",
+      [poId, userId]
     );
 
     if (poCheckRows.length === 0) {
@@ -552,8 +556,8 @@ async function deleteHandler(req: AuthRequest, context?: RouteContext) {
     );
 
     await sqlExecute(
-      "DELETE FROM purchase_orders WHERE id = ?",
-      [poId]
+      "DELETE FROM purchase_orders WHERE id = ? AND user_id = ?",
+      [poId, userId]
     );
 
     return NextResponse.json({
@@ -568,6 +572,6 @@ async function deleteHandler(req: AuthRequest, context?: RouteContext) {
   }
 }
 
-export const GET = requireAuth(getHandler);
-export const PUT = requireAuth(putHandler);
-export const DELETE = requireAuth(deleteHandler);
+export const GET = requireAuth(getHandler, { requiredFeature: "purchase_orders" });
+export const PUT = requireAuth(putHandler, { requiredFeature: "purchase_orders" });
+export const DELETE = requireAuth(deleteHandler, { requiredFeature: "purchase_orders" });

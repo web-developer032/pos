@@ -1,11 +1,13 @@
-import { NextRequest, NextResponse } from "next/server";
-import { requireAuth, RouteContext } from "@/lib/middleware/auth";
+import { NextResponse } from "next/server";
+import { requireAuth, RouteContext, type AuthRequest } from "@/lib/middleware/auth";
+import { getCurrentUserId } from "@/lib/auth/requestContext";
 import { sqlQuery } from "@/lib/db";
 import { handleApiError } from "@/lib/utils/apiHelpers";
 
 // GET - Get credit summary for a customer (balance, unpaid sales)
-async function getHandler(req: NextRequest, context?: RouteContext) {
+async function getHandler(req: AuthRequest, context?: RouteContext) {
   try {
+    const userId = getCurrentUserId(req);
     if (!context) {
       return NextResponse.json({ error: "Invalid request" }, { status: 400 });
     }
@@ -13,8 +15,8 @@ async function getHandler(req: NextRequest, context?: RouteContext) {
     const customerId = params.id;
 
     const customerRows = await sqlQuery(
-      "SELECT id, name, phone, credit_balance FROM customers WHERE id = ?",
-      [customerId]
+      "SELECT id, name, phone, credit_balance FROM customers WHERE id = ? AND user_id = ?",
+      [customerId, userId]
     );
 
     if (customerRows.length === 0) {
@@ -43,20 +45,20 @@ async function getHandler(req: NextRequest, context?: RouteContext) {
           (s.final_amount - COALESCE(SUM(p.amount), 0)) as amount_due
         FROM sales s
         LEFT JOIN payments p ON s.id = p.sale_id
-        WHERE s.customer_id = ? AND s.payment_status IN ('pending', 'partial')
+        WHERE s.customer_id = ? AND s.user_id = ? AND s.payment_status IN ('pending', 'partial')
         GROUP BY s.id
         ORDER BY s.created_at DESC`,
-      [customerId]
+      [customerId, userId]
     );
 
     const paymentsRows = await sqlQuery(
       `SELECT cp.*, u.username as recorded_by
         FROM customer_payments cp
         LEFT JOIN users u ON cp.user_id = u.id
-        WHERE cp.customer_id = ?
+        WHERE cp.customer_id = ? AND cp.user_id = ?
         ORDER BY cp.created_at DESC
         LIMIT 10`,
-      [customerId]
+      [customerId, userId]
     );
 
     const creditStatsRows = await sqlQuery(
@@ -64,8 +66,8 @@ async function getHandler(req: NextRequest, context?: RouteContext) {
           COUNT(*)::bigint as total_credit_sales,
           COALESCE(SUM(final_amount), 0) as total_credit_amount
         FROM sales
-        WHERE customer_id = ? AND payment_status IN ('pending', 'partial')`,
-      [customerId]
+        WHERE customer_id = ? AND user_id = ? AND payment_status IN ('pending', 'partial')`,
+      [customerId, userId]
     );
 
     const creditStats = creditStatsRows[0] as unknown as {
@@ -74,8 +76,8 @@ async function getHandler(req: NextRequest, context?: RouteContext) {
     };
 
     const totalPaymentsRows = await sqlQuery(
-      "SELECT COALESCE(SUM(amount), 0) as total_payments FROM customer_payments WHERE customer_id = ?",
-      [customerId]
+      "SELECT COALESCE(SUM(amount), 0) as total_payments FROM customer_payments WHERE customer_id = ? AND user_id = ?",
+      [customerId, userId]
     );
     const totalPayments = Number(
       (totalPaymentsRows[0] as Record<string, unknown>)?.total_payments ?? 0
@@ -102,4 +104,4 @@ async function getHandler(req: NextRequest, context?: RouteContext) {
   }
 }
 
-export const GET = requireAuth(getHandler);
+export const GET = requireAuth(getHandler, { requiredFeature: "customers" });

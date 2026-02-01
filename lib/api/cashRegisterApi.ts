@@ -89,7 +89,6 @@ export interface SessionDetails {
 
 export interface OpenDayRequest {
   opening_balance: number;
-  user_id: number;
   notes?: string;
 }
 

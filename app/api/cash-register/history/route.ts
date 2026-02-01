@@ -1,4 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
+import { requireAuth, AuthRequest } from "@/lib/middleware/auth";
+import { getCurrentUserId } from "@/lib/auth/requestContext";
 import { sqlQuery } from "@/lib/db";
 import {
   serializeSession,
@@ -6,27 +8,26 @@ import {
   SESSION_SELECT_SQL,
 } from "@/lib/utils/cashRegisterHelpers";
 
-// Disable caching for this route
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-// GET /api/cash-register/history - Get past sessions
-export async function GET(request: NextRequest) {
+async function getHandler(req: AuthRequest) {
   try {
-    const { searchParams } = new URL(request.url);
+    const userId = getCurrentUserId(req);
+    const { searchParams } = new URL(req.url);
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "25");
     const offset = (page - 1) * limit;
 
     const countRows = await sqlQuery<{ count: number }>(
-      "SELECT COUNT(*)::bigint as count FROM cash_register_sessions",
-      []
+      "SELECT COUNT(*)::bigint as count FROM cash_register_sessions WHERE user_id = ?",
+      [userId]
     );
     const total = Number(countRows[0]?.count ?? 0);
 
     const rows = await sqlQuery(
-      `${SESSION_SELECT_SQL} ORDER BY crs.opened_at DESC LIMIT ? OFFSET ?`,
-      [limit, offset]
+      `${SESSION_SELECT_SQL} WHERE crs.user_id = ? ORDER BY crs.opened_at DESC LIMIT ? OFFSET ?`,
+      [userId, limit, offset]
     );
 
     const sessions = rows.map((row) =>
@@ -50,3 +51,5 @@ export async function GET(request: NextRequest) {
     );
   }
 }
+
+export const GET = requireAuth(getHandler, { requiredFeature: "cash_register" });

@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { requireAuth, AuthRequest } from "@/lib/middleware/auth";
+import { getCurrentUserId } from "@/lib/auth/requestContext";
 import { prisma, sqlQuery, sqlExecute } from "@/lib/db";
 import { z } from "zod";
 import {
@@ -31,8 +32,9 @@ const poSchema = z.object({
   tax_value: z.number().min(0).optional(),
 });
 
-async function getHandler(req: NextRequest) {
+async function getHandler(req: AuthRequest) {
   try {
+    const userId = getCurrentUserId(req);
     const { searchParams } = new URL(req.url);
     const search = searchParams.get("search");
     const status = searchParams.get("status");
@@ -41,11 +43,11 @@ async function getHandler(req: NextRequest) {
     let sql = `
       SELECT po.*, s.name as supplier_name, u.username as user_name
       FROM purchase_orders po
-      JOIN suppliers s ON po.supplier_id = s.id
+      JOIN suppliers s ON po.supplier_id = s.id AND s.user_id = ?
       JOIN users u ON po.user_id = u.id
-      WHERE 1=1
+      WHERE po.user_id = ?
     `;
-    const args: (string | number)[] = [];
+    const args: (string | number)[] = [userId, userId];
 
     // Add search condition
     if (search) {
@@ -75,11 +77,11 @@ async function getHandler(req: NextRequest) {
         COALESCE(SUM(CASE WHEN po.status = 'pending' THEN po.total_amount ELSE 0 END), 0) as total_pending,
         COALESCE(SUM(po.total_amount), 0) as grand_total
       FROM purchase_orders po
-      JOIN suppliers s ON po.supplier_id = s.id
+      JOIN suppliers s ON po.supplier_id = s.id AND s.user_id = ?
       JOIN users u ON po.user_id = u.id
-      WHERE 1=1
+      WHERE po.user_id = ?
     `;
-    const summaryArgs: (string | number)[] = [];
+    const summaryArgs: (string | number)[] = [userId, userId];
 
     if (search) {
       summarySql += ` AND (po.po_number LIKE ? OR s.name LIKE ? OR u.username LIKE ?)`;
@@ -100,11 +102,11 @@ async function getHandler(req: NextRequest) {
       WHERE sp.supplier_id IN (
         SELECT DISTINCT po.supplier_id 
         FROM purchase_orders po
-        JOIN suppliers s ON po.supplier_id = s.id
+        JOIN suppliers s ON po.supplier_id = s.id AND s.user_id = ?
         JOIN users u ON po.user_id = u.id
-        WHERE 1=1
+        WHERE po.user_id = ?
     `;
-    const paidArgs: (string | number)[] = [];
+    const paidArgs: (string | number)[] = [userId, userId];
 
     if (search) {
       paidSql += ` AND (po.po_number LIKE ? OR s.name LIKE ? OR u.username LIKE ?)`;
@@ -148,6 +150,28 @@ async function postHandler(req: AuthRequest) {
     const user = req.user;
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Cross-check: supplier and products must belong to current user
+    const supplier = await prisma.supplier.findFirst({
+      where: { id: validated.supplier_id, userId: user.userId },
+    });
+    if (!supplier) {
+      return NextResponse.json(
+        { error: "Supplier not found" },
+        { status: 404 }
+      );
+    }
+    for (const item of validated.items) {
+      const product = await prisma.product.findFirst({
+        where: { id: item.product_id, userId: user.userId, deletedAt: null },
+      });
+      if (!product) {
+        return NextResponse.json(
+          { error: `Product ${item.product_id} not found or does not belong to you` },
+          { status: 400 }
+        );
+      }
     }
 
     const poNumber = `PO-${Date.now()}`;
@@ -243,13 +267,14 @@ async function postHandler(req: AuthRequest) {
   }
 }
 
-async function deleteHandler(req: NextRequest) {
+async function deleteHandler(req: AuthRequest) {
   try {
+    const userId = getCurrentUserId(req);
     const { searchParams } = new URL(req.url);
     const deleteAll = searchParams.get("delete_all") === "true";
 
     if (deleteAll) {
-      await sqlExecute("DELETE FROM purchase_orders", []);
+      await sqlExecute("DELETE FROM purchase_orders WHERE user_id = ?", [userId]);
       return NextResponse.json({
         message: "All purchase orders deleted successfully",
       });
@@ -261,6 +286,6 @@ async function deleteHandler(req: NextRequest) {
   }
 }
 
-export const GET = requireAuth(getHandler);
-export const POST = requireAuth(postHandler);
-export const DELETE = requireAuth(deleteHandler);
+export const GET = requireAuth(getHandler, { requiredFeature: "purchase_orders" });
+export const POST = requireAuth(postHandler, { requiredFeature: "purchase_orders" });
+export const DELETE = requireAuth(deleteHandler, { requiredFeature: "purchase_orders" });

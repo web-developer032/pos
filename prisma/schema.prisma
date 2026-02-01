@@ -81,6 +81,25 @@ enum CashRegisterStatus {
   closed
 }
 
+enum PlanType {
+  basic
+  pro
+  enterprise
+}
+
+enum SubscriptionInterval {
+  weekly
+  monthly
+  lifetime
+}
+
+enum SubscriptionStatus {
+  active
+  cancelled
+  expired
+  trialing
+}
+
 model User {
   id           Int      @id @default(autoincrement())
   username     String   @unique
@@ -90,6 +109,7 @@ model User {
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
+  subscriptions       Subscription[]
   sales                Sale[]
   purchaseOrders       PurchaseOrder[]
   capital              Capital[]
@@ -100,23 +120,51 @@ model User {
   cashRegisterSessions CashRegisterSession[]
   customerPayments    CustomerPayment[]
   returns              Return[]
+  categories           Category[]
+  suppliers            Supplier[]
+  products             Product[]
+  customers            Customer[]
+  employees            Employee[]
+  settings             Setting[]
+  discounts            Discount[]
 
   @@map("users")
 }
 
+model Subscription {
+  id          Int                  @id @default(autoincrement())
+  userId      Int                  @map("user_id")
+  plan        PlanType
+  interval    SubscriptionInterval
+  status      SubscriptionStatus   @default(active)
+  startedAt   DateTime             @default(now()) @map("started_at")
+  expiresAt   DateTime?            @map("expires_at")
+  cancelledAt DateTime?            @map("cancelled_at")
+  createdAt   DateTime             @default(now()) @map("created_at")
+  updatedAt   DateTime             @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("subscriptions")
+}
+
 model Category {
   id          Int      @id @default(autoincrement())
-  name        String   @unique
+  userId      Int      @map("user_id")
+  name        String
   description String?
   createdAt   DateTime @default(now()) @map("created_at")
 
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   products Product[]
 
+  @@unique([userId, name])
   @@map("categories")
 }
 
 model Supplier {
   id            Int      @id @default(autoincrement())
+  userId        Int      @map("user_id")
   name          String
   contactPerson String?  @map("contact_person")
   email         String?
@@ -124,16 +172,18 @@ model Supplier {
   address       String?
   createdAt     DateTime @default(now()) @map("created_at")
 
-  purchaseOrders    PurchaseOrder[]
-  supplierPayments  SupplierPayment[]
+  user             User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  purchaseOrders   PurchaseOrder[]
+  supplierPayments SupplierPayment[]
 
   @@map("suppliers")
 }
 
 model Product {
   id                 Int         @id @default(autoincrement())
+  userId             Int         @map("user_id")
   name               String
-  barcode            String?     @unique
+  barcode            String?
   sku               String?
   description        String?
   categoryId         Int?        @map("category_id")
@@ -149,20 +199,23 @@ model Product {
   createdAt          DateTime    @default(now()) @map("created_at")
   updatedAt         DateTime    @updatedAt @map("updated_at")
 
-  category         Category?         @relation(fields: [categoryId], references: [id])
-  baseProduct     Product?          @relation("ProductSubProducts", fields: [baseProductId], references: [id])
-  subProducts      Product[]         @relation("ProductSubProducts")
-  saleItems        SaleItem[]
+  user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category           Category?           @relation(fields: [categoryId], references: [id])
+  baseProduct        Product?            @relation("ProductSubProducts", fields: [baseProductId], references: [id])
+  subProducts        Product[]           @relation("ProductSubProducts")
+  saleItems          SaleItem[]
   purchaseOrderItems PurchaseOrderItem[]
   inventoryTransactions InventoryTransaction[]
-  productBarcodes  ProductBarcode[]
-  returnItems      ReturnItem[]
+  productBarcodes    ProductBarcode[]
+  returnItems        ReturnItem[]
 
+  @@unique([userId, barcode])
   @@map("products")
 }
 
 model Customer {
   id             Int      @id @default(autoincrement())
+  userId         Int      @map("user_id")
   name           String
   email          String?
   phone          String?
@@ -172,6 +225,7 @@ model Customer {
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 
+  user             User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   sales            Sale[]
   customerPayments CustomerPayment[]
 
@@ -284,6 +338,7 @@ model InventoryTransaction {
 
 model Discount {
   id           Int      @id @default(autoincrement())
+  userId       Int      @map("user_id")
   name         String
   type         String
   value        Float
@@ -293,6 +348,8 @@ model Discount {
   endDate      DateTime? @map("end_date")
   active       Int      @default(1)
   createdAt    DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("discounts")
 }
@@ -327,10 +384,15 @@ model ProductBarcode {
 }
 
 model Setting {
-  key       String   @id
+  id        Int      @id @default(autoincrement())
+  userId    Int      @map("user_id")
+  key       String
   value     String
   updatedAt DateTime @updatedAt @map("updated_at")
 
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, key])
   @@map("settings")
 }
 
@@ -417,6 +479,7 @@ model OtherIncome {
 
 model Employee {
   id          Int           @id @default(autoincrement())
+  userId      Int           @map("user_id")
   name        String
   phone       String?
   address     String?
@@ -428,7 +491,8 @@ model Employee {
   createdAt   DateTime      @default(now()) @map("created_at")
   updatedAt   DateTime      @updatedAt @map("updated_at")
 
-  salaryPayments SalaryPayment[]
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  salaryPayments  SalaryPayment[]
 
   @@map("employees")
 }

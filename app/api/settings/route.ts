@@ -1,10 +1,14 @@
-import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/middleware/auth";
+import { NextResponse } from "next/server";
+import { requireAuth, type AuthRequest } from "@/lib/middleware/auth";
+import { getCurrentUserId, whereUserId } from "@/lib/auth/requestContext";
 import { prisma } from "@/lib/db";
 
-async function getHandler(_req: NextRequest) {
+async function getHandler(req: AuthRequest) {
   try {
-    const rows = await prisma.setting.findMany();
+    const userId = getCurrentUserId(req);
+    const rows = await prisma.setting.findMany({
+      where: whereUserId(userId),
+    });
     const settings: { [key: string]: string } = {};
     rows.forEach((row) => {
       settings[row.key] = row.value;
@@ -19,15 +23,16 @@ async function getHandler(_req: NextRequest) {
   }
 }
 
-async function putHandler(req: NextRequest) {
+async function putHandler(req: AuthRequest) {
   try {
+    const userId = getCurrentUserId(req);
     const body = await req.json();
     const settings = body.settings as { [key: string]: string };
 
     for (const [key, value] of Object.entries(settings)) {
       await prisma.setting.upsert({
-        where: { key },
-        create: { key, value },
+        where: { userId_key: { userId, key } },
+        create: { userId, key, value },
         update: { value },
       });
     }
@@ -42,5 +47,11 @@ async function putHandler(req: NextRequest) {
   }
 }
 
-export const GET = requireAuth(getHandler);
-export const PUT = requireAuth(putHandler, ["admin", "manager"]);
+export const GET = requireAuth(getHandler, {
+  requiredFeature: "settings",
+  allowedRoles: ["admin", "manager"],
+});
+export const PUT = requireAuth(putHandler, {
+  requiredFeature: "settings",
+  allowedRoles: ["admin", "manager"],
+});

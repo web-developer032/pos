@@ -1,9 +1,11 @@
-import { NextRequest, NextResponse } from "next/server";
-import { requireAuth, RouteContext } from "@/lib/middleware/auth";
+import { NextResponse } from "next/server";
+import { requireAuth, RouteContext, type AuthRequest } from "@/lib/middleware/auth";
+import { getCurrentUserId } from "@/lib/auth/requestContext";
 import { sqlQuery, sqlExecute } from "@/lib/db";
 
-async function getHandler(req: NextRequest, context?: RouteContext) {
+async function getHandler(req: AuthRequest, context?: RouteContext) {
   try {
+    const userId = getCurrentUserId(req);
     if (!context) {
       return NextResponse.json({ error: "Invalid request" }, { status: 400 });
     }
@@ -13,8 +15,8 @@ async function getHandler(req: NextRequest, context?: RouteContext) {
             FROM sales s
             LEFT JOIN users u ON s.user_id = u.id
             LEFT JOIN customers c ON s.customer_id = c.id
-            WHERE s.id = ?`,
-      [params.id]
+            WHERE s.id = ? AND s.user_id = ?`,
+      [params.id, userId]
     );
 
     if (saleRows.length === 0) {
@@ -44,8 +46,9 @@ async function getHandler(req: NextRequest, context?: RouteContext) {
   }
 }
 
-async function deleteHandler(req: NextRequest, context?: RouteContext) {
+async function deleteHandler(req: AuthRequest, context?: RouteContext) {
   try {
+    const userId = getCurrentUserId(req);
     if (!context) {
       return NextResponse.json({ error: "Invalid request" }, { status: 400 });
     }
@@ -56,7 +59,7 @@ async function deleteHandler(req: NextRequest, context?: RouteContext) {
       return NextResponse.json({ error: "Invalid sale ID" }, { status: 400 });
     }
 
-    const saleCheckRows = await sqlQuery("SELECT id FROM sales WHERE id = ?", [saleId]);
+    const saleCheckRows = await sqlQuery("SELECT id FROM sales WHERE id = ? AND user_id = ?", [saleId, userId]);
 
     if (saleCheckRows.length === 0) {
       return NextResponse.json({ error: "Sale not found" }, { status: 404 });
@@ -124,7 +127,7 @@ async function deleteHandler(req: NextRequest, context?: RouteContext) {
 
     await sqlExecute("DELETE FROM sale_items WHERE sale_id = ?", [saleId]);
 
-    await sqlExecute("DELETE FROM sales WHERE id = ?", [saleId]);
+    await sqlExecute("DELETE FROM sales WHERE id = ? AND user_id = ?", [saleId, userId]);
 
     return NextResponse.json({ message: "Sale deleted successfully" });
   } catch (error) {
@@ -136,5 +139,5 @@ async function deleteHandler(req: NextRequest, context?: RouteContext) {
   }
 }
 
-export const GET = requireAuth(getHandler);
-export const DELETE = requireAuth(deleteHandler);
+export const GET = requireAuth(getHandler, { requiredFeature: "sales" });
+export const DELETE = requireAuth(deleteHandler, { requiredFeature: "sales" });

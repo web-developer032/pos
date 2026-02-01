@@ -1,9 +1,11 @@
-import { NextRequest, NextResponse } from "next/server";
-import { requireAuth, RouteContext } from "@/lib/middleware/auth";
+import { NextResponse } from "next/server";
+import { requireAuth, RouteContext, type AuthRequest } from "@/lib/middleware/auth";
+import { getCurrentUserId } from "@/lib/auth/requestContext";
 import { sqlQuery } from "@/lib/db";
 
-async function getHandler(req: NextRequest, context?: RouteContext) {
+async function getHandler(req: AuthRequest, context?: RouteContext) {
   try {
+    const userId = getCurrentUserId(req);
     if (!context) {
       return NextResponse.json({ error: "Invalid request" }, { status: 400 });
     }
@@ -12,12 +14,12 @@ async function getHandler(req: NextRequest, context?: RouteContext) {
 
     const sql = `SELECT DISTINCT p.*, c.name as category_name
             FROM products p
-            LEFT JOIN categories c ON p.category_id = c.id
+            LEFT JOIN categories c ON p.category_id = c.id AND c.user_id = ?
             LEFT JOIN product_barcodes pb ON p.id = pb.product_id
             WHERE (p.barcode = ? OR pb.barcode = ?) 
-              AND p.deleted_at IS NULL
+              AND p.user_id = ? AND p.deleted_at IS NULL
             LIMIT 1`;
-    const rows = await sqlQuery<Record<string, unknown> & { id: number }>(sql, [barcode, barcode]);
+    const rows = await sqlQuery<Record<string, unknown> & { id: number }>(sql, [userId, barcode, barcode, userId]);
 
     if (rows.length === 0) {
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
@@ -47,4 +49,4 @@ async function getHandler(req: NextRequest, context?: RouteContext) {
   }
 }
 
-export const GET = requireAuth(getHandler);
+export const GET = requireAuth(getHandler, { requiredFeature: "products" });

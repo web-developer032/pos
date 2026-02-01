@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
-import { requireAuth, AuthRequest } from "@/lib/middleware/auth";
+import { NextResponse } from "next/server";
+import { requireAuth, type AuthRequest } from "@/lib/middleware/auth";
+import { getCurrentUserId } from "@/lib/auth/requestContext";
 import { sqlQuery } from "@/lib/db";
 import { z } from "zod";
 import { handleApiError, handleValidationError } from "@/lib/utils/apiHelpers";
@@ -16,8 +17,9 @@ const employeeSchema = z.object({
   notes: z.string().optional(),
 });
 
-async function getHandler(req: NextRequest) {
+async function getHandler(req: AuthRequest) {
   try {
+    const userId = getCurrentUserId(req);
     const { searchParams } = new URL(req.url);
     const status = searchParams.get("status");
     const search = searchParams.get("search");
@@ -27,9 +29,9 @@ async function getHandler(req: NextRequest) {
         (SELECT COALESCE(SUM(CASE WHEN payment_type IN ('salary', 'bonus') THEN amount ELSE -amount END), 0)
          FROM salary_payments sp WHERE sp.employee_id = e.id) as total_paid
       FROM employees e
-      WHERE 1=1
+      WHERE e.user_id = ?
     `;
-    const args: (string | number)[] = [];
+    const args: (string | number)[] = [userId];
 
     if (status) {
       sql += " AND e.status = ?";
@@ -53,8 +55,9 @@ async function getHandler(req: NextRequest) {
         COALESCE(SUM(CASE WHEN salary_type = 'monthly' THEN base_salary ELSE 0 END), 0) as monthly_salary_total,
         COALESCE(SUM(CASE WHEN salary_type = 'daily' THEN base_salary ELSE 0 END), 0) as daily_rate_total
       FROM employees
+      WHERE user_id = ?
     `;
-    const summaryRows = await sqlQuery(summarySql, []);
+    const summaryRows = await sqlQuery(summarySql, [userId]);
 
     return NextResponse.json({
       employees: rows,
@@ -67,15 +70,17 @@ async function getHandler(req: NextRequest) {
 
 async function postHandler(req: AuthRequest) {
   try {
+    const userId = getCurrentUserId(req);
     const body = await req.json();
     const validated = employeeSchema.parse(body);
 
     const timestamp = getCurrentTimestamp();
 
     const rows = await sqlQuery(
-      `INSERT INTO employees (name, phone, address, salary_type, base_salary, join_date, status, notes, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`,
+      `INSERT INTO employees (user_id, name, phone, address, salary_type, base_salary, join_date, status, notes, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`,
       [
+        userId,
         validated.name,
         validated.phone || null,
         validated.address || null,
@@ -97,5 +102,5 @@ async function postHandler(req: AuthRequest) {
   }
 }
 
-export const GET = requireAuth(getHandler);
-export const POST = requireAuth(postHandler);
+export const GET = requireAuth(getHandler, { requiredFeature: "employees" });
+export const POST = requireAuth(postHandler, { requiredFeature: "employees" });

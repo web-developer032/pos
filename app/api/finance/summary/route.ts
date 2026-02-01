@@ -1,15 +1,18 @@
 import { NextResponse } from "next/server";
-import { requireAuth } from "@/lib/middleware/auth";
+import { requireAuth, type AuthRequest } from "@/lib/middleware/auth";
+import { getCurrentUserId } from "@/lib/auth/requestContext";
 import { sqlQuery } from "@/lib/db";
 
-async function getHandler() {
+async function getHandler(req: AuthRequest) {
   try {
+    const userId = getCurrentUserId(req);
     const capitalRows = await sqlQuery(
       `SELECT 
           COALESCE(SUM(CASE WHEN transaction_type = 'investment' THEN amount ELSE 0 END), 0) as total_investments,
           COALESCE(SUM(CASE WHEN transaction_type = 'withdrawal' THEN amount ELSE 0 END), 0) as total_withdrawals
-        FROM capital`,
-      []
+        FROM capital
+        WHERE user_id = ?`,
+      [userId]
     );
 
     const capital = capitalRows[0] as unknown as {
@@ -21,8 +24,8 @@ async function getHandler() {
       (capital.total_investments || 0) - (capital.total_withdrawals || 0);
 
     const expensesRows = await sqlQuery(
-      "SELECT COALESCE(SUM(amount), 0) as total_expenses FROM expenses",
-      []
+      "SELECT COALESCE(SUM(amount), 0) as total_expenses FROM expenses WHERE user_id = ?",
+      [userId]
     );
 
     const totalExpenses = Number((expensesRows[0] as Record<string, unknown>)?.total_expenses ?? 0);
@@ -30,15 +33,15 @@ async function getHandler() {
     const revenueRows = await sqlQuery(
       `SELECT COALESCE(SUM(final_amount), 0) as total_revenue
         FROM sales
-        WHERE payment_status != 'voided'`,
-      []
+        WHERE user_id = ? AND payment_status != 'voided'`,
+      [userId]
     );
 
     const grossRevenue = Number((revenueRows[0] as Record<string, unknown>)?.total_revenue ?? 0);
 
     const refundsRows = await sqlQuery(
-      "SELECT COALESCE(SUM(refund_amount), 0) as total_refunds FROM returns",
-      []
+      "SELECT COALESCE(SUM(refund_amount), 0) as total_refunds FROM returns WHERE user_id = ?",
+      [userId]
     );
 
     const totalRefunds = Number((refundsRows[0] as Record<string, unknown>)?.total_refunds ?? 0);
@@ -49,9 +52,9 @@ async function getHandler() {
       `SELECT 
           COALESCE(SUM((si.unit_price - si.cost_price) * si.quantity), 0) as gross_profit
         FROM sale_items si
-        JOIN sales s ON si.sale_id = s.id
+        JOIN sales s ON si.sale_id = s.id AND s.user_id = ?
         WHERE s.payment_status != 'voided'`,
-      []
+      [userId]
     );
 
     const grossProfit = Number((profitRows[0] as Record<string, unknown>)?.gross_profit ?? 0);
@@ -60,8 +63,9 @@ async function getHandler() {
       `SELECT 
           COALESCE(SUM((ri.unit_price - si.cost_price) * ri.quantity), 0) as returned_profit
         FROM return_items ri
-        JOIN sale_items si ON ri.sale_item_id = si.id`,
-      []
+        JOIN sale_items si ON ri.sale_item_id = si.id
+        JOIN returns r ON ri.return_id = r.id AND r.user_id = ?`,
+      [userId]
     );
 
     const returnedProfit = Number((returnedProfitRows[0] as Record<string, unknown>)?.returned_profit ?? 0);
@@ -69,8 +73,8 @@ async function getHandler() {
     const totalProfit = grossProfit - returnedProfit;
 
     const otherIncomeRows = await sqlQuery(
-      "SELECT COALESCE(SUM(amount), 0) as total_other_income FROM other_income",
-      []
+      "SELECT COALESCE(SUM(amount), 0) as total_other_income FROM other_income WHERE user_id = ?",
+      [userId]
     );
 
     const totalOtherIncome = Number((otherIncomeRows[0] as Record<string, unknown>)?.total_other_income ?? 0);
@@ -82,8 +86,9 @@ async function getHandler() {
             ELSE amount
           END
         ), 0) as total_salaries_paid
-        FROM salary_payments`,
-      []
+        FROM salary_payments
+        WHERE user_id = ?`,
+      [userId]
     );
 
     const totalSalariesPaid = Number((salariesRows[0] as Record<string, unknown>)?.total_salaries_paid ?? 0);
@@ -114,4 +119,4 @@ async function getHandler() {
   }
 }
 
-export const GET = requireAuth(getHandler);
+export const GET = requireAuth(getHandler, { requiredFeature: "finance" });

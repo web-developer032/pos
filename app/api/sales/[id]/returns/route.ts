@@ -1,16 +1,18 @@
 import { NextResponse } from "next/server";
-import { requireAuth, RouteContext } from "@/lib/middleware/auth";
+import { requireAuth, RouteContext, type AuthRequest } from "@/lib/middleware/auth";
+import { getCurrentUserId } from "@/lib/auth/requestContext";
 import { sqlQuery } from "@/lib/db";
 
-async function getHandler(req: Request, context?: RouteContext) {
+async function getHandler(req: AuthRequest, context?: RouteContext) {
   try {
+    const userId = getCurrentUserId(req);
     if (!context) {
       return NextResponse.json({ error: "Invalid request" }, { status: 400 });
     }
     const params = await context.params;
     const saleId = parseInt(params.id);
 
-    const saleCheckRows = await sqlQuery("SELECT id FROM sales WHERE id = ?", [saleId]);
+    const saleCheckRows = await sqlQuery("SELECT id FROM sales WHERE id = ? AND user_id = ?", [saleId, userId]);
 
     if (saleCheckRows.length === 0) {
       return NextResponse.json(
@@ -69,5 +71,5 @@ async function getHandler(req: Request, context?: RouteContext) {
   }
 }
 
-export const GET = requireAuth(getHandler);
+export const GET = requireAuth(getHandler, { requiredFeature: "sales" });
 

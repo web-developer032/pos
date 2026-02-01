@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { requireAuth, AuthRequest } from "@/lib/middleware/auth";
+import { getCurrentUserId } from "@/lib/auth/requestContext";
 import { sqlQuery, sqlExecute } from "@/lib/db";
 import { z } from "zod";
 import {
@@ -39,15 +40,16 @@ const saleSchema = z.object({
   amount_paid: z.number().min(0).optional(), // For partial/credit payments
 });
 
-async function getHandler(req: NextRequest) {
+async function getHandler(req: AuthRequest) {
   try {
+    const userId = getCurrentUserId(req);
     const { searchParams } = new URL(req.url);
     const startDate = searchParams.get("start_date");
     const endDate = searchParams.get("end_date");
     const search = searchParams.get("search");
     const { page, limit, offset } = getPaginationParams(req);
 
-    // Optimized query: Calculate net profit (after returns) using subquery
+    // Optimized query: Calculate net profit (after returns) using subquery; scope by user
     let sql = `
       SELECT s.*, 
              u.username as user_name, 
@@ -71,9 +73,9 @@ async function getHandler(req: NextRequest) {
       FROM sales s
       LEFT JOIN users u ON s.user_id = u.id
       LEFT JOIN customers c ON s.customer_id = c.id
-      WHERE 1=1
+      WHERE s.user_id = ?
     `;
-    const args: (string | number)[] = [];
+    const args: (string | number)[] = [userId];
 
     if (startDate) {
       sql += " AND s.created_at >= ?";
@@ -95,9 +97,9 @@ async function getHandler(req: NextRequest) {
       SELECT COUNT(*) as total
       FROM sales s
       LEFT JOIN customers c ON s.customer_id = c.id
-      WHERE 1=1
+      WHERE s.user_id = ?
     `;
-    const countArgs: (string | number)[] = [];
+    const countArgs: (string | number)[] = [userId];
     if (startDate) {
       countSql += " AND s.created_at >= ?";
       countArgs.push(`${startDate}T00:00:00.000Z`);
@@ -197,6 +199,20 @@ async function postHandler(req: AuthRequest) {
       );
     }
 
+    // Cross-check: customer must belong to current user
+    if (validated.customer_id) {
+      const customerRows = await sqlQuery(
+        "SELECT id FROM customers WHERE id = ? AND user_id = ?",
+        [validated.customer_id, user.userId]
+      );
+      if (customerRows.length === 0) {
+        return NextResponse.json(
+          { error: "Customer not found" },
+          { status: 404 }
+        );
+      }
+    }
+
     // Create sale with explicit timestamp to avoid timezone issues
     // Use getCurrentTimestamp from dateTime utility for consistency
     const { getCurrentTimestamp } = await import("@/lib/utils/dateTime");
@@ -230,13 +246,16 @@ async function postHandler(req: AuthRequest) {
       );
 
       const productRows = await sqlQuery<{ cost_price: number }>(
-        "SELECT cost_price FROM products WHERE id = ?",
-        [item.product_id]
+        "SELECT cost_price FROM products WHERE id = ? AND user_id = ? AND deleted_at IS NULL",
+        [item.product_id, user.userId]
       );
-      const costPrice =
-        productRows.length > 0
-          ? roundPrice(Number(productRows[0]?.cost_price ?? 0))
-          : 0;
+      if (productRows.length === 0) {
+        return NextResponse.json(
+          { error: `Product ${item.product_id} not found or does not belong to you` },
+          { status: 400 }
+        );
+      }
+      const costPrice = roundPrice(Number(productRows[0]?.cost_price ?? 0));
 
       await sqlExecute(
         "INSERT INTO sale_items (sale_id, product_id, quantity, unit_price, cost_price, discount, subtotal) VALUES (?, ?, ?, ?, ?, ?, ?)",
@@ -270,8 +289,8 @@ async function postHandler(req: AuthRequest) {
 
     if (creditAmount > 0 && validated.customer_id) {
       await sqlExecute(
-        "UPDATE customers SET credit_balance = credit_balance + ?, updated_at = ? WHERE id = ?",
-        [creditAmount, timestamp, validated.customer_id]
+        "UPDATE customers SET credit_balance = credit_balance + ?, updated_at = ? WHERE id = ? AND user_id = ?",
+        [creditAmount, timestamp, validated.customer_id, user.userId]
       );
     }
 
@@ -309,8 +328,8 @@ async function postHandler(req: AuthRequest) {
           }
         } else if (!costPrice) {
           const productRows = await sqlQuery<{ cost_price: number }>(
-            "SELECT cost_price FROM products WHERE id = ?",
-            [returnItem.product_id]
+            "SELECT cost_price FROM products WHERE id = ? AND user_id = ?",
+            [returnItem.product_id, user.userId]
           );
           if (productRows.length > 0) {
             costPrice = roundPrice(Number(productRows[0]?.cost_price ?? 0));
@@ -349,8 +368,8 @@ async function postHandler(req: AuthRequest) {
             FROM sales s
             LEFT JOIN users u ON s.user_id = u.id
             LEFT JOIN customers c ON s.customer_id = c.id
-            WHERE s.id = ?`,
-      [saleId]
+            WHERE s.id = ? AND s.user_id = ?`,
+      [saleId, user.userId]
     );
 
     const saleItemsRows = await sqlQuery(
@@ -378,28 +397,35 @@ async function postHandler(req: AuthRequest) {
   }
 }
 
-async function deleteHandler(req: NextRequest) {
+async function deleteHandler(req: AuthRequest) {
   try {
+    const userId = getCurrentUserId(req);
     const { searchParams } = new URL(req.url);
     const deleteAll = searchParams.get("delete_all") === "true";
 
     if (deleteAll) {
       await sqlExecute(
-        `DELETE FROM return_items WHERE return_id IN (SELECT id FROM returns)`,
-        []
+        `DELETE FROM return_items WHERE return_id IN (SELECT id FROM returns WHERE user_id = ?)`,
+        [userId]
       );
       await sqlExecute(
-        `DELETE FROM inventory_transactions WHERE transaction_type = 'return'`,
-        []
+        `DELETE FROM inventory_transactions WHERE transaction_type = 'return' AND reference_id IN (SELECT id FROM returns WHERE user_id = ?)`,
+        [userId]
       );
-      await sqlExecute("DELETE FROM returns", []);
+      await sqlExecute("DELETE FROM returns WHERE user_id = ?", [userId]);
       await sqlExecute(
-        `DELETE FROM inventory_transactions WHERE transaction_type = 'sale'`,
-        []
+        `DELETE FROM inventory_transactions WHERE transaction_type = 'sale' AND reference_id IN (SELECT id FROM sales WHERE user_id = ?)`,
+        [userId]
       );
-      await sqlExecute("DELETE FROM payments", []);
-      await sqlExecute("DELETE FROM sale_items", []);
-      await sqlExecute("DELETE FROM sales", []);
+      await sqlExecute(
+        "DELETE FROM payments WHERE sale_id IN (SELECT id FROM sales WHERE user_id = ?)",
+        [userId]
+      );
+      await sqlExecute(
+        "DELETE FROM sale_items WHERE sale_id IN (SELECT id FROM sales WHERE user_id = ?)",
+        [userId]
+      );
+      await sqlExecute("DELETE FROM sales WHERE user_id = ?", [userId]);
 
       return NextResponse.json({ message: "All sales deleted successfully" });
     }
@@ -410,6 +436,6 @@ async function deleteHandler(req: NextRequest) {
   }
 }
 
-export const GET = requireAuth(getHandler);
-export const POST = requireAuth(postHandler);
-export const DELETE = requireAuth(deleteHandler);
+export const GET = requireAuth(getHandler, { requiredFeature: "sales" });
+export const POST = requireAuth(postHandler, { requiredFeature: "sales" });
+export const DELETE = requireAuth(deleteHandler, { requiredFeature: "sales" });
