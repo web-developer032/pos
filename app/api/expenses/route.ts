@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { requireAuth, AuthRequest } from "@/lib/middleware/auth";
+import { getCurrentUserId } from "@/lib/auth/requestContext";
 import { sqlQuery } from "@/lib/db";
 import { z } from "zod";
 import { getCurrentTimestamp } from "@/lib/utils/dateTime";
@@ -14,8 +15,9 @@ const expenseSchema = z.object({
   notes: z.string().optional(),
 });
 
-async function getHandler(req: NextRequest) {
+async function getHandler(req: AuthRequest) {
   try {
+    const userId = getCurrentUserId(req);
     const { searchParams } = new URL(req.url);
     const startDate = searchParams.get("start_date");
     const endDate = searchParams.get("end_date");
@@ -25,9 +27,9 @@ async function getHandler(req: NextRequest) {
       SELECT e.*, u.username as user_name
       FROM expenses e
       JOIN users u ON e.user_id = u.id
-      WHERE 1=1
+      WHERE e.user_id = ?
     `;
-    const args: (string | number)[] = [];
+    const args: (string | number)[] = [userId];
 
     if (startDate) {
       sql += " AND e.created_at >= ?";
@@ -46,7 +48,7 @@ async function getHandler(req: NextRequest) {
 
     const rows = await sqlQuery(sql, args);
 
-    const totalsArgs = []; 
+    const totalsArgs: (string | number)[] = [userId]; 
     if (startDate) totalsArgs.push(`${startDate}T00:00:00.000Z`); 
     if (endDate) totalsArgs.push(`${endDate}T23:59:59.999Z`);
     let totalsSql = `
@@ -55,7 +57,7 @@ async function getHandler(req: NextRequest) {
         category,
         COALESCE(SUM(amount), 0) as category_total
       FROM expenses
-      WHERE 1=1
+      WHERE user_id = ?
     `;
     if (startDate) totalsSql += " AND created_at >= ?";
     if (endDate) totalsSql += " AND created_at <= ?";
@@ -134,5 +136,5 @@ async function postHandler(req: AuthRequest) {
   }
 }
 
-export const GET = requireAuth(getHandler);
-export const POST = requireAuth(postHandler);
+export const GET = requireAuth(getHandler, { requiredFeature: "finance" });
+export const POST = requireAuth(postHandler, { requiredFeature: "finance" });

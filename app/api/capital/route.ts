@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { requireAuth, AuthRequest } from "@/lib/middleware/auth";
+import { getCurrentUserId } from "@/lib/auth/requestContext";
 import { sqlQuery } from "@/lib/db";
 import { z } from "zod";
 import { getCurrentTimestamp } from "@/lib/utils/dateTime";
@@ -12,8 +13,9 @@ const capitalSchema = z.object({
   notes: z.string().optional(),
 });
 
-async function getHandler(req: NextRequest) {
+async function getHandler(req: AuthRequest) {
   try {
+    const userId = getCurrentUserId(req);
     const { searchParams } = new URL(req.url);
     const startDate = searchParams.get("start_date");
     const endDate = searchParams.get("end_date");
@@ -22,9 +24,9 @@ async function getHandler(req: NextRequest) {
       SELECT c.*, u.username as user_name
       FROM capital c
       JOIN users u ON c.user_id = u.id
-      WHERE 1=1
+      WHERE c.user_id = ?
     `;
-    const args: (string | number)[] = [];
+    const args: (string | number)[] = [userId];
 
     if (startDate) {
       sql += " AND c.created_at >= ?";
@@ -44,11 +46,12 @@ async function getHandler(req: NextRequest) {
         COALESCE(SUM(CASE WHEN transaction_type = 'investment' THEN amount ELSE 0 END), 0) as total_investments,
         COALESCE(SUM(CASE WHEN transaction_type = 'withdrawal' THEN amount ELSE 0 END), 0) as total_withdrawals
       FROM capital
-      WHERE 1=1
+      WHERE user_id = ?
     `;
-    if (startDate) totalsSql += " AND created_at >= ?";
-    if (endDate) totalsSql += " AND created_at <= ?";
-    const totalsRows = await sqlQuery(totalsSql, args);
+    const totalsArgs: (string | number)[] = [userId];
+    if (startDate) { totalsSql += " AND created_at >= ?"; totalsArgs.push(`${startDate}T00:00:00.000Z`); }
+    if (endDate) { totalsSql += " AND created_at <= ?"; totalsArgs.push(`${endDate}T23:59:59.999Z`); }
+    const totalsRows = await sqlQuery(totalsSql, totalsArgs);
     const totals = totalsRows[0] as Record<string, unknown>;
 
     return NextResponse.json({
@@ -118,5 +121,5 @@ async function postHandler(req: AuthRequest) {
   }
 }
 
-export const GET = requireAuth(getHandler);
-export const POST = requireAuth(postHandler);
+export const GET = requireAuth(getHandler, { requiredFeature: "finance" });
+export const POST = requireAuth(postHandler, { requiredFeature: "finance" });

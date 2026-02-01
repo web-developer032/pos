@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAuth, AuthRequest, RouteContext } from "@/lib/middleware/auth";
+import { getCurrentUserId, whereUserId } from "@/lib/auth/requestContext";
 import { prisma } from "@/lib/db";
 import type { SalaryPaymentType } from "@/prisma/generated/prisma/client";
 import { z } from "zod";
@@ -55,8 +56,9 @@ async function getHandler(req: AuthRequest, context?: RouteContext) {
       return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
     }
 
-    const payment = await prisma.salaryPayment.findUnique({
-      where: { id: paymentId },
+    const userId = getCurrentUserId(req);
+    const payment = await prisma.salaryPayment.findFirst({
+      where: { id: paymentId, ...whereUserId(userId) },
       include: {
         employee: { select: { name: true, salaryType: true } },
         user: { select: { username: true } },
@@ -88,8 +90,9 @@ async function putHandler(req: AuthRequest, context?: RouteContext) {
     const body = await req.json();
     const validated = updateSchema.parse(body);
 
-    const existing = await prisma.salaryPayment.findUnique({
-      where: { id: paymentId },
+    const userId = getCurrentUserId(req);
+    const existing = await prisma.salaryPayment.findFirst({
+      where: { id: paymentId, ...whereUserId(userId) },
     });
 
     if (!existing) {
@@ -121,16 +124,19 @@ async function putHandler(req: AuthRequest, context?: RouteContext) {
       );
     }
 
-    const payment = await prisma.salaryPayment.update({
-      where: { id: paymentId },
+    await prisma.salaryPayment.updateMany({
+      where: { id: paymentId, ...whereUserId(userId) },
       data,
+    });
+    const payment = await prisma.salaryPayment.findFirst({
+      where: { id: paymentId, ...whereUserId(userId) },
       include: {
         employee: { select: { name: true, salaryType: true } },
         user: { select: { username: true } },
       },
     });
 
-    return NextResponse.json({ payment: toPaymentResponse(payment) });
+    return NextResponse.json({ payment: payment ? toPaymentResponse(payment) : null });
   } catch (error) {
     const validationError = handleValidationError(error);
     if (validationError) return validationError;
@@ -140,6 +146,7 @@ async function putHandler(req: AuthRequest, context?: RouteContext) {
 
 async function deleteHandler(req: AuthRequest, context?: RouteContext) {
   try {
+    const userId = getCurrentUserId(req);
     const { id } = await context!.params;
     const paymentId = parseInt(id, 10);
 
@@ -147,8 +154,8 @@ async function deleteHandler(req: AuthRequest, context?: RouteContext) {
       return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
     }
 
-    const existing = await prisma.salaryPayment.findUnique({
-      where: { id: paymentId },
+    const existing = await prisma.salaryPayment.findFirst({
+      where: { id: paymentId, ...whereUserId(userId) },
     });
 
     if (!existing) {
@@ -158,8 +165,8 @@ async function deleteHandler(req: AuthRequest, context?: RouteContext) {
       );
     }
 
-    await prisma.salaryPayment.delete({
-      where: { id: paymentId },
+    await prisma.salaryPayment.deleteMany({
+      where: { id: paymentId, ...whereUserId(userId) },
     });
 
     return NextResponse.json({ message: "Payment deleted successfully" });
@@ -168,6 +175,6 @@ async function deleteHandler(req: AuthRequest, context?: RouteContext) {
   }
 }
 
-export const GET = requireAuth(getHandler);
-export const PUT = requireAuth(putHandler);
-export const DELETE = requireAuth(deleteHandler);
+export const GET = requireAuth(getHandler, { requiredFeature: "finance" });
+export const PUT = requireAuth(putHandler, { requiredFeature: "finance" });
+export const DELETE = requireAuth(deleteHandler, { requiredFeature: "finance" });

@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
-import { requireAuth, RouteContext } from "@/lib/middleware/auth";
+import { NextResponse } from "next/server";
+import { requireAuth, RouteContext, type AuthRequest } from "@/lib/middleware/auth";
+import { getCurrentUserId } from "@/lib/auth/requestContext";
 import { sqlQuery, sqlExecute } from "@/lib/db";
 import { z } from "zod";
 import { roundPrice } from "@/lib/utils/apiHelpers";
@@ -58,8 +59,9 @@ const productSchema = z
     }
   );
 
-async function getHandler(req: NextRequest, context?: RouteContext) {
+async function getHandler(req: AuthRequest, context?: RouteContext) {
   try {
+    const userId = getCurrentUserId(req);
     if (!context) {
       return NextResponse.json({ error: "Invalid request" }, { status: 400 });
     }
@@ -68,10 +70,10 @@ async function getHandler(req: NextRequest, context?: RouteContext) {
       `SELECT p.*, c.name as category_name,
                    bp.stock_quantity as base_product_stock
             FROM products p
-            LEFT JOIN categories c ON p.category_id = c.id
-            LEFT JOIN products bp ON p.base_product_id = bp.id
-            WHERE p.id = ? AND p.deleted_at IS NULL`,
-      [params.id]
+            LEFT JOIN categories c ON p.category_id = c.id AND c.user_id = ?
+            LEFT JOIN products bp ON p.base_product_id = bp.id AND bp.user_id = ?
+            WHERE p.id = ? AND p.user_id = ? AND p.deleted_at IS NULL`,
+      [userId, userId, params.id, userId]
     );
 
     if (rows.length === 0) {
@@ -91,9 +93,9 @@ async function getHandler(req: NextRequest, context?: RouteContext) {
     const subProductsRows = await sqlQuery(
       `SELECT id, name, barcode, quantity_multiplier, cost_price, selling_price, unit
             FROM products 
-            WHERE base_product_id = ? AND deleted_at IS NULL
+            WHERE base_product_id = ? AND user_id = ? AND deleted_at IS NULL
             ORDER BY name`,
-      [params.id]
+      [params.id, userId]
     );
 
     const subProducts = subProductsRows.map((row) => row as unknown as {
@@ -116,8 +118,9 @@ async function getHandler(req: NextRequest, context?: RouteContext) {
   }
 }
 
-async function putHandler(req: NextRequest, context?: RouteContext) {
+async function putHandler(req: AuthRequest, context?: RouteContext) {
   try {
+    const userId = getCurrentUserId(req);
     if (!context) {
       return NextResponse.json({ error: "Invalid request" }, { status: 400 });
     }
@@ -131,8 +134,8 @@ async function putHandler(req: NextRequest, context?: RouteContext) {
       validated.base_product_id !== null
     ) {
       const baseProductRows = await sqlQuery(
-        "SELECT id, sku, base_product_id FROM products WHERE id = ? AND deleted_at IS NULL",
-        [validated.base_product_id]
+        "SELECT id, sku, base_product_id FROM products WHERE id = ? AND user_id = ? AND deleted_at IS NULL",
+        [validated.base_product_id, userId]
       );
       if (baseProductRows.length === 0) {
         return NextResponse.json(
@@ -225,9 +228,9 @@ async function putHandler(req: NextRequest, context?: RouteContext) {
     const resultRows = await sqlQuery(
       `SELECT p.*, c.name as category_name
             FROM products p
-            LEFT JOIN categories c ON p.category_id = c.id
-            WHERE p.id = ? AND p.deleted_at IS NULL`,
-      [params.id]
+            LEFT JOIN categories c ON p.category_id = c.id AND c.user_id = ?
+            WHERE p.id = ? AND p.user_id = ? AND p.deleted_at IS NULL`,
+      [userId, params.id, userId]
     );
 
     if (resultRows.length === 0) {
@@ -260,16 +263,17 @@ async function putHandler(req: NextRequest, context?: RouteContext) {
   }
 }
 
-async function deleteHandler(req: NextRequest, context?: RouteContext) {
+async function deleteHandler(req: AuthRequest, context?: RouteContext) {
   try {
+    const userId = getCurrentUserId(req);
     if (!context) {
       return NextResponse.json({ error: "Invalid request" }, { status: 400 });
     }
     const params = await context.params;
 
     const productRows = await sqlQuery(
-      "SELECT id, name FROM products WHERE id = ?",
-      [params.id]
+      "SELECT id, name FROM products WHERE id = ? AND user_id = ?",
+      [params.id, userId]
     );
 
     if (productRows.length === 0) {
@@ -277,8 +281,8 @@ async function deleteHandler(req: NextRequest, context?: RouteContext) {
     }
 
     await sqlExecute(
-      "UPDATE products SET deleted_at = CURRENT_TIMESTAMP WHERE id = ?",
-      [params.id]
+      "UPDATE products SET deleted_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?",
+      [params.id, userId]
     );
 
     return NextResponse.json({ message: "Product deleted successfully" });
@@ -291,6 +295,6 @@ async function deleteHandler(req: NextRequest, context?: RouteContext) {
   }
 }
 
-export const GET = requireAuth(getHandler);
-export const PUT = requireAuth(putHandler);
-export const DELETE = requireAuth(deleteHandler);
+export const GET = requireAuth(getHandler, { requiredFeature: "products" });
+export const PUT = requireAuth(putHandler, { requiredFeature: "products" });
+export const DELETE = requireAuth(deleteHandler, { requiredFeature: "products" });

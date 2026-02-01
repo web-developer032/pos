@@ -1,5 +1,7 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { z } from "zod";
+import { requireAuth, AuthRequest } from "@/lib/middleware/auth";
+import { getCurrentUserId } from "@/lib/auth/requestContext";
 import { prisma } from "@/lib/db";
 import {
   serializeSession,
@@ -13,13 +15,14 @@ const closeSessionSchema = z.object({
   notes: z.string().optional(),
 });
 
-export async function POST(request: NextRequest) {
+async function postHandler(req: AuthRequest) {
   try {
-    const body = await request.json();
+    const userId = getCurrentUserId(req);
+    const body = await req.json();
     const validatedData = closeSessionSchema.parse(body);
 
     const session = await prisma.cashRegisterSession.findFirst({
-      where: { status: "open" },
+      where: { status: "open", userId },
     });
     if (!session) {
       return NextResponse.json(
@@ -33,6 +36,7 @@ export async function POST(request: NextRequest) {
     const [cashSalesAgg, cashRefundsAgg, cashExpensesAgg] = await Promise.all([
       prisma.sale.aggregate({
         where: {
+          userId,
           paymentMethod: "cash",
           createdAt: { gte: openedAt },
         },
@@ -40,6 +44,7 @@ export async function POST(request: NextRequest) {
       }),
       prisma.return.aggregate({
         where: {
+          userId,
           refundMethod: "cash",
           createdAt: { gte: openedAt },
         },
@@ -47,6 +52,7 @@ export async function POST(request: NextRequest) {
       }),
       prisma.expense.aggregate({
         where: {
+          userId,
           paymentMethod: "cash",
           createdAt: { gte: openedAt },
         },
@@ -115,3 +121,5 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+
+export const POST = requireAuth(postHandler, { requiredFeature: "cash_register" });

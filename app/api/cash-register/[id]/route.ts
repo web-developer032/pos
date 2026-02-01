@@ -1,5 +1,7 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { z } from "zod";
+import { requireAuth, AuthRequest, RouteContext } from "@/lib/middleware/auth";
+import { getCurrentUserId } from "@/lib/auth/requestContext";
 import { sqlQuery, sqlExecute } from "@/lib/db";
 import { getCurrentTimestamp } from "@/lib/utils/dateTime";
 import {
@@ -8,7 +10,6 @@ import {
   SESSION_SELECT_SQL,
 } from "@/lib/utils/cashRegisterHelpers";
 
-// Disable caching for this route
 export const dynamic = "force-dynamic";
 
 const updateSessionSchema = z.object({
@@ -17,13 +18,14 @@ const updateSessionSchema = z.object({
   notes: z.string().optional(),
 });
 
-// GET /api/cash-register/[id] - Get specific session details
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+async function getHandler(
+  req: AuthRequest,
+  context?: RouteContext
 ) {
   try {
-    const { id } = await params;
+    const userId = getCurrentUserId(req);
+    const params = await context!.params;
+    const { id } = params;
     const sessionId = parseInt(id);
 
     if (isNaN(sessionId)) {
@@ -34,8 +36,8 @@ export async function GET(
     }
 
     const sessionRows = await sqlQuery(
-      `${SESSION_SELECT_SQL} WHERE crs.id = ?`,
-      [sessionId]
+      `${SESSION_SELECT_SQL} WHERE crs.id = ? AND crs.user_id = ?`,
+      [sessionId, userId]
     );
 
     if (sessionRows.length === 0) {
@@ -56,27 +58,27 @@ export async function GET(
       `SELECT payment_method, COUNT(*)::bigint as transaction_count,
                COALESCE(SUM(final_amount), 0) as total_amount
         FROM sales
-        WHERE created_at >= ? AND created_at <= ?
+        WHERE user_id = ? AND created_at >= ? AND created_at <= ?
         GROUP BY payment_method`,
-      [openedAt, closedAt]
+      [userId, openedAt, closedAt]
     );
 
     const returnsRows = await sqlQuery(
       `SELECT refund_method, COUNT(*)::bigint as return_count,
                COALESCE(SUM(refund_amount), 0) as total_refund
         FROM returns
-        WHERE created_at >= ? AND created_at <= ?
+        WHERE user_id = ? AND created_at >= ? AND created_at <= ?
         GROUP BY refund_method`,
-      [openedAt, closedAt]
+      [userId, openedAt, closedAt]
     );
 
     const expensesRows = await sqlQuery(
       `SELECT payment_method, category, COUNT(*)::bigint as expense_count,
                COALESCE(SUM(amount), 0) as total_amount
         FROM expenses
-        WHERE created_at >= ? AND created_at <= ?
+        WHERE user_id = ? AND created_at >= ? AND created_at <= ?
         GROUP BY payment_method, category`,
-      [openedAt, closedAt]
+      [userId, openedAt, closedAt]
     );
 
     return NextResponse.json({
@@ -94,13 +96,13 @@ export async function GET(
   }
 }
 
-// PATCH /api/cash-register/[id] - Update session balances
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+async function patchHandler(
+  req: AuthRequest,
+  context?: RouteContext
 ) {
   try {
-    const { id } = await params;
+    const params = await context!.params;
+    const { id } = params;
     const sessionId = parseInt(id);
 
     if (isNaN(sessionId)) {
@@ -110,12 +112,13 @@ export async function PATCH(
       );
     }
 
-    const body = await request.json();
+    const body = await req.json();
     const validatedData = updateSessionSchema.parse(body);
 
+    const sessionUserId = getCurrentUserId(req);
     const sessionRows = await sqlQuery(
-      `SELECT id, status, opening_balance, opened_at FROM cash_register_sessions WHERE id = ?`,
-      [sessionId]
+      `SELECT id, status, opening_balance, opened_at FROM cash_register_sessions WHERE id = ? AND user_id = ?`,
+      [sessionId, sessionUserId]
     );
 
     if (sessionRows.length === 0) {
@@ -245,3 +248,6 @@ export async function PATCH(
     );
   }
 }
+
+export const GET = requireAuth(getHandler, { requiredFeature: "cash_register" });
+export const PATCH = requireAuth(patchHandler, { requiredFeature: "cash_register" });

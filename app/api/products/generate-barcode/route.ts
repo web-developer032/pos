@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/middleware/auth";
+import { NextResponse } from "next/server";
+import { requireAuth, type AuthRequest } from "@/lib/middleware/auth";
+import { getCurrentUserId } from "@/lib/auth/requestContext";
 import { sqlQuery } from "@/lib/db";
 
 /**
@@ -16,22 +17,23 @@ function generateRandomBarcode(): string {
   return `2${timestamp}${random}`;
 }
 
-async function getHandler(_req: NextRequest) {
+async function getHandler(req: AuthRequest) {
   try {
+    const userId = getCurrentUserId(req);
     const maxAttempts = 20;
     let attempts = 0;
     let barcode: string = "";
     let isUnique = false;
 
-    // Generate barcode and check for uniqueness
+    // Generate barcode and check for uniqueness (per user)
     while (attempts < maxAttempts && !isUnique) {
       barcode = generateRandomBarcode();
 
       const existing = await sqlQuery(
-        `SELECT id FROM products WHERE barcode = ? AND deleted_at IS NULL
+        `SELECT id FROM products WHERE barcode = ? AND user_id = ? AND deleted_at IS NULL
               UNION
-              SELECT product_id as id FROM product_barcodes WHERE barcode = ?`,
-        [barcode, barcode]
+              SELECT p.id FROM product_barcodes pb JOIN products p ON p.id = pb.product_id WHERE pb.barcode = ? AND p.user_id = ?`,
+        [barcode, userId, barcode, userId]
       );
 
       if (existing.length === 0) {
@@ -48,10 +50,10 @@ async function getHandler(_req: NextRequest) {
       barcode = `2${timestamp.slice(-7)}${random}`;
 
       const finalCheck = await sqlQuery(
-        `SELECT id FROM products WHERE barcode = ? AND deleted_at IS NULL
+        `SELECT id FROM products WHERE barcode = ? AND user_id = ? AND deleted_at IS NULL
               UNION
-              SELECT product_id as id FROM product_barcodes WHERE barcode = ?`,
-        [barcode, barcode]
+              SELECT p.id FROM product_barcodes pb JOIN products p ON p.id = pb.product_id WHERE pb.barcode = ? AND p.user_id = ?`,
+        [barcode, userId, barcode, userId]
       );
 
       if (finalCheck.length > 0) {
@@ -70,5 +72,5 @@ async function getHandler(_req: NextRequest) {
   }
 }
 
-export const GET = requireAuth(getHandler);
+export const GET = requireAuth(getHandler, { requiredFeature: "products" });
 

@@ -75,7 +75,6 @@ export function OpenDayModal({ isOpen, onClose }: OpenDayModalProps) {
     try {
       await openDay({
         opening_balance: parseFloat(data.opening_balance) || 0,
-        user_id: Number(user.id),
         notes: data.notes || undefined,
       }).unwrap();
 

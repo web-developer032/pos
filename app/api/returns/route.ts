@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { requireAuth, AuthRequest } from "@/lib/middleware/auth";
+import { getCurrentUserId } from "@/lib/auth/requestContext";
 import { sqlQuery, sqlExecute } from "@/lib/db";
 import { z } from "zod";
 import { getCurrentTimestamp } from "@/lib/utils/dateTime";
@@ -21,8 +22,9 @@ const returnSchema = z.object({
   notes: z.string().optional(),
 });
 
-async function getHandler(req: NextRequest) {
+async function getHandler(req: AuthRequest) {
   try {
+    const userId = getCurrentUserId(req);
     const { searchParams } = new URL(req.url);
     const saleId = searchParams.get("sale_id");
 
@@ -30,10 +32,10 @@ async function getHandler(req: NextRequest) {
       SELECT r.*, u.username as user_name, s.sale_number
       FROM returns r
       JOIN users u ON r.user_id = u.id
-      JOIN sales s ON r.sale_id = s.id
-      WHERE 1=1
+      JOIN sales s ON r.sale_id = s.id AND s.user_id = ?
+      WHERE r.user_id = ?
     `;
-    const args: (string | number)[] = [];
+    const args: (string | number)[] = [userId, userId];
 
     if (saleId) {
       sql += " AND r.sale_id = ?";
@@ -65,8 +67,8 @@ async function postHandler(req: AuthRequest) {
     }
 
     const saleCheckRows = await sqlQuery(
-      "SELECT id, final_amount FROM sales WHERE id = ?",
-      [validated.sale_id]
+      "SELECT id, final_amount FROM sales WHERE id = ? AND user_id = ?",
+      [validated.sale_id, user.userId]
     );
 
     if (saleCheckRows.length === 0) {
@@ -163,9 +165,9 @@ async function postHandler(req: AuthRequest) {
       `SELECT r.*, u.username as user_name, s.sale_number
             FROM returns r
             JOIN users u ON r.user_id = u.id
-            JOIN sales s ON r.sale_id = s.id
-            WHERE r.id = ?`,
-      [returnId]
+            JOIN sales s ON r.sale_id = s.id AND s.user_id = ?
+            WHERE r.id = ? AND r.user_id = ?`,
+      [user.userId, returnId, user.userId]
     );
 
     const returnItemsRows = await sqlQuery(
@@ -198,5 +200,5 @@ async function postHandler(req: AuthRequest) {
   }
 }
 
-export const GET = requireAuth(getHandler);
-export const POST = requireAuth(postHandler);
+export const GET = requireAuth(getHandler, { requiredFeature: "sales" });
+export const POST = requireAuth(postHandler, { requiredFeature: "sales" });

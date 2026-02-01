@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
-import { requireAuth, RouteContext } from "@/lib/middleware/auth";
+import { NextResponse } from "next/server";
+import { requireAuth, RouteContext, type AuthRequest } from "@/lib/middleware/auth";
+import { getCurrentUserId, whereUserId } from "@/lib/auth/requestContext";
 import { prisma } from "@/lib/db";
 import { z } from "zod";
 
@@ -11,8 +12,9 @@ const customerSchema = z.object({
   loyalty_points: z.number().int().min(0).optional(),
 });
 
-async function getHandler(req: NextRequest, context?: RouteContext) {
+async function getHandler(req: AuthRequest, context?: RouteContext) {
   try {
+    const userId = getCurrentUserId(req);
     if (!context) {
       return NextResponse.json({ error: "Invalid request" }, { status: 400 });
     }
@@ -21,8 +23,8 @@ async function getHandler(req: NextRequest, context?: RouteContext) {
     if (Number.isNaN(id)) {
       return NextResponse.json({ error: "Invalid id" }, { status: 400 });
     }
-    const customer = await prisma.customer.findUnique({
-      where: { id },
+    const customer = await prisma.customer.findFirst({
+      where: { id, ...whereUserId(userId) },
     });
 
     if (!customer) {
@@ -42,8 +44,9 @@ async function getHandler(req: NextRequest, context?: RouteContext) {
   }
 }
 
-async function putHandler(req: NextRequest, context?: RouteContext) {
+async function putHandler(req: AuthRequest, context?: RouteContext) {
   try {
+    const userId = getCurrentUserId(req);
     if (!context) {
       return NextResponse.json({ error: "Invalid request" }, { status: 400 });
     }
@@ -76,9 +79,18 @@ async function putHandler(req: NextRequest, context?: RouteContext) {
       );
     }
 
-    const customer = await prisma.customer.update({
-      where: { id },
+    const result = await prisma.customer.updateMany({
+      where: { id, ...whereUserId(userId) },
       data,
+    });
+    if (result.count === 0) {
+      return NextResponse.json(
+        { error: "Customer not found" },
+        { status: 404 }
+      );
+    }
+    const customer = await prisma.customer.findFirst({
+      where: { id, ...whereUserId(userId) },
     });
 
     return NextResponse.json({ customer });
@@ -97,8 +109,9 @@ async function putHandler(req: NextRequest, context?: RouteContext) {
   }
 }
 
-async function deleteHandler(req: NextRequest, context?: RouteContext) {
+async function deleteHandler(req: AuthRequest, context?: RouteContext) {
   try {
+    const userId = getCurrentUserId(req);
     if (!context) {
       return NextResponse.json({ error: "Invalid request" }, { status: 400 });
     }
@@ -107,8 +120,8 @@ async function deleteHandler(req: NextRequest, context?: RouteContext) {
     if (Number.isNaN(id)) {
       return NextResponse.json({ error: "Invalid id" }, { status: 400 });
     }
-    await prisma.customer.delete({
-      where: { id },
+    await prisma.customer.deleteMany({
+      where: { id, ...whereUserId(userId) },
     });
 
     return NextResponse.json({ message: "Customer deleted successfully" });
@@ -121,6 +134,6 @@ async function deleteHandler(req: NextRequest, context?: RouteContext) {
   }
 }
 
-export const GET = requireAuth(getHandler);
-export const PUT = requireAuth(putHandler);
-export const DELETE = requireAuth(deleteHandler);
+export const GET = requireAuth(getHandler, { requiredFeature: "customers" });
+export const PUT = requireAuth(putHandler, { requiredFeature: "customers" });
+export const DELETE = requireAuth(deleteHandler, { requiredFeature: "customers" });

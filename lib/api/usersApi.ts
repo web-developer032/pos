@@ -1,12 +1,22 @@
 import { apiSlice } from "./apiSlice";
 import { PaginationInfo } from "./productsApi";
 
+export interface UserSubscription {
+  id: number;
+  plan: string;
+  interval: string;
+  status: string;
+  started_at?: string;
+  expires_at?: string | null;
+}
+
 export interface User {
   id: number;
   username: string;
   email: string;
   role: string;
   created_at?: string;
+  subscription?: UserSubscription | null;
 }
 
 export interface CreateUserRequest {

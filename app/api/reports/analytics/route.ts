@@ -1,20 +1,22 @@
-import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/middleware/auth";
+import { NextResponse } from "next/server";
+import { requireAuth, type AuthRequest } from "@/lib/middleware/auth";
+import { getCurrentUserId } from "@/lib/auth/requestContext";
 import { sqlQuery } from "@/lib/db";
 
 /**
  * Optimized analytics endpoint for sales and profit data
  * Returns aggregated data grouped by date for charts and dashboards
  */
-async function getHandler(req: NextRequest) {
+async function getHandler(req: AuthRequest) {
   try {
+    const userId = getCurrentUserId(req);
     const { searchParams } = new URL(req.url);
     const startDate = searchParams.get("start_date");
     const endDate = searchParams.get("end_date");
     const groupBy = searchParams.get("group_by") || "day";
 
-    let dateFilter = "";
-    const args: (string | number)[] = [];
+    let dateFilter = " AND user_id = ?";
+    const args: (string | number)[] = [userId];
 
     if (startDate) {
       dateFilter += " AND created_at >= ?";
@@ -206,4 +208,4 @@ async function getHandler(req: NextRequest) {
   }
 }
 
-export const GET = requireAuth(getHandler);
+export const GET = requireAuth(getHandler, { requiredFeature: "reports" });

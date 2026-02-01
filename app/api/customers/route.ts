@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/middleware/auth";
+import { NextResponse } from "next/server";
+import { requireAuth, type AuthRequest } from "@/lib/middleware/auth";
+import { getCurrentUserId } from "@/lib/auth/requestContext";
 import { sqlQuery, sqlExecute } from "@/lib/db";
 import { z } from "zod";
 import {
@@ -19,16 +20,16 @@ const customerSchema = z.object({
   loyalty_points: z.number().int().min(0).optional(),
 });
 
-async function getHandler(req: NextRequest) {
+async function getHandler(req: AuthRequest) {
   try {
+    const userId = getCurrentUserId(req);
     const { searchParams } = new URL(req.url);
     const search = searchParams.get("search");
     const { page, limit, offset } = getPaginationParams(req);
 
-    let sql = "SELECT * FROM customers WHERE 1=1";
-    const args: (string | number)[] = [];
+    let sql = "SELECT * FROM customers WHERE user_id = ?";
+    const args: (string | number)[] = [userId];
 
-    // Add search condition
     const searchCondition = buildSearchCondition(search, [
       "name",
       "email",
@@ -55,14 +56,16 @@ async function getHandler(req: NextRequest) {
   }
 }
 
-async function postHandler(req: NextRequest) {
+async function postHandler(req: AuthRequest) {
   try {
+    const userId = getCurrentUserId(req);
     const body = await req.json();
     const validated = customerSchema.parse(body);
 
     const rows = await sqlQuery(
-      "INSERT INTO customers (name, email, phone, address, loyalty_points, created_at) VALUES (?, ?, ?, ?, ?, ?) RETURNING *",
+      "INSERT INTO customers (user_id, name, email, phone, address, loyalty_points, created_at) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING *",
       [
+        userId,
         validated.name,
         validated.email || null,
         validated.phone || null,
@@ -80,13 +83,14 @@ async function postHandler(req: NextRequest) {
   }
 }
 
-async function deleteHandler(req: NextRequest) {
+async function deleteHandler(req: AuthRequest) {
   try {
+    const userId = getCurrentUserId(req);
     const { searchParams } = new URL(req.url);
     const deleteAll = searchParams.get("delete_all") === "true";
 
     if (deleteAll) {
-      await sqlExecute("DELETE FROM customers", []);
+      await sqlExecute("DELETE FROM customers WHERE user_id = ?", [userId]);
       return NextResponse.json({
         message: "All customers deleted successfully",
       });
@@ -98,6 +102,6 @@ async function deleteHandler(req: NextRequest) {
   }
 }
 
-export const GET = requireAuth(getHandler);
-export const POST = requireAuth(postHandler);
-export const DELETE = requireAuth(deleteHandler);
+export const GET = requireAuth(getHandler, { requiredFeature: "customers" });
+export const POST = requireAuth(postHandler, { requiredFeature: "customers" });
+export const DELETE = requireAuth(deleteHandler, { requiredFeature: "customers" });

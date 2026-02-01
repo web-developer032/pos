@@ -1,14 +1,16 @@
-import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/middleware/auth";
+import { NextResponse } from "next/server";
+import { requireAuth, type AuthRequest } from "@/lib/middleware/auth";
+import { getCurrentUserId } from "@/lib/auth/requestContext";
 import { sqlQuery } from "@/lib/db";
 import { generateRandomSKU } from "@/lib/utils/skuGenerator";
 
 /**
  * Generate a unique SKU
- * Checks database to ensure uniqueness
+ * Checks database to ensure uniqueness (per user)
  */
-async function getHandler(_req: NextRequest) {
+async function getHandler(req: AuthRequest) {
   try {
+    const userId = getCurrentUserId(req);
     const maxAttempts = 20;
     let attempts = 0;
     let sku: string = "";
@@ -19,8 +21,8 @@ async function getHandler(_req: NextRequest) {
       sku = generateRandomSKU();
 
       const existing = await sqlQuery(
-        "SELECT id FROM products WHERE sku = ? AND deleted_at IS NULL",
-        [sku]
+        "SELECT id FROM products WHERE sku = ? AND user_id = ? AND deleted_at IS NULL",
+        [sku, userId]
       );
 
       if (existing.length === 0) {
@@ -52,8 +54,8 @@ async function getHandler(_req: NextRequest) {
       sku = `SKU-${segment1}-${segment2}`;
 
       const finalCheck = await sqlQuery(
-        "SELECT id FROM products WHERE sku = ? AND deleted_at IS NULL",
-        [sku]
+        "SELECT id FROM products WHERE sku = ? AND user_id = ? AND deleted_at IS NULL",
+        [sku, userId]
       );
 
       if (finalCheck.length > 0) {
@@ -93,4 +95,4 @@ async function getHandler(_req: NextRequest) {
   }
 }
 
-export const GET = requireAuth(getHandler);
+export const GET = requireAuth(getHandler, { requiredFeature: "products" });

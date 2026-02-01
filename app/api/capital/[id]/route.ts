@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAuth, RouteContext, AuthRequest } from "@/lib/middleware/auth";
+import { getCurrentUserId, whereUserId } from "@/lib/auth/requestContext";
 import { prisma } from "@/lib/db";
 import { z } from "zod";
 
@@ -24,8 +25,9 @@ function toCapitalResponse(c: { id: number; amount: number; description: string 
   };
 }
 
-async function getHandler(req: Request, context?: RouteContext) {
+async function getHandler(req: AuthRequest, context?: RouteContext) {
   try {
+    const userId = getCurrentUserId(req);
     if (!context) {
       return NextResponse.json({ error: "Invalid request" }, { status: 400 });
     }
@@ -35,8 +37,8 @@ async function getHandler(req: Request, context?: RouteContext) {
       return NextResponse.json({ error: "Invalid id" }, { status: 400 });
     }
 
-    const capital = await prisma.capital.findUnique({
-      where: { id },
+    const capital = await prisma.capital.findFirst({
+      where: { id, ...whereUserId(userId) },
       include: { user: { select: { username: true } } },
     });
 
@@ -59,6 +61,7 @@ async function getHandler(req: Request, context?: RouteContext) {
 
 async function putHandler(req: AuthRequest, context?: RouteContext) {
   try {
+    const userId = getCurrentUserId(req);
     if (!context) {
       return NextResponse.json({ error: "Invalid request" }, { status: 400 });
     }
@@ -70,7 +73,7 @@ async function putHandler(req: AuthRequest, context?: RouteContext) {
     const body = await req.json();
     const validated = updateCapitalSchema.parse(body);
 
-    const existing = await prisma.capital.findUnique({ where: { id } });
+    const existing = await prisma.capital.findFirst({ where: { id, ...whereUserId(userId) } });
     if (!existing) {
       return NextResponse.json(
         { error: "Capital record not found" },
@@ -78,8 +81,8 @@ async function putHandler(req: AuthRequest, context?: RouteContext) {
       );
     }
 
-    await prisma.capital.update({
-      where: { id },
+    await prisma.capital.updateMany({
+      where: { id, ...whereUserId(userId) },
       data: {
         amount: validated.amount,
         description: validated.description ?? null,
@@ -88,8 +91,8 @@ async function putHandler(req: AuthRequest, context?: RouteContext) {
       },
     });
 
-    const capital = await prisma.capital.findUnique({
-      where: { id },
+    const capital = await prisma.capital.findFirst({
+      where: { id, ...whereUserId(userId) },
       include: { user: { select: { username: true } } },
     });
 
@@ -109,8 +112,9 @@ async function putHandler(req: AuthRequest, context?: RouteContext) {
   }
 }
 
-async function deleteHandler(req: Request, context?: RouteContext) {
+async function deleteHandler(req: AuthRequest, context?: RouteContext) {
   try {
+    const userId = getCurrentUserId(req);
     if (!context) {
       return NextResponse.json({ error: "Invalid request" }, { status: 400 });
     }
@@ -120,7 +124,7 @@ async function deleteHandler(req: Request, context?: RouteContext) {
       return NextResponse.json({ error: "Invalid id" }, { status: 400 });
     }
 
-    const existing = await prisma.capital.findUnique({ where: { id } });
+    const existing = await prisma.capital.findFirst({ where: { id, ...whereUserId(userId) } });
     if (!existing) {
       return NextResponse.json(
         { error: "Capital record not found" },
@@ -128,7 +132,7 @@ async function deleteHandler(req: Request, context?: RouteContext) {
       );
     }
 
-    await prisma.capital.delete({ where: { id } });
+    await prisma.capital.deleteMany({ where: { id, ...whereUserId(userId) } });
 
     return NextResponse.json({ message: "Capital record deleted successfully" });
   } catch (error) {
@@ -140,6 +144,6 @@ async function deleteHandler(req: Request, context?: RouteContext) {
   }
 }
 
-export const GET = requireAuth(getHandler);
-export const PUT = requireAuth(putHandler);
-export const DELETE = requireAuth(deleteHandler);
+export const GET = requireAuth(getHandler, { requiredFeature: "finance" });
+export const PUT = requireAuth(putHandler, { requiredFeature: "finance" });
+export const DELETE = requireAuth(deleteHandler, { requiredFeature: "finance" });

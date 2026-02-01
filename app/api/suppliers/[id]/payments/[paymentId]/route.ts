@@ -180,7 +180,7 @@ async function deleteHandler(req: Request, context?: RouteContext) {
   }
 }
 
-export const GET = requireAuth(getHandler);
-export const PUT = requireAuth(putHandler);
-export const DELETE = requireAuth(deleteHandler);
+export const GET = requireAuth(getHandler, { requiredFeature: "suppliers" });
+export const PUT = requireAuth(putHandler, { requiredFeature: "suppliers" });
+export const DELETE = requireAuth(deleteHandler, { requiredFeature: "suppliers" });
 

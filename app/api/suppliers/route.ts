@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/middleware/auth";
+import { NextResponse } from "next/server";
+import { requireAuth, type AuthRequest } from "@/lib/middleware/auth";
+import { getCurrentUserId } from "@/lib/auth/requestContext";
 import { sqlQuery, sqlExecute } from "@/lib/db";
 import { z } from "zod";
 import { getCurrentTimestamp } from "@/lib/utils/dateTime";
@@ -12,27 +13,28 @@ const supplierSchema = z.object({
   address: z.string().optional(),
 });
 
-async function getHandler(req: NextRequest) {
+async function getHandler(req: AuthRequest) {
   try {
+    const userId = getCurrentUserId(req);
     const { searchParams } = new URL(req.url);
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "25");
     const search = searchParams.get("search") || "";
     const offset = (page - 1) * limit;
 
-    // Build search condition
+    const baseWhere = "user_id = ?";
     const searchCondition = search
-      ? "WHERE name LIKE ? OR contact_person LIKE ? OR phone LIKE ?"
+      ? "AND (name LIKE ? OR contact_person LIKE ? OR phone LIKE ?)"
       : "";
     const searchArgs = search
-      ? [`%${search}%`, `%${search}%`, `%${search}%`]
-      : [];
+      ? [userId, `%${search}%`, `%${search}%`, `%${search}%`]
+      : [userId];
 
-    const countSql = `SELECT COUNT(*)::bigint as total FROM suppliers ${searchCondition || "WHERE 1=1"}`;
+    const countSql = `SELECT COUNT(*)::bigint as total FROM suppliers WHERE ${baseWhere} ${searchCondition}`;
     const countRows = await sqlQuery<{ total: number }>(countSql, searchArgs);
     const total = Number(countRows[0]?.total ?? 0);
 
-    const dataSql = `SELECT * FROM suppliers ${searchCondition || "WHERE 1=1"} ORDER BY name LIMIT ? OFFSET ?`;
+    const dataSql = `SELECT * FROM suppliers WHERE ${baseWhere} ${searchCondition} ORDER BY name LIMIT ? OFFSET ?`;
     const resultRows = await sqlQuery(dataSql, [...searchArgs, limit, offset]);
 
     const suppliersWithLedger = await Promise.all(
@@ -42,8 +44,8 @@ async function getHandler(req: NextRequest) {
         const purchasesRows = await sqlQuery<{ total_purchases: number }>(
           `SELECT COALESCE(SUM(total_amount), 0) as total_purchases
                 FROM purchase_orders
-                WHERE supplier_id = ? AND status = 'completed'`,
-          [supplierData.id]
+                WHERE supplier_id = ? AND user_id = ? AND status = 'completed'`,
+          [supplierData.id, userId]
         );
         const totalPurchases = Number(purchasesRows[0]?.total_purchases ?? 0);
 
@@ -84,14 +86,16 @@ async function getHandler(req: NextRequest) {
   }
 }
 
-async function postHandler(req: NextRequest) {
+async function postHandler(req: AuthRequest) {
   try {
+    const userId = getCurrentUserId(req);
     const body = await req.json();
     const validated = supplierSchema.parse(body);
 
     const rows = await sqlQuery(
-      "INSERT INTO suppliers (name, contact_person, email, phone, address, created_at) VALUES (?, ?, ?, ?, ?, ?) RETURNING *",
+      "INSERT INTO suppliers (user_id, name, contact_person, email, phone, address, created_at) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING *",
       [
+        userId,
         validated.name,
         validated.contact_person || null,
         validated.email || null,
@@ -117,13 +121,14 @@ async function postHandler(req: NextRequest) {
   }
 }
 
-async function deleteHandler(req: NextRequest) {
+async function deleteHandler(req: AuthRequest) {
   try {
+    const userId = getCurrentUserId(req);
     const { searchParams } = new URL(req.url);
     const deleteAll = searchParams.get("delete_all") === "true";
 
     if (deleteAll) {
-      await sqlExecute("DELETE FROM suppliers", []);
+      await sqlExecute("DELETE FROM suppliers WHERE user_id = ?", [userId]);
       return NextResponse.json({
         message: "All suppliers deleted successfully",
       });
@@ -139,6 +144,6 @@ async function deleteHandler(req: NextRequest) {
   }
 }
 
-export const GET = requireAuth(getHandler);
-export const POST = requireAuth(postHandler);
-export const DELETE = requireAuth(deleteHandler);
+export const GET = requireAuth(getHandler, { requiredFeature: "suppliers" });
+export const POST = requireAuth(postHandler, { requiredFeature: "suppliers" });
+export const DELETE = requireAuth(deleteHandler, { requiredFeature: "suppliers" });

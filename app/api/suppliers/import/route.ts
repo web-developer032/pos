@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/middleware/auth";
+import { NextResponse } from "next/server";
+import { requireAuth, type AuthRequest } from "@/lib/middleware/auth";
+import { getCurrentUserId } from "@/lib/auth/requestContext";
 import { sqlExecute } from "@/lib/db";
 import { z } from "zod";
 
@@ -15,8 +16,9 @@ const importSchema = z.object({
   suppliers: z.array(supplierSchema),
 });
 
-async function postHandler(req: NextRequest) {
+async function postHandler(req: AuthRequest) {
   try {
+    const userId = getCurrentUserId(req);
     const body = await req.json();
     const validated = importSchema.parse(body);
 
@@ -27,8 +29,9 @@ async function postHandler(req: NextRequest) {
       const supplier = validated.suppliers[i];
       try {
         await sqlExecute(
-          "INSERT INTO suppliers (name, contact_person, email, phone, address) VALUES (?, ?, ?, ?, ?)",
+          "INSERT INTO suppliers (user_id, name, contact_person, email, phone, address) VALUES (?, ?, ?, ?, ?, ?)",
           [
+            userId,
             supplier.name,
             supplier.contact_person || null,
             supplier.email || null,
@@ -64,4 +67,4 @@ async function postHandler(req: NextRequest) {
   }
 }
 
-export const POST = requireAuth(postHandler);
+export const POST = requireAuth(postHandler, { requiredFeature: "suppliers" });

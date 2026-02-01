@@ -1,9 +1,11 @@
-import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/middleware/auth";
+import { NextResponse } from "next/server";
+import { requireAuth, type AuthRequest } from "@/lib/middleware/auth";
+import { getCurrentUserId } from "@/lib/auth/requestContext";
 import { sqlQuery } from "@/lib/db";
 
-async function getHandler(req: NextRequest) {
+async function getHandler(req: AuthRequest) {
   try {
+    const userId = getCurrentUserId(req);
     const { searchParams } = new URL(req.url);
     const startDate = searchParams.get("start_date");
     const endDate = searchParams.get("end_date");
@@ -15,9 +17,9 @@ async function getHandler(req: NextRequest) {
         COALESCE(SUM(final_amount), 0) as total_revenue,
         COALESCE(AVG(final_amount), 0) as average_order_value
       FROM sales
-      WHERE 1=1
+      WHERE user_id = ?
     `;
-    const args: (string | number)[] = [];
+    const args: (string | number)[] = [userId];
 
     if (startDate) {
       sql += " AND created_at >= ?";
@@ -41,4 +43,4 @@ async function getHandler(req: NextRequest) {
   }
 }
 
-export const GET = requireAuth(getHandler);
+export const GET = requireAuth(getHandler, { requiredFeature: "reports" });

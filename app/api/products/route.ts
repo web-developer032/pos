@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/middleware/auth";
+import { NextResponse } from "next/server";
+import { requireAuth, type AuthRequest } from "@/lib/middleware/auth";
+import { getCurrentUserId } from "@/lib/auth/requestContext";
 import { sqlQuery, sqlExecute } from "@/lib/db";
 import { z } from "zod";
 import {
@@ -65,8 +66,9 @@ const productSchema = z
     }
   );
 
-async function getHandler(req: NextRequest) {
+async function getHandler(req: AuthRequest) {
   try {
+    const userId = getCurrentUserId(req);
     const { searchParams } = new URL(req.url);
     const categoryId = searchParams.get("category_id");
     const search = searchParams.get("search");
@@ -77,11 +79,11 @@ async function getHandler(req: NextRequest) {
              c.name as category_name,
              bp.stock_quantity as base_product_stock
       FROM products p
-      LEFT JOIN categories c ON p.category_id = c.id
-      LEFT JOIN products bp ON p.base_product_id = bp.id
-      WHERE p.deleted_at IS NULL
+      LEFT JOIN categories c ON p.category_id = c.id AND c.user_id = ?
+      LEFT JOIN products bp ON p.base_product_id = bp.id AND bp.user_id = ?
+      WHERE p.deleted_at IS NULL AND p.user_id = ?
     `;
-    const args: (string | number)[] = [];
+    const args: (string | number)[] = [userId, userId, userId];
 
     if (categoryId) {
       sql += " AND p.category_id = ?";
@@ -150,15 +152,16 @@ async function getHandler(req: NextRequest) {
   }
 }
 
-async function postHandler(req: NextRequest) {
+async function postHandler(req: AuthRequest) {
   try {
+    const userId = getCurrentUserId(req);
     const body = await req.json();
     const validated = productSchema.parse(body);
 
     if (validated.base_product_id) {
       const baseProductRows = await sqlQuery(
-        "SELECT id, sku, base_product_id FROM products WHERE id = ? AND deleted_at IS NULL",
-        [validated.base_product_id]
+        "SELECT id, sku, base_product_id FROM products WHERE id = ? AND user_id = ? AND deleted_at IS NULL",
+        [validated.base_product_id, userId]
       );
       if (baseProductRows.length === 0) {
         return NextResponse.json(
@@ -188,11 +191,12 @@ async function postHandler(req: NextRequest) {
     }
 
     const insertRows = await sqlQuery<{ id: number }>(
-      `INSERT INTO products (name, barcode, sku, description, category_id, 
+      `INSERT INTO products (user_id, name, barcode, sku, description, category_id, 
             cost_price, selling_price, stock_quantity, min_stock_level, unit, image_url,
             base_product_id, quantity_multiplier, created_at, updated_at) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
       [
+        userId,
         validated.name,
         validated.barcode || null,
         validated.sku || null,
@@ -232,8 +236,8 @@ async function postHandler(req: NextRequest) {
     }
 
     const productRows = await sqlQuery(
-      "SELECT * FROM products WHERE id = ?",
-      [productId]
+      "SELECT * FROM products WHERE id = ? AND user_id = ?",
+      [productId, userId]
     );
     return NextResponse.json({ product: productRows[0] }, { status: 201 });
   } catch (error) {
@@ -243,15 +247,16 @@ async function postHandler(req: NextRequest) {
   }
 }
 
-async function deleteHandler(req: NextRequest) {
+async function deleteHandler(req: AuthRequest) {
   try {
+    const userId = getCurrentUserId(req);
     const { searchParams } = new URL(req.url);
     const deleteAll = searchParams.get("delete_all") === "true";
 
     if (deleteAll) {
       await sqlExecute(
-        "UPDATE products SET deleted_at = CURRENT_TIMESTAMP WHERE deleted_at IS NULL",
-        []
+        "UPDATE products SET deleted_at = CURRENT_TIMESTAMP WHERE deleted_at IS NULL AND user_id = ?",
+        [userId]
       );
 
       return NextResponse.json({
@@ -265,6 +270,6 @@ async function deleteHandler(req: NextRequest) {
   }
 }
 
-export const GET = requireAuth(getHandler);
-export const POST = requireAuth(postHandler);
-export const DELETE = requireAuth(deleteHandler);
+export const GET = requireAuth(getHandler, { requiredFeature: "products" });
+export const POST = requireAuth(postHandler, { requiredFeature: "products" });
+export const DELETE = requireAuth(deleteHandler, { requiredFeature: "products" });

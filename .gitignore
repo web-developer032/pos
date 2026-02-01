@@ -26,7 +26,6 @@ yarn-error.log*
 
 # local env files
 .env*.local
-.env
 
 # vercel
 .vercel
@@ -43,3 +42,4 @@ data/db
 
 # Prisma 7 generated client (created at build by prisma generate)
 prisma/generated
+config.bat

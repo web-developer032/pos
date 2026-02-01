@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { requireAuth, AuthRequest } from "@/lib/middleware/auth";
+import { getCurrentUserId } from "@/lib/auth/requestContext";
 import { sqlQuery } from "@/lib/db";
 import {
   serializeSession,
@@ -6,16 +8,15 @@ import {
   SESSION_SELECT_SQL,
 } from "@/lib/utils/cashRegisterHelpers";
 
-// Disable caching for this route - session state must always be fresh
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-// GET /api/cash-register/current - Get current open session
-export async function GET() {
+async function getHandler(req: AuthRequest) {
   try {
+    const userId = getCurrentUserId(req);
     const rows = await sqlQuery<SessionRow>(
-      `${SESSION_SELECT_SQL} WHERE crs.status = 'open' ORDER BY crs.opened_at DESC LIMIT 1`,
-      []
+      `${SESSION_SELECT_SQL} WHERE crs.status = 'open' AND crs.user_id = ? ORDER BY crs.opened_at DESC LIMIT 1`,
+      [userId]
     );
 
     if (rows.length === 0) {
@@ -34,3 +35,5 @@ export async function GET() {
     );
   }
 }
+
+export const GET = requireAuth(getHandler, { requiredFeature: "cash_register" });

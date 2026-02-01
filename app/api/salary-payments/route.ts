@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { requireAuth, AuthRequest } from "@/lib/middleware/auth";
+import { getCurrentUserId } from "@/lib/auth/requestContext";
 import { sqlQuery } from "@/lib/db";
 import { z } from "zod";
 import { handleApiError, handleValidationError } from "@/lib/utils/apiHelpers";
@@ -15,8 +16,9 @@ const salaryPaymentSchema = z.object({
   notes: z.string().optional(),
 });
 
-async function getHandler(req: NextRequest) {
+async function getHandler(req: AuthRequest) {
   try {
+    const userId = getCurrentUserId(req);
     const { searchParams } = new URL(req.url);
     const employeeId = searchParams.get("employee_id");
     const period = searchParams.get("period");
@@ -27,8 +29,8 @@ async function getHandler(req: NextRequest) {
     const limit = parseInt(searchParams.get("limit") || "20");
     const offset = (page - 1) * limit;
 
-    let whereClause = " WHERE 1=1";
-    const args: (string | number)[] = [];
+    let whereClause = " WHERE sp.user_id = ? AND e.user_id = ?";
+    const args: (string | number)[] = [userId, userId];
 
     if (employeeId) {
       whereClause += " AND sp.employee_id = ?";
@@ -109,8 +111,8 @@ async function postHandler(req: AuthRequest) {
     }
 
     const employeeRows = await sqlQuery(
-      "SELECT id, name FROM employees WHERE id = ?",
-      [validated.employee_id]
+      "SELECT id, name FROM employees WHERE id = ? AND user_id = ?",
+      [validated.employee_id, user.userId]
     );
 
     if (employeeRows.length === 0) {
@@ -146,5 +148,5 @@ async function postHandler(req: AuthRequest) {
   }
 }
 
-export const GET = requireAuth(getHandler);
-export const POST = requireAuth(postHandler);
+export const GET = requireAuth(getHandler, { requiredFeature: "finance" });
+export const POST = requireAuth(postHandler, { requiredFeature: "finance" });

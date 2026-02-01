@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAuth, AuthRequest, RouteContext } from "@/lib/middleware/auth";
+import { getCurrentUserId } from "@/lib/auth/requestContext";
 import { sqlQuery, sqlExecute } from "@/lib/db";
 import { z } from "zod";
 import { handleApiError, handleValidationError } from "@/lib/utils/apiHelpers";
@@ -18,6 +19,7 @@ const updateSchema = z.object({
 
 async function getHandler(req: AuthRequest, context?: RouteContext) {
   try {
+    const userId = getCurrentUserId(req);
     const { id } = await context!.params;
     const employeeId = parseInt(id);
 
@@ -30,8 +32,8 @@ async function getHandler(req: AuthRequest, context?: RouteContext) {
           (SELECT COALESCE(SUM(CASE WHEN payment_type IN ('salary', 'bonus') THEN amount ELSE -amount END), 0)
            FROM salary_payments sp WHERE sp.employee_id = e.id) as total_paid
         FROM employees e
-        WHERE e.id = ?`,
-      [employeeId]
+        WHERE e.id = ? AND e.user_id = ?`,
+      [employeeId, userId]
     );
 
     if (rows.length === 0) {
@@ -45,10 +47,10 @@ async function getHandler(req: AuthRequest, context?: RouteContext) {
       `SELECT sp.*, u.username as user_name
         FROM salary_payments sp
         LEFT JOIN users u ON sp.user_id = u.id
-        WHERE sp.employee_id = ?
+        WHERE sp.employee_id = ? AND sp.user_id = ?
         ORDER BY sp.created_at DESC
         LIMIT 10`,
-      [employeeId]
+      [employeeId, userId]
     );
 
     return NextResponse.json({
@@ -62,6 +64,7 @@ async function getHandler(req: AuthRequest, context?: RouteContext) {
 
 async function putHandler(req: AuthRequest, context?: RouteContext) {
   try {
+    const userId = getCurrentUserId(req);
     const { id } = await context!.params;
     const employeeId = parseInt(id);
 
@@ -73,8 +76,8 @@ async function putHandler(req: AuthRequest, context?: RouteContext) {
     const validated = updateSchema.parse(body);
 
     const existingRows = await sqlQuery(
-      "SELECT id FROM employees WHERE id = ?",
-      [employeeId]
+      "SELECT id FROM employees WHERE id = ? AND user_id = ?",
+      [employeeId, userId]
     );
 
     if (existingRows.length === 0) {
@@ -120,10 +123,10 @@ async function putHandler(req: AuthRequest, context?: RouteContext) {
       args.push(validated.notes || null);
     }
 
-    args.push(employeeId);
+    args.push(employeeId, userId);
 
     const updatedRows = await sqlQuery(
-      `UPDATE employees SET ${updates.join(", ")} WHERE id = ? RETURNING *`,
+      `UPDATE employees SET ${updates.join(", ")} WHERE id = ? AND user_id = ? RETURNING *`,
       args
     );
 
@@ -137,6 +140,7 @@ async function putHandler(req: AuthRequest, context?: RouteContext) {
 
 async function deleteHandler(req: AuthRequest, context?: RouteContext) {
   try {
+    const userId = getCurrentUserId(req);
     const { id } = await context!.params;
     const employeeId = parseInt(id);
 
@@ -145,8 +149,8 @@ async function deleteHandler(req: AuthRequest, context?: RouteContext) {
     }
 
     const existingRows = await sqlQuery(
-      "SELECT id FROM employees WHERE id = ?",
-      [employeeId]
+      "SELECT id FROM employees WHERE id = ? AND user_id = ?",
+      [employeeId, userId]
     );
 
     if (existingRows.length === 0) {
@@ -163,16 +167,16 @@ async function deleteHandler(req: AuthRequest, context?: RouteContext) {
     const paymentCount = Number(countRows[0]?.count ?? 0);
 
     if (paymentCount > 0) {
-      await sqlExecute(
-        "UPDATE employees SET status = 'inactive', updated_at = ? WHERE id = ?",
-        [getCurrentTimestamp(), employeeId]
-      );
+    await sqlExecute(
+      "UPDATE employees SET status = 'inactive', updated_at = ? WHERE id = ? AND user_id = ?",
+      [getCurrentTimestamp(), employeeId, userId]
+    );
       return NextResponse.json({
         message: "Employee deactivated (has payment history)",
       });
     }
 
-    await sqlExecute("DELETE FROM employees WHERE id = ?", [employeeId]);
+    await sqlExecute("DELETE FROM employees WHERE id = ? AND user_id = ?", [employeeId, userId]);
 
     return NextResponse.json({ message: "Employee deleted successfully" });
   } catch (error) {
@@ -180,6 +184,6 @@ async function deleteHandler(req: AuthRequest, context?: RouteContext) {
   }
 }
 
-export const GET = requireAuth(getHandler);
-export const PUT = requireAuth(putHandler);
-export const DELETE = requireAuth(deleteHandler);
+export const GET = requireAuth(getHandler, { requiredFeature: "employees" });
+export const PUT = requireAuth(putHandler, { requiredFeature: "employees" });
+export const DELETE = requireAuth(deleteHandler, { requiredFeature: "employees" });

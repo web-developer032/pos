@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { verifyPassword, generateToken } from "@/lib/auth/auth";
+import { getActiveSubscription } from "@/lib/auth/subscription";
 import { z } from "zod";
 
 const loginSchema = z.object({
@@ -35,6 +36,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const subscription = await getActiveSubscription(user.id);
+
     // Generate token
     const token = generateToken({
       userId: user.id,
@@ -42,7 +45,7 @@ export async function POST(request: NextRequest) {
       role: user.role,
     });
 
-    // Create response with JSON data
+    // Create response with JSON data (include plan/subscription for frontend)
     const response = NextResponse.json({
       token,
       user: {
@@ -50,6 +53,10 @@ export async function POST(request: NextRequest) {
         username: user.username,
         email: user.email,
         role: user.role,
+        plan: subscription?.plan ?? null,
+        subscriptionInterval: subscription?.interval ?? null,
+        subscriptionStatus: subscription?.status ?? null,
+        features: subscription?.features ?? [],
       },
     });
 

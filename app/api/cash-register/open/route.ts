@@ -1,5 +1,7 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { z } from "zod";
+import { requireAuth, AuthRequest } from "@/lib/middleware/auth";
+import { getCurrentUserId } from "@/lib/auth/requestContext";
 import { prisma } from "@/lib/db";
 import {
   serializeSession,
@@ -10,17 +12,17 @@ export const dynamic = "force-dynamic";
 
 const openSessionSchema = z.object({
   opening_balance: z.number().min(0, "Opening balance must be non-negative"),
-  user_id: z.number().int().positive("User ID is required"),
   notes: z.string().optional(),
 });
 
-export async function POST(request: NextRequest) {
+async function postHandler(req: AuthRequest) {
   try {
-    const body = await request.json();
+    const userId = getCurrentUserId(req);
+    const body = await req.json();
     const validatedData = openSessionSchema.parse(body);
 
     const existing = await prisma.cashRegisterSession.findFirst({
-      where: { status: "open" },
+      where: { status: "open", userId },
     });
     if (existing) {
       return NextResponse.json(
@@ -31,7 +33,7 @@ export async function POST(request: NextRequest) {
 
     const session = await prisma.cashRegisterSession.create({
       data: {
-        userId: validatedData.user_id,
+        userId,
         openingBalance: validatedData.opening_balance,
         status: "open",
         notes: validatedData.notes ?? null,
@@ -71,3 +73,5 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+
+export const POST = requireAuth(postHandler, { requiredFeature: "cash_register" });

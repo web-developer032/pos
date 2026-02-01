@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth, AuthRequest } from "@/lib/middleware/auth";
 import { prisma } from "@/lib/db";
+import { getActiveSubscription } from "@/lib/auth/subscription";
 
 async function handler(req: AuthRequest) {
   const user = req.user;
@@ -17,8 +18,19 @@ async function handler(req: AuthRequest) {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
   }
 
+  const subscription = await getActiveSubscription(dbUser.id);
+
   return NextResponse.json({
-    user: dbUser,
+    user: {
+      id: dbUser.id,
+      username: dbUser.username,
+      email: dbUser.email,
+      role: dbUser.role,
+      plan: subscription?.plan ?? null,
+      subscriptionInterval: subscription?.interval ?? null,
+      subscriptionStatus: subscription?.status ?? null,
+      features: subscription?.features ?? [],
+    },
   });
 }
 

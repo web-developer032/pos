@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
+import { requireAuth, AuthRequest } from "@/lib/middleware/auth";
+import { getCurrentUserId } from "@/lib/auth/requestContext";
 import { sqlQuery } from "@/lib/db";
 
-// Disable caching for this route - summary must always be fresh
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
@@ -39,16 +40,16 @@ const EMPTY_SUMMARY = {
   },
 };
 
-// GET /api/cash-register/summary - Get current day summary
-export async function GET() {
+async function getHandler(req: AuthRequest) {
   try {
+    const userId = getCurrentUserId(req);
     const openSessionRows = await sqlQuery<{
       id: number;
       opening_balance: number;
       opened_at: string;
     }>(
-      `SELECT id, opening_balance, opened_at FROM cash_register_sessions WHERE status = 'open' LIMIT 1`,
-      []
+      `SELECT id, opening_balance, opened_at FROM cash_register_sessions WHERE status = 'open' AND user_id = ? LIMIT 1`,
+      [userId]
     );
 
     if (openSessionRows.length === 0) {
@@ -75,10 +76,10 @@ export async function GET() {
                COALESCE(SUM((SELECT SUM((si.unit_price - si.cost_price) * si.quantity) 
                              FROM sale_items si WHERE si.sale_id = sales.id)), 0) as gross_profit
         FROM sales
-        WHERE created_at >= ?
+        WHERE user_id = ? AND created_at >= ?
         GROUP BY payment_method
       `,
-      [openedAt]
+      [userId, openedAt]
     );
 
     const returnedProfitResult = await sqlQuery<{ returned_profit: number }>(
@@ -87,9 +88,9 @@ export async function GET() {
         FROM returns r
         JOIN return_items ri ON r.id = ri.return_id
         JOIN sale_items si ON ri.sale_item_id = si.id
-        WHERE r.created_at >= ?
+        WHERE r.user_id = ? AND r.created_at >= ?
       `,
-      [openedAt]
+      [userId, openedAt]
     );
 
     const returnedProfit = Number(
@@ -101,8 +102,8 @@ export async function GET() {
       total_amount: number;
     }>(
       `SELECT COUNT(*) as transaction_count, COALESCE(SUM(final_amount), 0) as total_amount
-            FROM sales WHERE created_at >= ?`,
-      [openedAt]
+            FROM sales WHERE user_id = ? AND created_at >= ?`,
+      [userId, openedAt]
     );
 
     const returnsByMethodResult = await sqlQuery<{
@@ -111,8 +112,8 @@ export async function GET() {
       total_refund: number;
     }>(
       `SELECT refund_method, COUNT(*) as return_count, COALESCE(SUM(refund_amount), 0) as total_refund
-            FROM returns WHERE created_at >= ? GROUP BY refund_method`,
-      [openedAt]
+            FROM returns WHERE user_id = ? AND created_at >= ? GROUP BY refund_method`,
+      [userId, openedAt]
     );
 
     const totalReturnsResult = await sqlQuery<{
@@ -120,8 +121,8 @@ export async function GET() {
       total_refund: number;
     }>(
       `SELECT COUNT(*) as return_count, COALESCE(SUM(refund_amount), 0) as total_refund
-            FROM returns WHERE created_at >= ?`,
-      [openedAt]
+            FROM returns WHERE user_id = ? AND created_at >= ?`,
+      [userId, openedAt]
     );
 
     const expensesByMethodResult = await sqlQuery<{
@@ -131,8 +132,8 @@ export async function GET() {
       total_amount: number;
     }>(
       `SELECT payment_method, category, COUNT(*) as expense_count, COALESCE(SUM(amount), 0) as total_amount
-            FROM expenses WHERE created_at >= ? GROUP BY payment_method, category`,
-      [openedAt]
+            FROM expenses WHERE user_id = ? AND created_at >= ? GROUP BY payment_method, category`,
+      [userId, openedAt]
     );
 
     const totalExpensesResult = await sqlQuery<{
@@ -140,8 +141,8 @@ export async function GET() {
       total_amount: number;
     }>(
       `SELECT COUNT(*) as expense_count, COALESCE(SUM(amount), 0) as total_amount
-            FROM expenses WHERE created_at >= ?`,
-      [openedAt]
+            FROM expenses WHERE user_id = ? AND created_at >= ?`,
+      [userId, openedAt]
     );
 
     const cashSalesRow = salesByMethodResult.find(
@@ -216,3 +217,5 @@ export async function GET() {
     );
   }
 }
+
+export const GET = requireAuth(getHandler, { requiredFeature: "cash_register" });
